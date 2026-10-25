@@ -17,7 +17,7 @@
   &__card {
     position: relative;
     z-index: 1;
-    background: #151521;
+    background: var(--color-surface);
     border-radius: 16px;
     padding: 48px 64px;
     display: flex;
@@ -34,8 +34,8 @@
     width: 56px;
     height: 56px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--color-surface-secondary);
+    color: var(--color-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -46,13 +46,13 @@
 
   &__subtitle {
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-muted-text);
     font-weight: 400;
   }
 
   &__title {
     font-size: 20px;
-    color: #fff;
+    color: var(--color-text);
     font-weight: 500;
   }
 }

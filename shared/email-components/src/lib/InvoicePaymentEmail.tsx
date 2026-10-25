@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+import { CSSProperties } from "react";
 import {
   Button,
   Section,
@@ -7,10 +7,10 @@ import {
   Row,
   Column,
   render,
-} from '@react-email/components';
-import isEmpty from 'lodash.isempty';
-import { EmailTemplateLayout } from './EmailTemplateLayout';
-import { EmailTemplate } from './EmailTemplate';
+} from "@react-email/components";
+import isEmpty from "lodash.isempty";
+import { EmailTemplateLayout } from "./EmailTemplateLayout";
+import { EmailTemplate } from "./EmailTemplate";
 
 export interface InvoicePaymentEmailProps {
   preview: string;
@@ -74,7 +74,7 @@ export const InvoicePaymentEmail: React.FC<
   companyLogoUri,
 
   // # Colors
-  primaryColor = 'rgb(0, 82, 204)',
+  primaryColor = "#1f6f5c",
 
   // # Invoice amount
   invoiceAmount,
@@ -84,34 +84,34 @@ export const InvoicePaymentEmail: React.FC<
 
   // # Due date
   dueDate,
-  dueDateLabel = 'Due {dueDate}',
+  dueDateLabel = "Due {dueDate}",
 
   // # Invoice number
   invoiceNumber,
-  invoiceNumberLabel = 'Invoice # {invoiceNumber}',
+  invoiceNumberLabel = "Invoice # {invoiceNumber}",
 
   // # invoice total
   total,
-  totalLabel = 'Total',
+  totalLabel = "Total",
 
   // # Subtotal
   subtotal,
-  subtotalLabel = 'Subtotal',
+  subtotalLabel = "Subtotal",
 
   // # Discount
   discount,
-  discountLabel = 'Discount',
+  discountLabel = "Discount",
 
   // # Adjustment
   adjustment,
-  adjustmentLabel = 'Adjustment',
+  adjustmentLabel = "Adjustment",
 
   // # Invoice due amount
-  dueAmountLabel = 'Due Amount',
+  dueAmountLabel = "Due Amount",
   dueAmount,
 
   // # View invoice button
-  viewInvoiceButtonLabel = 'View Invoice',
+  viewInvoiceButtonLabel = "View Invoice",
   viewInvoiceButtonUrl,
 
   items,
@@ -131,12 +131,12 @@ export const InvoicePaymentEmail: React.FC<
             </Row>
             <Row>
               <Text style={invoiceNumberStyle}>
-                {invoiceNumberLabel?.replace('{invoiceNumber}', invoiceNumber)}
+                {invoiceNumberLabel?.replace("{invoiceNumber}", invoiceNumber)}
               </Text>
             </Row>
             <Row>
               <Text style={invoiceDateStyle}>
-                {dueDateLabel.replace('{dueDate}', dueDate)}
+                {dueDateLabel.replace("{dueDate}", dueDate)}
               </Text>
             </Row>
           </Section>
@@ -155,11 +155,11 @@ export const InvoicePaymentEmail: React.FC<
           <Section style={totalsSectionStyle}>
             {items.map((item, index) => (
               <Row key={index} style={itemLineRowStyle}>
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemLabelStyle}>{item.label}</Text>
                 </Column>
 
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemAmountStyle}>
                     {item.quantity} x {item.rate}
                   </Text>
@@ -168,22 +168,22 @@ export const InvoicePaymentEmail: React.FC<
             ))}
 
             <Row style={totalLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={totalLineItemLabelStyle}>{subtotalLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={totalLineItemAmountStyle}>{subtotal}</Text>
               </Column>
             </Row>
 
             {!isEmpty(discount) && (
               <Row style={lineRowStyle}>
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemLabelStyle}>{discountLabel}</Text>
                 </Column>
 
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemAmountStyle}>{discount}</Text>
                 </Column>
               </Row>
@@ -191,34 +191,34 @@ export const InvoicePaymentEmail: React.FC<
 
             {!isEmpty(adjustment) && (
               <Row style={lineRowStyle}>
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemLabelStyle}>{adjustmentLabel}</Text>
                 </Column>
 
-                <Column width={'50%'}>
+                <Column width={"50%"}>
                   <Text style={listItemAmountStyle}>{adjustment}</Text>
                 </Column>
               </Row>
             )}
 
             <Row style={totalLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={totalLineItemLabelStyle}>{totalLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={totalLineItemAmountStyle}>{total}</Text>
               </Column>
             </Row>
 
             <Row style={dueAmounLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={dueAmountLineItemLabelStyle}>
                   {dueAmountLabel}
                 </Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={dueAmountLineItemAmountStyle}>{dueAmount}</Text>
               </Column>
             </Row>
@@ -235,44 +235,44 @@ export const renderInvoicePaymentEmail = (props: InvoicePaymentEmailProps) => {
 };
 
 const headerInfoStyle: CSSProperties = {
-  textAlign: 'center',
+  textAlign: "center",
   marginBottom: 20,
 };
 const mainSectionStyle: CSSProperties = {};
 
 const invoiceAmountStyle: CSSProperties = {
   margin: 0,
-  color: '#383E47',
+  color: "#383E47",
   fontWeight: 500,
 };
 const invoiceNumberStyle: CSSProperties = {
   margin: 0,
-  fontSize: '13px',
-  color: '#404854',
+  fontSize: "13px",
+  color: "#404854",
 };
 const invoiceDateStyle: CSSProperties = {
   margin: 0,
-  fontSize: '13px',
-  color: '#404854',
+  fontSize: "13px",
+  color: "#404854",
 };
 
 const invoiceCompanyNameStyle: CSSProperties = {
   margin: 0,
-  fontSize: '18px',
+  fontSize: "18px",
   fontWeight: 500,
-  color: '#404854',
+  color: "#404854",
 };
 
 const viewInvoiceButtonStyle: CSSProperties = {
-  display: 'block',
-  cursor: 'pointer',
-  textAlign: 'center',
+  display: "block",
+  cursor: "pointer",
+  textAlign: "center",
   fontSize: 16,
-  padding: '10px 15px',
-  lineHeight: '1',
-  backgroundColor: 'rgb(0, 82, 204)',
-  color: '#fff',
-  borderRadius: '5px',
+  padding: "10px 15px",
+  lineHeight: "1",
+  backgroundColor: "#1f6f5c",
+  color: "#fff",
+  borderRadius: "5px",
 };
 
 const listItemLabelStyle: CSSProperties = {
@@ -281,28 +281,28 @@ const listItemLabelStyle: CSSProperties = {
 
 const listItemAmountStyle: CSSProperties = {
   margin: 0,
-  textAlign: 'right',
+  textAlign: "right",
 };
 
 const invoiceMessageStyle: CSSProperties = {
-  whiteSpace: 'pre-line',
-  color: '#000',
-  margin: '0 0 20px 0',
-  lineHeight: '20px',
+  whiteSpace: "pre-line",
+  color: "#000",
+  margin: "0 0 20px 0",
+  lineHeight: "20px",
 };
 
 const dueAmounLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #000',
+  borderBottom: "1px solid #000",
   height: 40,
 };
 
 const lineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #D9D9D9',
+  borderBottom: "1px solid #D9D9D9",
   height: 40,
 };
 
 const totalLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #000',
+  borderBottom: "1px solid #000",
   height: 40,
 };
 
@@ -327,11 +327,11 @@ const dueAmountLineItemAmountStyle: CSSProperties = {
 };
 
 const itemLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #D9D9D9',
+  borderBottom: "1px solid #D9D9D9",
   height: 40,
 };
 
 const totalsSectionStyle = {
-  marginTop: '20px',
-  borderTop: '1px solid #D9D9D9',
+  marginTop: "20px",
+  borderTop: "1px solid #D9D9D9",
 };

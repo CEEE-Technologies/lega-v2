@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useLayoutEffect } from 'react';
 import { createSelector } from 'reselect';
 import type { RootState } from '@/store/reducers';
 import type { AnyAction } from 'redux';
@@ -44,6 +44,16 @@ export const useSplashLoading = () => {
     useDispatchAction(splashStopLoading),
   ];
 };
+
+/** Balance each boot task even when it finishes from cache or unmounts. */
+export function useSplashLoadingState(isLoading: boolean) {
+  const [startLoading, stopLoading] = useSplashLoading();
+  useLayoutEffect(() => {
+    if (!isLoading) return;
+    startLoading();
+    return stopLoading;
+  }, [isLoading, startLoading, stopLoading]);
+}
 
 /**
  * Sidebar submenu actions.

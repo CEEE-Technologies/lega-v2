@@ -1,0 +1,22 @@
+.lega-logo {
+  display: inline-block;
+  vertical-align: middle;
+  width: var(--lega-logo-width);
+  height: calc(var(--lega-logo-width) * 0.345);
+  flex-shrink: 0;
+  color: var(--color-primary);
+  background-color: currentColor;
+  mask: url('/brand/lega-logo.png') left center / 100% 100% no-repeat;
+  -webkit-mask: url('/brand/lega-logo.png') left center / 100% 100% no-repeat;
+
+  &--white {
+    color: #fff;
+  }
+
+  &--symbol {
+    width: var(--lega-logo-width);
+    height: calc(var(--lega-logo-width) * 345 / 262);
+    mask-size: calc(var(--lega-logo-width) * 1000 / 262) 100%;
+    -webkit-mask-size: calc(var(--lega-logo-width) * 1000 / 262) 100%;
+  }
+}

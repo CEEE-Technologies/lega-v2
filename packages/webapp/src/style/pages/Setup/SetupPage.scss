@@ -1,4 +1,4 @@
-@import "../../_base.scss";
+@import '../../_base.scss';
 
 .setup-page {
   display: grid;
@@ -35,7 +35,7 @@
         padding-left: 10px;
       }
 
-      &__header{
+      &__header {
         position: sticky;
         top: 0;
       }
@@ -58,14 +58,14 @@
         opacity: 0.55;
         margin-bottom: 10px;
         font-weight: 200;
-      } 
+      }
 
       &__organization {
         font-size: 16px;
         opacity: 0.75;
         margin-top: 2.4rem;
 
-        span>a {
+        span > a {
           text-decoration: underline;
           color: #ffffff;
           margin-top: 6px;
@@ -87,7 +87,7 @@
         gap: 10px;
         flex-wrap: wrap;
 
-        >div {
+        > div {
           font-size: 13px;
 
           a {
@@ -156,7 +156,7 @@
       &::before {
         background-color: #75859c;
       }
-      ~li {
+      ~ li {
         &:before,
         &:after {
           background: #e0e0e0;
@@ -164,7 +164,7 @@
       }
 
       p.wizard-info {
-        color: #004dd0;
+        color: var(--color-primary);
       }
     }
   }

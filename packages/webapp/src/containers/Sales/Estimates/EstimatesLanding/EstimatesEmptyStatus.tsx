@@ -4,6 +4,7 @@ import { useHistory } from 'react-router-dom';
 import { EmptyStatus } from '@/components';
 import { Can, FormattedMessage as T } from '@/components';
 import { SaleEstimateAction, AbilitySubject } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 
 export function EstimatesEmptyStatus() {
   const history = useHistory();
@@ -27,9 +28,17 @@ export function EstimatesEmptyStatus() {
             >
               <T id={'new_sale_estimate'} />
             </Button>
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

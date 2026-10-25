@@ -9,22 +9,12 @@ import { withDashboardActions } from '@/containers/Dashboard/withDashboardAction
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { withUniversalSearchActions } from '@/containers/UniversalSearch/withUniversalSearchActions';
 import { getDashboardRoutes } from '@/routes/dashboard';
+import { toggleColorTheme } from '@/utils/theme';
 
 interface GlobalHotkeyRoute {
   path: string;
   hotkey?: string;
 }
-
-// Toggle dark/light mode by toggling 'bp4-dark' class on body
-const handleToggleDarkMode = () => {
-  const body = document.body;
-
-  if (body.classList.contains('bp4-dark')) {
-    body.classList.remove('bp4-dark');
-  } else {
-    body.classList.add('bp4-dark');
-  }
-};
 
 type GlobalHotkeysProps = Pick<
   WithDashboardActionsProps,
@@ -80,7 +70,7 @@ function GlobalHotkeys({
     }, 0);
   });
   useHotkeys('shift+h', () => {
-    handleToggleDarkMode();
+    toggleColorTheme();
   });
 
   return <div></div>;

@@ -1,5 +1,5 @@
 import React from 'react';
-import BigcapitalLoading from './BigcapitalLoading';
+import LegaLoading from './LegaLoading';
 import { Choose } from '@/components';
 
 interface DashboardLoadingIndicatorProps {
@@ -19,7 +19,7 @@ export default function DashboardLoadingIndicator({
   return (
     <Choose>
       <Choose.When condition={isLoading}>
-        <BigcapitalLoading />
+        <LegaLoading />
       </Choose.When>
 
       <Choose.Otherwise>{children}</Choose.Otherwise>

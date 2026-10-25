@@ -26,7 +26,7 @@ function CreateWorkspaceDrawerRoot({
     <CreateWorkspaceDrawerContainer
       isOpen={isOpen}
       name={name}
-      size={'700px'}
+      size={'100%'}
       position={Position.TOP}
       payload={payload}
     >

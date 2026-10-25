@@ -42,9 +42,9 @@ describe('plaid config', () => {
 
   it('defaults the client name when PLAID_CLIENT_NAME is unset or empty', () => {
     delete process.env.PLAID_CLIENT_NAME;
-    expect(plaidConfig().clientName).toBe('Bigcapital');
+    expect(plaidConfig().clientName).toBe('LEGA');
 
     process.env.PLAID_CLIENT_NAME = '';
-    expect(plaidConfig().clientName).toBe('Bigcapital');
+    expect(plaidConfig().clientName).toBe('LEGA');
   });
 });

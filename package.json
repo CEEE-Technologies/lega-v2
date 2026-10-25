@@ -2,6 +2,7 @@
   "name": "bigcapital-monorepo",
   "private": true,
   "scripts": {
+    "qbo:import": "pnpm --filter @lega/qbo-import run cli",
     "dev": "lerna run dev",
     "build": "lerna run build",
     "typecheck": "lerna run typecheck",

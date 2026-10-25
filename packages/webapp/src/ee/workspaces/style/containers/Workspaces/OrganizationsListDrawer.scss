@@ -1,16 +1,16 @@
 @import '@/style/_base.scss';
 
-$organizations-drawer-border: rgba(255, 255, 255, 0.08);
+$organizations-drawer-border: var(--color-border);
 
 .organizations-list-table.bigcapital-datatable {
   --color-datatable-head-background: transparent;
-  --color-datatable-head-text: rgba(255, 255, 255, 0.45);
+  --color-datatable-head-text: var(--color-muted-text);
   --color-datatable-head-border: #{$organizations-drawer-border};
   --color-datatable-cell-border: #{$organizations-drawer-border};
-  --color-datatable-cell-hover-background: rgba(255, 255, 255, 0.04);
-  --color-datatable-no-results-text: rgba(255, 255, 255, 0.5);
-  --color-datatable-caret: rgba(255, 255, 255, 0.35);
-  --color-datatable-caret-hover: rgba(255, 255, 255, 0.55);
+  --color-datatable-cell-hover-background: var(--color-surface-secondary);
+  --color-datatable-no-results-text: var(--color-muted-text);
+  --color-datatable-caret: var(--color-muted-text);
+  --color-datatable-caret-hover: var(--color-muted-text);
 
   .table .thead .th {
     font-size: 13px;
@@ -29,15 +29,15 @@ $organizations-drawer-border: rgba(255, 255, 255, 0.08);
   .table .tbody .tr .td {
     padding-top: 12px;
     padding-bottom: 12px;
-    color: rgba(255, 255, 255, 0.78);
+    color: var(--color-text);
   }
 
   .sort-icon--desc {
-    border-bottom-color: rgba(255, 255, 255, 0.45) !important;
+    border-bottom-color: var(--color-muted-text) !important;
   }
 
   .sort-icon--asc {
-    border-top-color: rgba(255, 255, 255, 0.45) !important;
+    border-top-color: var(--color-muted-text) !important;
   }
 
   .th.align-right,
@@ -64,7 +64,7 @@ $organizations-drawer-border: rgba(255, 255, 255, 0.08);
     display: block;
     font-size: 11px;
     font-weight: 500;
-    color: rgba(17, 131, 218, 0.95);
+    color: var(--color-primary);
     letter-spacing: 0.02em;
   }
 
@@ -76,7 +76,7 @@ $organizations-drawer-border: rgba(255, 255, 255, 0.08);
   }
 
   .organizations-list-table__numeric-amount {
-    color: rgba(255, 255, 255, 0.78);
+    color: var(--color-text);
     font-variant-numeric: tabular-nums;
   }
 
@@ -102,7 +102,6 @@ $organizations-drawer-border: rgba(255, 255, 255, 0.08);
 // Workspace Delete Dialog Styles
 .workspace-delete-dialog {
   &__details {
-
     p {
       margin: 0 0 8px 0;
     }

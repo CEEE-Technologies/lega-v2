@@ -18,7 +18,8 @@ const pickClientEnv = (env: Record<string, string>) =>
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const rootDir = __dirname;
-  const env = loadEnv(mode, rootDir, '');
+  const envDir = path.resolve(rootDir, '../..');
+  const env = loadEnv(mode, envDir, '');
   const clientEnv = pickClientEnv(env);
   const port = Number(env.PORT) || 4000;
   const plugins: PluginOption[] = [
@@ -32,6 +33,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins,
     root: rootDir,
+    envDir,
     resolve: {
       alias: {
         '@': path.resolve(rootDir, 'src'),

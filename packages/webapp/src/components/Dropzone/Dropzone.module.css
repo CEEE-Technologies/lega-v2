@@ -15,15 +15,17 @@
   border-color: var(--color-dropzone-border);
   background: var(--color-dropzone-background);
   position: relative;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 
   &.dropzoneAccept {
-    border-color: rgb(0, 82, 204);
+    border-color: #1f6f5c;
     background: rgba(0, 82, 204, 0.05);
   }
 
   &.dropzoneReject {
-    border-color: #AC2F33;
-    background: rgba(172, 47, 51, 0.05)
+    border-color: #ac2f33;
+    background: rgba(172, 47, 51, 0.05);
   }
 }

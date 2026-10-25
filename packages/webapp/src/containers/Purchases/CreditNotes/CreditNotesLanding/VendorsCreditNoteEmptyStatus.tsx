@@ -3,6 +3,7 @@ import React from 'react';
 import { useHistory } from 'react-router-dom';
 import { EmptyStatus, Can, FormattedMessage as T } from '@/components';
 import { VendorCreditAction, AbilitySubject } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 
 export function VendorsCreditNoteEmptyStatus() {
   const history = useHistory();
@@ -25,9 +26,17 @@ export function VendorsCreditNoteEmptyStatus() {
               <T id={'vendor_credits.label.new_vendor_credit'} />
             </Button>
 
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

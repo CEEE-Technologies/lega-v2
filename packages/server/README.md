@@ -1,1 +1,1 @@
-## @bigcapitalhq/server
+# LEGA API server

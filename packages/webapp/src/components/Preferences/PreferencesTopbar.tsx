@@ -3,6 +3,7 @@ import classNames from 'classnames';
 import * as FF from 'fp-ts/function';
 import React from 'react';
 import { Route, Switch } from 'react-router-dom';
+import { CurrentCompany } from '@/components/Dashboard/CurrentCompany';
 import DashboardTopbarUser from '@/components/Dashboard/TopbarUser';
 import { CLASSES } from '@/constants/classes';
 import { withDashboard } from '@/containers/Dashboard/withDashboard';
@@ -56,6 +57,7 @@ function PreferencesTopbar({ preferencesPageTitle }) {
       </div>
 
       <div class="preferences-topbar__user">
+        <CurrentCompany />
         <DashboardTopbarUser />
       </div>
     </div>

@@ -6,5 +6,5 @@ export default registerAs('plaid', () => ({
   secret: process.env.PLAID_SECRET,
   linkWebhook: process.env.PLAID_LINK_WEBHOOK,
   // Shown to users in Plaid Link; Link shows "This Application" past 30 characters.
-  clientName: process.env.PLAID_CLIENT_NAME || 'Bigcapital',
+  clientName: process.env.PLAID_CLIENT_NAME || 'LEGA',
 }));

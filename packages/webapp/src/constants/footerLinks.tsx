@@ -1,24 +1,11 @@
 import intl from 'react-intl-universal';
+import { brandLinks } from './branding';
 
-export const getFooterLinks = (): Array<{ title: string; link: string }> => [
-  {
-    title: intl.get('blog'),
-    link: 'https://docs.bigcapital.ly/blog',
-  },
-  {
-    title: intl.get('community'),
-    link: 'https://discord.com/invite/c8nPBJafeb',
-  },
-  {
-    title: intl.get('support'),
-    link: 'https://discord.com/invite/c8nPBJafeb',
-  },
-  {
-    title: intl.get('docs'),
-    link: 'https://docs.bigcapital.ly',
-  },
-  {
-    title: 'Bigcapital',
-    link: 'http://bigcapital.ly',
-  },
-];
+export const getFooterLinks = (): Array<{ title: string; link: string }> =>
+  [
+    { title: intl.get('support'), link: brandLinks.support },
+    { title: intl.get('docs'), link: brandLinks.docs },
+    { title: 'LEGA', link: brandLinks.website },
+  ].filter((item): item is { title: string; link: string } =>
+    Boolean(item.link),
+  );

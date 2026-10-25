@@ -2,6 +2,7 @@ import { Button, Intent } from '@blueprintjs/core';
 import { useHistory } from 'react-router-dom';
 import { Can, FormattedMessage as T, EmptyStatus } from '@/components';
 import { AbilitySubject, CustomerAction } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 
 export function CustomersEmptyStatus() {
   const history = useHistory();
@@ -27,9 +28,17 @@ export function CustomersEmptyStatus() {
               <T id={'new_customer'} />
             </Button>
 
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

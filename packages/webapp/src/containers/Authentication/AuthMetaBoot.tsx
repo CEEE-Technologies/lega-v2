@@ -2,6 +2,7 @@ import { Spinner } from '@blueprintjs/core';
 import { createContext, ReactNode, useContext } from 'react';
 import styled from 'styled-components';
 import { useAuthMetadata } from '@/hooks/query';
+import { useSplashLoadingState } from '@/hooks/state';
 
 export interface AuthMetaBootState {
   isAuthMetaLoading: boolean;
@@ -24,6 +25,8 @@ function AuthMetaBootProvider({
   ...props
 }: AuthMetaBootProviderProps) {
   const { isLoading: isAuthMetaLoading, data: authMeta } = useAuthMetadata();
+
+  useSplashLoadingState(isAuthMetaLoading);
 
   const state: AuthMetaBootState = {
     isAuthMetaLoading,

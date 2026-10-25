@@ -1,64 +1,61 @@
-
 body.page-payment-made-new,
-body.page-payment-made-edit{
-
-  .dashboard__footer{
+body.page-payment-made-edit {
+  .dashboard__footer {
     display: none;
   }
 }
 
-.dashboard__insider--payment-made{
+.dashboard__insider--payment-made {
   padding-bottom: 64px;
 }
 
 .page-form--payment-made {
   $self: '.page-form';
 
-  #{$self}__header{
-    .bp4-label{
+  #{$self}__header {
+    .bp4-label {
       min-width: 160px;
     }
-    .bp4-form-content{
+    .bp4-form-content {
       width: 100%;
     }
 
-    .bp4-form-group{
+    .bp4-form-group {
       margin-bottom: 18px;
 
-      &.bp4-inline{
-        max-width: 470px; 
+      &.bp4-inline {
+        max-width: 470px;
       }
-      button.receive-full-amount{
+      button.receive-full-amount {
         width: auto;
         padding: 0;
         min-height: auto;
         font-size: 12px;
         margin-top: 4px;
         background-color: transparent;
-        color: #0052cc;
+        color: var(--color-primary);
 
-        &:hover{
+        &:hover {
           text-decoration: underline;
         }
       }
     }
   }
 
-  #{$self}__primary-section{
+  #{$self}__primary-section {
     display: flex;
     padding-bottom: 2px;
   }
 
-  #{$self}__big-numbers{
+  #{$self}__big-numbers {
     margin-left: auto;
     padding-right: 10px;
   }
 
-  .datatable-editor{
-    
-    .table .tbody{
-      .tr.no-results{
-        .td{
+  .datatable-editor {
+    .table .tbody {
+      .tr.no-results {
+        .td {
           font-size: 15px;
           padding: 26px 0;
           color: #5a5a77;
@@ -66,24 +63,24 @@ body.page-payment-made-edit{
       }
     }
 
-    .table{
+    .table {
       .th,
       .td {
         &.amount,
         &.due_amount,
         &.payment_amount {
-
           &,
           input {
             text-align: right;
           }
         }
       }
-     
-      .tr{
+
+      .tr {
         .td:first-of-type,
-        .th:first-of-type{
-          span, div{
+        .th:first-of-type {
+          span,
+          div {
             margin-left: auto;
             margin-right: auto;
           }
@@ -92,12 +89,12 @@ body.page-payment-made-edit{
     }
   }
 
-  #{$self}__footer{
-    .form-group--statement{
+  #{$self}__footer {
+    .form-group--statement {
       max-width: 500px;
       width: 100%;
 
-      textarea{
+      textarea {
         width: 100%;
         min-height: 70px;
       }

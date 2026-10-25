@@ -70,7 +70,7 @@ export function InvoicePaymentPage({
   organizationAddress,
 
   // # Colors
-  primaryColor = 'rgb(0, 82, 204)',
+  primaryColor = '#1f6f5c',
 
   // # Customer
   customerName,
@@ -113,10 +113,10 @@ export function InvoicePaymentPage({
   payInvoiceButtonProps,
 
   // # Buy note
-  buyNote = 'By confirming your payment, you allow Bigcapital Technology, Inc. to charge you for this payment and save your payment information in accordance with their terms.',
+  buyNote = `By confirming your payment, you allow ${organizationName || 'the merchant'} to charge you for this payment and save your payment information in accordance with their terms.`,
 
   // # Copyright
-  copyrightText = `© 2024 Bigcapital Technology, Inc. <br /> All rights reserved.`,
+  copyrightText,
   classNames,
 }: PaymentPageProps) {
   return (
@@ -246,12 +246,20 @@ export function InvoicePaymentPage({
       <Stack spacing={18} className={styles.footer}>
         <Box dangerouslySetInnerHTML={{ __html: organizationAddress }}></Box>
 
-        {copyrightText && (
+        {copyrightText ? (
           <Stack
             spacing={0}
             className={styles.footerText}
             dangerouslySetInnerHTML={{ __html: copyrightText }}
           ></Stack>
+        ) : (
+          copyrightText === undefined && (
+            <Stack spacing={0} className={styles.footerText}>
+              © {new Date().getFullYear()} {organizationName}
+              <br />
+              All rights reserved.
+            </Stack>
+          )
         )}
       </Stack>
     </Box>

@@ -2,12 +2,14 @@
 
 .workspaces-sidebar {
   width: 48px;
+  flex: 0 0 48px;
+  direction: ltr;
   height: 100vh;
   background: $sidebar-background;
   display: flex;
   flex-direction: column;
   padding: 12px 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
   z-index: $sidebar-zindex + 1;
 
   &__scrollable {
@@ -47,9 +49,28 @@
   &__footer {
     flex-shrink: 0;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     justify-content: center;
     padding-top: 12px;
     margin-top: auto;
+  }
+
+  // The rectangular tooltip target remains under the pointer at the rounded
+  // button's corners. It must use the same cursor as the button itself.
+  &__item-tooltip {
+    &,
+    .bp4-popover-target {
+      cursor: pointer;
+    }
+
+    &.is-disabled {
+      &,
+      .bp4-popover-target {
+        cursor: not-allowed;
+      }
+    }
   }
 
   &__item {
@@ -63,12 +84,13 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.15s ease, transform 0.1s ease, border-radius 0.15s ease;
+    transition:
+      background 0.15s ease,
+      border-radius 0.15s ease;
     position: relative;
 
     &:hover {
       background: rgba(255, 255, 255, 0.2);
-      transform: scale(1.05);
     }
 
     &.is-active {
@@ -84,7 +106,7 @@
         transform: translateY(-50%);
         width: 3px;
         height: 24px;
-        background: #fff;
+        background: var(--color-accent);
         border-radius: 0 2px 2px 0;
       }
     }
@@ -152,4 +174,10 @@
       stroke: rgba(255, 255, 255, 0.8);
     }
   }
+}
+
+// Tooltips must never intercept the icon's hover target, including while Popper
+// measures and positions their portal beside the narrow rail.
+.workspaces-sidebar-tooltip {
+  pointer-events: none;
 }

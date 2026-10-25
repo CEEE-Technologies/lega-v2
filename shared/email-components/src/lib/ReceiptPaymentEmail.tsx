@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+import { CSSProperties } from "react";
 import {
   Column,
   Heading,
@@ -6,10 +6,10 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components';
-import isEmpty from 'lodash.isempty';
-import { EmailTemplateLayout } from './EmailTemplateLayout';
-import { EmailTemplate } from './EmailTemplate';
+} from "@react-email/components";
+import isEmpty from "lodash.isempty";
+import { EmailTemplateLayout } from "./EmailTemplateLayout";
+import { EmailTemplate } from "./EmailTemplate";
 export interface ReceiptEmailTemplateProps {
   preview: string;
 
@@ -52,34 +52,34 @@ export const ReceiptEmailTemplate: React.FC<
   preview,
 
   // # Company
-  companyName = 'Bigcapital, Inc.',
+  companyName = "Example Company",
   companyLogoUri,
 
   // # Invoice total
-  total = '$1,000.00',
-  totalLabel = 'Total',
+  total = "$1,000.00",
+  totalLabel = "Total",
 
   // # Diso
-  discountLabel = 'Discount',
+  discountLabel = "Discount",
   discount,
 
   // # ADjustment
-  adjustmentLabel = 'Adjustment',
+  adjustmentLabel = "Adjustment",
   adjustment,
 
   // # Subtotal
-  subtotal = '$1,000.00',
-  subtotalLabel = 'Subtotal',
+  subtotal = "$1,000.00",
+  subtotalLabel = "Subtotal",
 
   // # Receipt #
-  receiptNumberLabel = 'Receipt # {receiptNumber}',
-  receiptNumber = 'REC-00001',
+  receiptNumberLabel = "Receipt # {receiptNumber}",
+  receiptNumber = "REC-00001",
 
   // # Message
-  message = '',
+  message = "",
 
   // # Items
-  items = [{ label: 'Swaniawski Muller', quantity: '1', rate: '$1,000.00' }],
+  items = [{ label: "Swaniawski Muller", quantity: "1", rate: "$1,000.00" }],
 }) => {
   return (
     <EmailTemplateLayout preview={preview}>
@@ -97,7 +97,7 @@ export const ReceiptEmailTemplate: React.FC<
 
           <Row>
             <Text style={receiptNumberStyle}>
-              {receiptNumberLabel?.replace('{receiptNumber}', receiptNumber)}
+              {receiptNumberLabel?.replace("{receiptNumber}", receiptNumber)}
             </Text>
           </Row>
         </Section>
@@ -107,11 +107,11 @@ export const ReceiptEmailTemplate: React.FC<
         <Section style={totalsSectionStyle}>
           {items.map((item, index) => (
             <Row key={index} style={itemLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{item.label}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>
                   {item.quantity} x {item.rate}
                 </Text>
@@ -120,22 +120,22 @@ export const ReceiptEmailTemplate: React.FC<
           ))}
 
           <Row style={totalLineRowStyle}>
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={dueAmountLineItemLabelStyle}>{subtotalLabel}</Text>
             </Column>
 
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={dueAmountLineItemAmountStyle}>{subtotal}</Text>
             </Column>
           </Row>
 
           {!isEmpty(discount) && (
             <Row style={itemLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{discountLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>{discount}</Text>
               </Column>
             </Row>
@@ -143,22 +143,22 @@ export const ReceiptEmailTemplate: React.FC<
 
           {!isEmpty(adjustment) && (
             <Row style={itemLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{adjustmentLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>{adjustment}</Text>
               </Column>
             </Row>
           )}
 
           <Row style={totalLineRowStyle}>
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemLabelStyle}>{totalLabel}</Text>
             </Column>
 
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemAmountStyle}>{total}</Text>
             </Column>
           </Row>
@@ -175,32 +175,32 @@ export const ReceiptEmailTemplate: React.FC<
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export const renderReceiptEmailTemplate = (
-  props: ReceiptEmailTemplateProps
+  props: ReceiptEmailTemplateProps,
 ) => {
   return render(<ReceiptEmailTemplate {...props} />);
 };
 
 const headerInfoStyle: CSSProperties = {
-  textAlign: 'center',
+  textAlign: "center",
   marginBottom: 20,
 };
 
 const amountStyle: CSSProperties = {
   margin: 0,
-  color: '#383E47',
+  color: "#383E47",
   fontWeight: 500,
 };
 const receiptNumberStyle: CSSProperties = {
   margin: 0,
-  fontSize: '13px',
-  color: '#404854',
+  fontSize: "13px",
+  color: "#404854",
 };
 
 const invoiceCompanyNameStyle: CSSProperties = {
   margin: 0,
-  fontSize: '18px',
+  fontSize: "18px",
   fontWeight: 500,
-  color: '#404854',
+  color: "#404854",
 };
 
 const listItemLabelStyle: CSSProperties = {
@@ -209,17 +209,17 @@ const listItemLabelStyle: CSSProperties = {
 
 const listItemAmountStyle: CSSProperties = {
   margin: 0,
-  textAlign: 'right',
+  textAlign: "right",
 };
 
 const messageStyle: CSSProperties = {
-  whiteSpace: 'pre-line',
-  margin: '0 0 20px 0',
-  lineHeight: '20px',
+  whiteSpace: "pre-line",
+  margin: "0 0 20px 0",
+  lineHeight: "20px",
 };
 
 const totalLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #000',
+  borderBottom: "1px solid #000",
   height: 40,
 };
 
@@ -244,11 +244,11 @@ const dueAmountLineItemAmountStyle: CSSProperties = {
 };
 
 const itemLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #D9D9D9',
+  borderBottom: "1px solid #D9D9D9",
   height: 40,
 };
 
 const totalsSectionStyle = {
-  marginTop: '20px',
-  borderTop: '1px solid #D9D9D9',
+  marginTop: "20px",
+  borderTop: "1px solid #D9D9D9",
 };

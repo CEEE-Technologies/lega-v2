@@ -5,12 +5,12 @@
   --item-label-text: #252a33;
   --item-date-text: #5c7080;
   --item-border-hover: #c0c0c0;
-  
+
   :global(.bp4-dark) & {
     --item-background: var(--color-dark-gray3);
     --item-border: rgba(255, 255, 255, 0.2);
     --item-date-text: var(--color-light-gray1);
-    --item-label-text: var(--color-light-gray4);    
+    --item-label-text: var(--color-light-gray4);
     --item-border-hover: rgba(255, 255, 255, 0.45);
   }
   background: var(--item-background);
@@ -50,7 +50,7 @@
   :global
   input:checked
   ~ .bp4-control-indicator {
-  box-shadow: 0 0 0 1px #0069ff;
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 
 .label {

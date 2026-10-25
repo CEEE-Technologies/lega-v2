@@ -6,10 +6,9 @@ import React from 'react';
 import intl from 'react-intl-universal';
 import rtlDetect from 'rtl-detect';
 import { setLocale } from 'yup';
-import { useWatchImmediate } from '../hooks';
 import { AppIntlProvider } from './AppIntlProvider';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
-import { useSplashLoading } from '@/hooks/state';
+import { useSplashLoadingState } from '@/hooks/state';
 
 const SUPPORTED_LOCALES = [
   { name: 'English', value: 'en' },
@@ -55,7 +54,8 @@ async function loadYupLocales(currentLocale) {
 async function loadMomentLocale(currentLocale) {
   const momentLocale = transformMomentLocale(currentLocale);
   if (momentLocale === 'en') return;
-  await import(`moment/locale/${momentLocale}`);
+  // Vite cannot resolve variable bare-package specifiers at runtime.
+  if (momentLocale === 'ar-ly') await import('moment/locale/ar-ly');
 }
 
 /**
@@ -81,7 +81,6 @@ function transformMomentLocale(currentLocale) {
  * @returns {{ isLoading: boolean }}
  */
 function useAppLoadLocales(currentLocale) {
-  const [startLoading, stopLoading] = useSplashLoading();
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -100,13 +99,8 @@ function useAppLoadLocales(currentLocale) {
         moment.locale(transformMomentLocale(currentLocale));
         setIsLoading(false);
       });
-  }, [currentLocale, stopLoading]);
+  }, [currentLocale]);
 
-  // Watches the value to start/stop splash screen.
-  useWatchImmediate(
-    (value) => (value ? startLoading() : stopLoading()),
-    isLoading,
-  );
   return { isLoading };
 }
 
@@ -116,7 +110,6 @@ function useAppLoadLocales(currentLocale) {
  * @returns {{ isLoading: boolean }}
  */
 function useAppYupLoadLocales(currentLocale) {
-  const [startLoading, stopLoading] = useSplashLoading();
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -126,13 +119,8 @@ function useAppYupLoadLocales(currentLocale) {
         setIsLoading(false);
       })
       .then(() => {});
-  }, [currentLocale, stopLoading]);
+  }, [currentLocale]);
 
-  // Watches the valiue to start/stop splash screen.
-  useWatchImmediate(
-    (value) => (value ? startLoading() : stopLoading()),
-    isLoading,
-  );
   return { isLoading };
 }
 
@@ -158,6 +146,7 @@ function AppIntlLoader({ children }) {
 
   // Detarmines whether the app locales loading.
   const isLoading = isAppYupLocalesLoading || isAppLocalesLoading;
+  useSplashLoadingState(isLoading);
 
   return (
     <AppIntlProvider currentLocale={currentLocale} isRTL={isRTL}>

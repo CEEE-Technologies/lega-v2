@@ -1,6 +1,6 @@
-import { Spinner } from '@blueprintjs/core';
 import * as FF from 'fp-ts/function';
 import React, { useEffect, Suspense } from 'react';
+import { BootLoading } from './BootLoading';
 import type { WithDashboardActionsProps } from '@/containers/Dashboard/withDashboardActions';
 import type { WithUniversalSearchActionsProps } from '@/containers/UniversalSearch/withUniversalSearchActions';
 import { CLASSES } from '@/constants/classes';
@@ -99,13 +99,7 @@ function DashboardPage({
 
   return (
     <div className={CLASSES.DASHBOARD_PAGE}>
-      <Suspense
-        fallback={
-          <div className="dashboard__fallback-loading">
-            <Spinner size={40} />
-          </div>
-        }
-      >
+      <Suspense fallback={<BootLoading showSpinner />}>
         <Component />
       </Suspense>
     </div>

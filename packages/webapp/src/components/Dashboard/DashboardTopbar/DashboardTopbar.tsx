@@ -8,7 +8,6 @@ import {
   Position,
   MenuItem,
   Menu,
-  MenuDivider,
 } from '@blueprintjs/core';
 import { Popover2 } from '@blueprintjs/popover2';
 import * as FF from 'fp-ts/function';
@@ -22,14 +21,12 @@ import type { WithDashboardActionsProps } from '@/containers/Dashboard/withDashb
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
 import type { WithUniversalSearchActionsProps } from '@/containers/UniversalSearch/withUniversalSearchActions';
 import { FormattedMessage as T, Icon, Hint, If } from '@/components';
+import { CurrentCompany } from '@/components/Dashboard/CurrentCompany';
 import DashboardBackLink from '@/components/Dashboard/DashboardBackLink';
 import DashboardBreadcrumbs from '@/components/Dashboard/DashboardBreadcrumbs';
 import DashboardTopbarUser from '@/components/Dashboard/TopbarUser';
+import { brandLinks } from '@/constants/branding';
 import { DialogsName } from '@/constants/dialogs';
-import {
-  COMMUNITY_BIGCAPITAL_LINK,
-  DOCS_BIGCAPITAL_LINK,
-} from '@/constants/routes';
 import { withDashboard } from '@/containers/Dashboard/withDashboard';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
@@ -118,6 +115,7 @@ function DashboardTopbar({
       </div>
 
       <div className="dashboard__topbar-right">
+        <CurrentCompany />
         <Navbar className="dashboard__topbar-navbar">
           <NavbarGroup>
             <DashboardQuickSearchButton onClick={() => openGlobalSearch()} />
@@ -135,22 +133,28 @@ function DashboardTopbar({
             <Popover2
               content={
                 <Menu>
-                  <MenuItem
-                    text={'Documents'}
-                    onClick={() => window.open(DOCS_BIGCAPITAL_LINK)}
-                    labelElement={<Icon icon={'share'} iconSize={16} />}
-                  />
-                  <MenuItem
-                    text={'Community support'}
-                    onClick={() => window.open(COMMUNITY_BIGCAPITAL_LINK)}
-                    labelElement={<Icon icon={'share'} iconSize={16} />}
-                  />
+                  {brandLinks.docs && (
+                    <MenuItem
+                      text={'Documents'}
+                      href={brandLinks.docs}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      labelElement={<Icon icon={'share'} iconSize={16} />}
+                    />
+                  )}
+                  {brandLinks.support && (
+                    <MenuItem
+                      text={<T id="support" />}
+                      href={brandLinks.support}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      labelElement={<Icon icon={'share'} iconSize={16} />}
+                    />
+                  )}
                   <MenuItem
                     text={'Keyboard shortcuts'}
                     onClick={() => openDialog(DialogsName.KeyboardShortcutForm)}
                   />
-                  <MenuDivider />
-                  <MenuItem text={'Share feedback'} />
                 </Menu>
               }
             >

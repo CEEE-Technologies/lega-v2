@@ -1,4 +1,5 @@
-import { Icon, For, FormattedMessage as T } from '@/components';
+import { For, FormattedMessage as T } from '@/components';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 import { getFooterLinks } from '@/constants/footerLinks';
 import { useAuthActions } from '@/hooks/state';
 
@@ -21,6 +22,8 @@ function FooterLinkItem({ title, link }: { title: string; link: string }) {
 function SetupLeftSectionFooter() {
   // Retrieve the footer links.
   const footerLinks = getFooterLinks();
+
+  if (!footerLinks.length) return null;
 
   return (
     <div className={'content__footer'}>
@@ -71,12 +74,7 @@ export function SetupLeftSection() {
     <section className={'setup-page__left-section'}>
       <div className={'content'}>
         <div className={'content__logo'}>
-          <Icon
-            icon="bigcapital"
-            className={'bigcapital--alt'}
-            height={37}
-            width={190}
-          />
+          <BrandLogo width={160} tone="white" />
         </div>
         <SetupLeftSectionHeader />
         <SetupLeftSectionFooter />

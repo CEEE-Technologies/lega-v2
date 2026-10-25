@@ -1,16 +1,13 @@
-
 body.page-payment-receive-new,
-body.page-payment-receive-edit{
-
-  .dashboard__footer{
+body.page-payment-receive-edit {
+  .dashboard__footer {
     display: none;
   }
 }
 
-.dashboard__insider--payment-receive-form{
+.dashboard__insider--payment-receive-form {
   padding-bottom: 64px;
 }
-
 
 .page-form--payment-receive {
   $self: '.page-form';
@@ -38,7 +35,7 @@ body.page-payment-receive-edit{
         font-size: 12px;
         margin-top: 4px;
         background-color: transparent;
-        color: #0052cc;
+        color: var(--color-primary);
 
         &:hover {
           text-decoration: underline;
@@ -58,7 +55,6 @@ body.page-payment-receive-edit{
   }
 
   .datatable-editor {
-
     .table .tbody {
       .tr.no-results {
         .td {
@@ -75,7 +71,6 @@ body.page-payment-receive-edit{
         &.invoice_amount,
         &.amount_due,
         &.payment_amount {
-
           &,
           input {
             text-align: right;
@@ -86,7 +81,6 @@ body.page-payment-receive-edit{
       .tr {
         .td:first-of-type,
         .th:first-of-type {
-
           span,
           div {
             margin-left: auto;

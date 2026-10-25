@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApplicationBoot } from '@/components';
 import { useAuthMetadata } from '@/hooks/query/authentication';
+import { useSplashLoadingState } from '@/hooks/state';
 
 interface PrivatePagesProviderProps {
   children?: React.ReactNode;
@@ -14,6 +15,7 @@ export function PrivatePagesProvider({ children }: PrivatePagesProviderProps) {
   const { isLoading: isAuthMetaLoading } = useAuthMetadata();
 
   const isLoading = isAppBootLoading || isAuthMetaLoading;
+  useSplashLoadingState(isLoading);
 
   return <React.Fragment>{!isLoading ? children : null}</React.Fragment>;
 }

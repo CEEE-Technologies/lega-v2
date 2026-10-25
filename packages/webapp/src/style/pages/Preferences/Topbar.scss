@@ -30,7 +30,7 @@
     .bp4-button:not([class*='bp4-intent-']):not(.bp4-minimal) {
       padding: 0;
       background-size: contain;
-      background-color: #eed1f2;
+      background-color: var(--color-surface-secondary);
       border-radius: 50%;
       height: 32px;
       width: 32px;
@@ -42,7 +42,7 @@
       &,
       &:hover,
       &:focus {
-        background-color: #cb20e5;
+        background-color: var(--color-primary);
         border: 0;
         box-shadow: none;
       }
@@ -55,7 +55,7 @@
     margin-right: 15px;
     border-right: 1px solid #e5e5e5;
 
-    .bp4-dark &{
+    .bp4-dark & {
       border-right-color: rgba(255, 255, 255, 0.2);
     }
     .bp4-button + .bp4-button {

@@ -4,6 +4,7 @@ import styles from './BankRulesLandingEmptyState.module.scss';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
 import { EmptyStatus, Can, FormattedMessage as T } from '@/components';
 import { AbilitySubject, BankRuleAction } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 import { DialogsName } from '@/constants/dialogs';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 
@@ -35,9 +36,17 @@ function BankRulesLandingEmptyStateRoot({
               New Bank Rule
             </Button>
 
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

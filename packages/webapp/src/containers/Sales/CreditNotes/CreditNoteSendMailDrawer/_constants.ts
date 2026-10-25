@@ -1,5 +1,5 @@
 export const defaultCreditNoteMailReceiptProps = {
-  companyName: 'Bigcapital Technology, Inc.',
+  companyName: 'Example Company',
   companyLogoUri: ' ',
 
   total: '$1,000.00',
@@ -14,5 +14,5 @@ Please find your credit note # CN-0001 for $1,000.00 attached to this email.
 If you have any questions, please let us know.
 
 Thanks,
-Bigcapital`,
+LEGA`,
 };
