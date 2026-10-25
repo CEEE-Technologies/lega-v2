@@ -110,6 +110,10 @@ function PaymentReceiveFormProvider({
     isFetching: isPaymentFetching,
   } = usePaymentReceiveEditPage(paymentReceiveId, {
     enabled: !!paymentReceiveId,
+    // Formik reads the values only once, so a cached copy would stick even
+    // after fresh data arrives (e.g. invoice due amounts changed by another
+    // payment). Drop it on close so the form always opens with fresh data.
+    gcTime: 0,
   });
   const paymentReceiveEditPage = paymentReceivedEditData?.data;
   const paymentEntriesEditPage = paymentReceivedEditData?.entries;
