@@ -10,8 +10,14 @@ interface SetupWizardContentProps {
   stepId: string;
 }
 
+// Keep the stepper and step content in one centered column.
+const rootClassName = css`
+  max-width: 760px;
+  margin: 0 auto;
+`;
+
 const itemsClassName = css`
-  padding: 40px 40px 20px;
+  padding: 40px 25px 20px;
 `;
 
 /**
@@ -26,6 +32,7 @@ export function SetupWizardContent({
       <Stepper
         active={stepIndex}
         classNames={{
+          root: rootClassName,
           items: itemsClassName,
         }}
       >
