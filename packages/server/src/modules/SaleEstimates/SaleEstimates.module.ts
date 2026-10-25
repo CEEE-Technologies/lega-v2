@@ -19,7 +19,7 @@ import { BranchesSettingsService } from '../Branches/BranchesSettings';
 import { WarehouseTransactionDTOTransform } from '../Warehouses/Integrations/WarehouseTransactionDTOTransform';
 import { WarehousesSettings } from '../Warehouses/WarehousesSettings';
 import { SaleEstimateIncrement } from './commands/SaleEstimateIncrement.service';
-import { AutoIncrementOrdersService } from '../AutoIncrementOrders/AutoIncrementOrders.service';
+import { AutoIncrementOrdersModule } from '../AutoIncrementOrders/AutoIncrementOrders.module';
 import { BrandingTemplateDTOTransformer } from '../PdfTemplate/BrandingTemplateDTOTransformer';
 import { SaleEstimatesApplication } from './SaleEstimates.application';
 import { DeleteSaleEstimate } from './commands/DeleteSaleEstimate.service';
@@ -52,6 +52,7 @@ import { SendSaleEstimateMailProcess } from './processes/SendSaleEstimateMail.pr
 
 @Module({
   imports: [
+    AutoIncrementOrdersModule,
     TenancyModule,
     TenancyDatabaseModule,
     DynamicListModule,
@@ -71,7 +72,6 @@ import { SendSaleEstimateMailProcess } from './processes/SendSaleEstimateMail.pr
   ],
   controllers: [SaleEstimatesController],
   providers: [
-    AutoIncrementOrdersService,
     BrandingTemplateDTOTransformer,
     SaleEstimateIncrement,
     CreateSaleEstimate,

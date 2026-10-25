@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import {
   usePaymentReceiveTotals,
   usePaymentReceivedTotalExceededAmount,
+  usePaymentReceivedOverAppliedAmount,
 } from './utils';
 import {
   T,
@@ -16,6 +17,7 @@ import {
 export function PaymentReceiveFormFootetRight() {
   const { formattedSubtotal, formattedTotal } = usePaymentReceiveTotals();
   const exceededAmount = usePaymentReceivedTotalExceededAmount();
+  const overAppliedAmount = usePaymentReceivedOverAppliedAmount();
 
   return (
     <PaymentReceiveTotalLines labelColWidth={'180px'} amountColWidth={'180px'}>
@@ -34,6 +36,17 @@ export function PaymentReceiveFormFootetRight() {
         value={<FormatNumber value={exceededAmount} noZero={false} />}
         textStyle={TotalLineTextStyle.Regular}
       />
+      {overAppliedAmount > 0 && (
+        <TotalLine
+          title={'Applied over amount received'}
+          value={
+            <OverAppliedValue>
+              <FormatNumber value={overAppliedAmount} noZero={false} />
+            </OverAppliedValue>
+          }
+          textStyle={TotalLineTextStyle.Regular}
+        />
+      )}
     </PaymentReceiveTotalLines>
   );
 }
@@ -46,4 +59,9 @@ const PaymentReceiveTotalLines = styled(TotalLines)`
   }
   width: 100%;
   color: var(--x-color-text);
+`;
+
+const OverAppliedValue = styled.span`
+  color: var(--color-danger, #c23030);
+  font-weight: 600;
 `;

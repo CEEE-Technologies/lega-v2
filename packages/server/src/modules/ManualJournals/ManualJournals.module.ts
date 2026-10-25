@@ -7,7 +7,7 @@ import { CommandManualJournalValidators } from './commands/CommandManualJournalV
 import { AutoIncrementManualJournal } from './commands/AutoIncrementManualJournal.service';
 import { ManualJournalBranchesDTOTransformer } from '../Branches/integrations/ManualJournals/ManualJournalDTOTransformer.service';
 import { TenancyModule } from '../Tenancy/Tenancy.module';
-import { AutoIncrementOrdersService } from '../AutoIncrementOrders/AutoIncrementOrders.service';
+import { AutoIncrementOrdersModule } from '../AutoIncrementOrders/AutoIncrementOrders.module';
 import { BranchesModule } from '../Branches/Branches.module';
 import { ManualJournalsController } from './ManualJournals.controller';
 import { ManualJournalsApplication } from './ManualJournalsApplication.service';
@@ -23,7 +23,13 @@ import { BulkDeleteManualJournalsService } from './BulkDeleteManualJournals.serv
 import { ValidateBulkDeleteManualJournalsService } from './ValidateBulkDeleteManualJournals.service';
 
 @Module({
-  imports: [TenancyModule, BranchesModule, LedgerModule, DynamicListModule],
+  imports: [
+    AutoIncrementOrdersModule,
+    TenancyModule,
+    BranchesModule,
+    LedgerModule,
+    DynamicListModule,
+  ],
   controllers: [ManualJournalsController],
   providers: [
     CreateManualJournalService,
@@ -34,7 +40,6 @@ import { ValidateBulkDeleteManualJournalsService } from './ValidateBulkDeleteMan
     AutoIncrementManualJournal,
     CommandManualJournalValidators,
     ManualJournalBranchesDTOTransformer,
-    AutoIncrementOrdersService,
     ManualJournalsApplication,
     GetManualJournal,
     GetManualJournals,

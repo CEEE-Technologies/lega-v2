@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SettingsStore } from '../Settings/SettingsStore';
 import { SETTINGS_PROVIDER } from '../Settings/Settings.types';
 import { transactionIncrement } from '@/utils/transaction-increment';
+import { ImportAls } from '../Import/ImportALS';
 
 /**
  * Auto increment orders service.
@@ -11,6 +12,7 @@ export class AutoIncrementOrdersService {
   constructor(
     @Inject(SETTINGS_PROVIDER)
     private readonly settingsStore: () => SettingsStore,
+    private readonly importAls: ImportAls,
   ) {}
 
   /**
@@ -54,6 +56,12 @@ export class AutoIncrementOrdersService {
    * @param {string} orderNumber -Order number.
    */
   async incrementSettingsNextNumber(group: string) {
+    // An import preview creates the records and then rolls them back, but this
+    // setting is saved outside that transaction, so skip it or the counter
+    // would advance once per previewed row.
+    if (this.importAls.isImportPreview) {
+      return;
+    }
     const settingsStore = await this.settingsStore();
 
     const settingNo = settingsStore.get({ group, key: 'next_number' });

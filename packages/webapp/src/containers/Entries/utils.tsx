@@ -1,5 +1,5 @@
 import * as FF from 'fp-ts/function';
-import { sumBy, isEmpty, last, keyBy, groupBy } from 'lodash';
+import { isEmpty, last, keyBy, groupBy } from 'lodash';
 import React, { useCallback } from 'react';
 import { useItemEntriesTableContext } from './ItemEntriesTableProvider';
 import type { ItemEntry } from '@/interfaces/ItemEntries';
@@ -7,6 +7,7 @@ import type { TaxRate } from '@bigcapital/sdk-ts';
 import { useItem } from '@/hooks/query';
 import {
   toSafeNumber,
+  safeSumBy,
   saveInvoke,
   updateTableCell,
   updateAutoAddNewLine,
@@ -75,7 +76,9 @@ export function updateItemsEntriesTotal<T extends ItemsEntryRow>(
 export function getEntriesTotal<T extends { amount?: string | number }>(
   entries: T[],
 ): number {
-  return sumBy(entries, 'amount');
+  // The blank "Enter an item" row has amount '' and plain sumBy would turn
+  // the total into text (70000 + '' = "70000"), so treat blanks as 0.
+  return safeSumBy(entries, 'amount');
 }
 
 /**
@@ -399,7 +402,7 @@ export const aggregateItemEntriesTaxRates =
     return Object.keys(groupedTaxRates).map((taxRateId) => {
       const taxRate = taxRatesById[taxRateId];
       const groupedEntries = groupedTaxRates[taxRateId];
-      const totalTaxAmount = sumBy(groupedEntries, 'taxAmount');
+      const totalTaxAmount = safeSumBy(groupedEntries, 'taxAmount');
       const taxAmountFormatted = formattedAmount(totalTaxAmount, currencyCode);
 
       return {

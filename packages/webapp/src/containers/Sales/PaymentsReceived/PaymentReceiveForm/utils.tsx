@@ -1,6 +1,6 @@
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
-import { omit, pick, first, sumBy } from 'lodash';
+import { omit, pick, first } from 'lodash';
 import moment from 'moment';
 import React from 'react';
 import intl from 'react-intl-universal';
@@ -301,6 +301,9 @@ export const useSetPrimaryBranchToForm = () => {
 /**
  * Transformes the response errors types.
  */
+export const PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE =
+  'The amounts applied to invoices are more than the amount received. Lower the invoice payment amounts or raise the amount received.';
+
 export const transformErrors = (
   errors: PaymentReceiveErrorResponse[],
   {
@@ -318,6 +321,12 @@ export const transformErrors = (
       'paymentReceiveNo',
       intl.get('payment_received.field.error.payment_receive_no_required'),
     );
+  }
+  if (getError('PAYMENT_ENTRIES_EXCEED_AMOUNT')) {
+    AppToaster.show({
+      message: PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE,
+      intent: Intent.DANGER,
+    });
   }
   if (getError('PAYMENT_ACCOUNT_CURRENCY_INVALID')) {
     AppToaster.show({
@@ -363,7 +372,7 @@ export const usePaymentReceivedTotalAppliedAmount = (): number => {
     values: { entries },
   } = useFormikContext<PaymentReceiveFormValues>();
 
-  return React.useMemo(() => sumBy(entries, 'paymentAmount'), [entries]);
+  return React.useMemo(() => safeSumBy(entries, 'paymentAmount'), [entries]);
 };
 
 export const usePaymentReceivedTotalAmount = () => {
@@ -374,11 +383,20 @@ export const usePaymentReceivedTotalAmount = () => {
   return amount;
 };
 
+// Received more than applied to invoices (the rest is an excess payment).
 export const usePaymentReceivedTotalExceededAmount = (): number => {
   const totalAmount = usePaymentReceivedTotalAmount();
   const totalApplied = usePaymentReceivedTotalAppliedAmount();
 
-  return Math.abs(Number(totalAmount) - totalApplied);
+  return Math.max(Number(totalAmount) - totalApplied, 0);
+};
+
+// Applied to invoices more than was received, which can't be saved.
+export const usePaymentReceivedOverAppliedAmount = (): number => {
+  const totalAmount = usePaymentReceivedTotalAmount();
+  const totalApplied = usePaymentReceivedTotalAppliedAmount();
+
+  return Math.max(totalApplied - Number(totalAmount), 0);
 };
 
 /**
@@ -417,7 +435,7 @@ export const resetFormState = ({
 export const getExceededAmountFromValues = (
   values: PaymentReceiveFormValues,
 ): number => {
-  const totalApplied = sumBy(values.entries, 'paymentAmount');
+  const totalApplied = safeSumBy(values.entries, 'paymentAmount');
   const totalAmount = Number(values.amount);
 
   return totalAmount - totalApplied;

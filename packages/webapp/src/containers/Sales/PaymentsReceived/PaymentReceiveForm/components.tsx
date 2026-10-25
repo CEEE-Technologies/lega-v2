@@ -1,7 +1,7 @@
 import { Button } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
 import moment from 'moment';
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import intl from 'react-intl-universal';
 import { usePaymentReceiveFormContext } from './PaymentReceiveFormProvider';
 import {
@@ -11,6 +11,7 @@ import {
 } from './utils';
 import { Money, ExchangeRateInputGroup, MoneyFieldCell } from '@/components';
 import { CLASSES } from '@/constants/classes';
+import { useUpdateEffect } from '@/hooks';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { transactionNumber } from '@/utils';
 
@@ -122,7 +123,8 @@ export const usePaymentReceiveEntriesColumns = (
       {
         Header: 'Invoice date',
         id: 'invoiceDate',
-        accessor: 'invoiceDate',
+        // Page entries carry the invoice date as `date`.
+        accessor: 'date',
         Cell: createInvoiceDateCell(onViewInvoiceDetail),
         disableSortBy: true,
         disableResizing: true,
@@ -211,7 +213,9 @@ export const PaymentReceiveSyncIncrementSettingsToForm =
       paymentReceiveSettings?.autoIncrement as boolean | undefined;
     const { setFieldValue } = useFormikContext<PaymentReceiveFormValues>();
 
-    useLayoutEffect(() => {
+    // Only when the numbering settings change, so opening an existing payment
+    // keeps its own number instead of showing the next one.
+    useUpdateEffect(() => {
       if (!paymentReceiveAutoIncrement) return;
 
       setFieldValue(

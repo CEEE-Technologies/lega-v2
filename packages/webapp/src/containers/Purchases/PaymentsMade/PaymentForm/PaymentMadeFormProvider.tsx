@@ -122,6 +122,10 @@ function PaymentMadeFormProvider({
     isLoading: isPaymentLoading,
   } = usePaymentMadeEditPage(paymentMadeId, {
     enabled: !!paymentMadeId,
+    // Formik reads the values only once, so a cached copy would stick even
+    // after fresh data arrives (e.g. bill due amounts changed by another
+    // payment). Drop it on close so the form always opens with fresh data.
+    gcTime: 0,
   });
   const paymentMadeEditPage = paymentMadeEditData?.billPayment;
   const paymentEntriesEditPage = paymentMadeEditData?.entries;

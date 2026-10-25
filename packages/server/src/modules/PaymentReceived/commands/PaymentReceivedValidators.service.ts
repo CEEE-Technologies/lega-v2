@@ -113,6 +113,28 @@ export class PaymentReceivedValidators {
   }
 
   /**
+   * Validates the amounts applied to invoices don't add up to more than the
+   * amount received; otherwise invoices get marked paid with money that was
+   * never received and the accrual and cash ledgers disagree.
+   * @param {number} amount - Amount received.
+   * @param {IPaymentReceivedEntryDTO[]} entries - Lines applied to invoices.
+   */
+  public validateEntriesWithinAmount(
+    amount: number,
+    entries: IPaymentReceivedEntryDTO[] = [],
+  ) {
+    const totalApplied = sumBy(
+      entries,
+      (entry) => Number(entry.paymentAmount) || 0,
+    );
+
+    // Compare in cents to ignore floating point noise.
+    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+      throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
+    }
+  }
+
+  /**
    * Validates entries invoice payment amount.
    * @param {IPaymentReceivedEntryDTO[]} paymentReceiveEntries
    * @param {IPaymentReceivedEntry[]} oldPaymentEntries
@@ -137,7 +159,10 @@ export class PaymentReceivedValidators {
 
     const storedInvoicesMap = new Map(
       storedInvoices.map((invoice: SaleInvoice) => {
-        const oldEntries = oldPaymentEntries.filter((entry) => entry.invoiceId);
+        // Only this invoice's line on the old payment frees up its due amount.
+        const oldEntries = oldPaymentEntries.filter(
+          (entry) => entry.invoiceId === invoice.id,
+        );
         const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
 
         return [
