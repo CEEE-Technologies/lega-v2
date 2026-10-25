@@ -14,6 +14,7 @@ import {
   notifyPaymentReceiveBySms,
   fetchPaymentReceiveSmsDetails,
   fetchPaymentReceivedPdf,
+  type GetPaymentsReceivedQuery,
 } from '@bigcapital/sdk-ts';
 import {
   useMutation,
@@ -89,7 +90,8 @@ export function usePaymentReceives(
   return useQuery({
     ...props,
     queryKey: paymentReceivesKeys.list(query),
-    queryFn: () => fetchPaymentsReceived(fetcher),
+    queryFn: () =>
+      fetchPaymentsReceived(fetcher, query as GetPaymentsReceivedQuery),
   });
 }
 

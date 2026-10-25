@@ -8,6 +8,7 @@ import {
   validateBulkDeleteBillPayments,
   fetchBillPaymentEditPage,
   fetchBillPaymentNewPageEntries,
+  type GetBillPaymentsQuery,
 } from '@bigcapital/sdk-ts';
 import {
   useMutation,
@@ -48,7 +49,7 @@ export function usePaymentMades(
   return useQuery({
     ...props,
     queryKey: paymentMadesKeys.list(query),
-    queryFn: () => fetchBillPayments(fetcher),
+    queryFn: () => fetchBillPayments(fetcher, query as GetBillPaymentsQuery),
   });
 }
 
