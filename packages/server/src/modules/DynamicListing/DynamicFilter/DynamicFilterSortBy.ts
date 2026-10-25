@@ -70,16 +70,24 @@ export class DynamicFilterSortBy extends DynamicFilterRoleAbstractor {
     const comparatorColumn = this.getFieldComparatorColumn(field);
     const safeOrder = sanitizeSortDirection(this.sortRole.order);
 
+    // Rows that tie on the sort column (e.g. records imported in the same second)
+    // have no fixed order, so pages could repeat or skip rows. Break ties by id.
+    const orderByIdTieBreaker = (builder) => {
+      builder.orderBy(`${this.tableName}.id`, safeOrder);
+    };
+
     // Sort custom query.
     if (typeof field.sortCustomQuery !== 'undefined') {
       return (builder) => {
         field.sortCustomQuery(builder, { ...this.sortRole, order: safeOrder });
+        orderByIdTieBreaker(builder);
       };
     }
 
     return (builder) => {
       if (this.sortRole.fieldKey) {
         builder.orderBy(`${comparatorColumn}`, safeOrder);
+        orderByIdTieBreaker(builder);
       }
     };
   };
