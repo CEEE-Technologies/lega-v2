@@ -45,6 +45,11 @@ export class PaymentReceiveDTOTransformer {
       paymentReceiveDTO.amount ??
       sumBy(paymentReceiveDTO.entries, 'paymentAmount');
 
+    this.validators.validateEntriesWithinAmount(
+      amount,
+      paymentReceiveDTO.entries,
+    );
+
     // Retreive the next invoice number.
     const autoNextNumber = await this.increments.getNextPaymentReceiveNumber();
 

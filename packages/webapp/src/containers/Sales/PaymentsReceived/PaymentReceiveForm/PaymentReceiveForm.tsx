@@ -27,6 +27,7 @@ import {
   transformErrors,
   resetFormState,
   getExceededAmountFromValues,
+  PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE,
   type PaymentReceiveFormValues,
   type PaymentReceiveErrorResponse,
   type PaymentReceiveEditEntry,
@@ -119,6 +120,14 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
     if (Number(values.amount) <= 0) {
       AppToaster.show({
         message: intl.get('you_cannot_make_payment_with_zero_total_amount'),
+        intent: Intent.DANGER,
+      });
+      setSubmitting(false);
+      return;
+    }
+    if (exceededAmount < 0) {
+      AppToaster.show({
+        message: PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE,
         intent: Intent.DANGER,
       });
       setSubmitting(false);
