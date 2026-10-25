@@ -164,10 +164,10 @@ export const SaleInvoicesSampleData = [
 ];
 
 export const defaultInvoicePdfTemplateAttributes = {
-  primaryColor: 'red',
-  secondaryColor: 'red',
+  primaryColor: '#1f6f5c',
+  secondaryColor: '#ad6d0f',
 
-  companyName: 'Bigcapital Technology, Inc.',
+  companyName: 'Example Company',
 
   showCompanyLogo: true,
   companyLogoKey: '',

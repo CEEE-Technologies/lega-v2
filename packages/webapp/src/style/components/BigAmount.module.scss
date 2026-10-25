@@ -1,7 +1,6 @@
-
-.root{
-  --x-color-amount-text: #343463;
-  --x-color-label-text: #5d6f90;
+.root {
+  --x-color-amount-text: var(--color-text);
+  --x-color-label-text: var(--color-muted-text);
 
   :global(.bp4-dark) & {
     --x-color-label-text: rgba(255, 255, 255, 0.7);
@@ -10,14 +9,14 @@
   text-align: right;
 }
 
-.label{
+.label {
   color: var(--x-color-label-text);
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
 }
 
-.number{
+.number {
   margin: 0;
   text-overflow: ellipsis;
   white-space: nowrap;

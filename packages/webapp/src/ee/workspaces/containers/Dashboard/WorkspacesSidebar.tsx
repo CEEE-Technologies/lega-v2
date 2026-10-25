@@ -2,6 +2,7 @@ import { Tooltip, Position, Spinner, Icon } from '@blueprintjs/core';
 import classNames from 'classnames';
 import * as FF from 'fp-ts/function';
 import React, { useState } from 'react';
+import intl from 'react-intl-universal';
 import type { Workspace } from '@bigcapital/sdk-ts';
 import { DRAWERS } from '@/constants/drawers';
 import {
@@ -11,6 +12,7 @@ import {
 import { WorkspaceSwitchingOverlay } from '@/ee/workspaces/components/WorkspaceSwitchingOverlay';
 import { useWorkspaces } from '@/ee/workspaces/hooks/query';
 import { useSwitchOrganization } from '@/ee/workspaces/hooks/useSwitchOrganization';
+import { canSwitchWorkspace } from '@/ee/workspaces/utils';
 import { useAuthOrganizationId } from '@/hooks/state';
 import { firstLettersArgs } from '@/utils';
 
@@ -30,17 +32,26 @@ function WorkspaceIcon({
 }) {
   const name = workspace.metadata?.name || workspace.organizationId;
   const initials = firstLettersArgs(...(name || '').split(' '));
-  const isDisabled = !workspace.isReady || workspace.isBuildRunning;
+  const isDisabled = !canSwitchWorkspace(workspace);
   const logoUri = workspace.metadata?.logoUri;
 
   return (
     <Tooltip
       content={name}
-      position={Position.RIGHT}
+      position={Position.LEFT}
+      boundary="viewport"
+      modifiers={{ offset: { offset: '0, 8' } }}
       minimal
-      className="workspaces-sidebar__item-tooltip"
+      popoverClassName="workspaces-sidebar-tooltip"
+      className={classNames('workspaces-sidebar__item-tooltip', {
+        'is-disabled': isDisabled,
+      })}
     >
       <button
+        type="button"
+        aria-label={name}
+        aria-current={isActive ? 'true' : undefined}
+        data-testId={`company-${workspace.organizationId}`}
         className={classNames('workspaces-sidebar__item', {
           'is-active': isActive,
           'is-disabled': isDisabled,
@@ -74,12 +85,18 @@ function OrganizationsListButton({
 }) {
   return (
     <Tooltip
-      content="View all organizations"
-      position={Position.RIGHT}
+      content={intl.get('workspaces.view_all_workspaces')}
+      position={Position.LEFT}
+      boundary="viewport"
+      modifiers={{ offset: { offset: '0, 8' } }}
       minimal
+      popoverClassName="workspaces-sidebar-tooltip"
       className="workspaces-sidebar__item-tooltip"
     >
       <button
+        type="button"
+        aria-label={intl.get('workspaces.view_all_workspaces')}
+        data-testId="all-companies"
         className={classNames(
           'workspaces-sidebar__item',
           'workspaces-sidebar__list-btn',
@@ -102,12 +119,18 @@ function AddWorkspaceButton({
 }) {
   return (
     <Tooltip
-      content="Create workspace"
-      position={Position.RIGHT}
+      content={intl.get('workspaces.create_workspace')}
+      position={Position.LEFT}
+      boundary="viewport"
+      modifiers={{ offset: { offset: '0, 8' } }}
       minimal
+      popoverClassName="workspaces-sidebar-tooltip"
       className="workspaces-sidebar__item-tooltip"
     >
       <button
+        type="button"
+        aria-label={intl.get('workspaces.create_workspace')}
+        data-testId="create-company"
         className={classNames(
           'workspaces-sidebar__item',
           'workspaces-sidebar__add-btn',
@@ -135,7 +158,14 @@ function WorkspacesSidebarRoot({ openDrawer }: WithDrawerActionsProps) {
     organizationId: string,
     workspaceName: string,
   ) => {
-    if (organizationId === activeOrganizationId) {
+    const workspace = workspaces?.find(
+      (item) => item.organizationId === organizationId,
+    );
+    if (
+      !workspace ||
+      !canSwitchWorkspace(workspace, activeOrganizationId) ||
+      switchingWorkspaceName
+    ) {
       return;
     }
     setSwitchingWorkspaceName(workspaceName);
@@ -147,7 +177,11 @@ function WorkspacesSidebarRoot({ openDrawer }: WithDrawerActionsProps) {
 
   return (
     <>
-      <div className="workspaces-sidebar">
+      <aside
+        className="workspaces-sidebar"
+        aria-label={intl.get('workspaces.company_switcher')}
+        data-testId="company-sidebar"
+      >
         <div className="workspaces-sidebar__scrollable">
           {isLoading ? (
             <div className="workspaces-sidebar__loading">
@@ -170,7 +204,7 @@ function WorkspacesSidebarRoot({ openDrawer }: WithDrawerActionsProps) {
           <OrganizationsListButton openDrawer={openDrawer} />
           <AddWorkspaceButton openDrawer={openDrawer} />
         </div>
-      </div>
+      </aside>
       {switchingWorkspaceName && (
         <WorkspaceSwitchingOverlay workspaceName={switchingWorkspaceName} />
       )}

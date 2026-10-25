@@ -1,25 +1,18 @@
 export const DefaultPdfTemplateTerms =
-  'All services provided are non-refundable. For any disputes, please contact us within 7 days of receiving this invoice.';
+  "All services provided are non-refundable. For any disputes, please contact us within 7 days of receiving this invoice.";
 
 export const DefaultPdfTemplateStatement =
-  'Thank you for your business. We look forward to working with you again!';
+  "Thank you for your business. We look forward to working with you again!";
 
-export const DefaultPdfTemplateItemName = 'Web development';
+export const DefaultPdfTemplateItemName = "Web development";
 
 export const DefaultPdfTemplateItemDescription =
-  'Website development with content and SEO optimization';
+  "Website development with content and SEO optimization";
 
-export const DefaultPdfTemplateAddressBilledTo = `Bigcapital Technology, Inc.<br />
-131 Continental Dr, <br />
-Suite 305, <br />
-Newark, Delaware 19713, <br />
-United States,<br />
-+1 762-339-5634
-`;
+export const DefaultPdfTemplateAddressBilledTo = `Example Customer<br />
+123 Example Street<br />
+customer@example.com`;
 
-export const DefaultPdfTemplateAddressBilledFrom = `131 Continental Dr Suite 305 Newark, <br />
-Delaware 19713,<br />
-United States, <br />
-+1 762-339-5634, <br />
-ahmed@bigcapital.app
-`;
+export const DefaultPdfTemplateAddressBilledFrom = `Example Company<br />
+456 Sample Street<br />
+accounts@example.com`;

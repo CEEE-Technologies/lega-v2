@@ -1,1 +1,1 @@
-# @bigcapital/webapp
+# LEGA web application

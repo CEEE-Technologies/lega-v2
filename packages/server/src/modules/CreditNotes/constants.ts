@@ -83,8 +83,8 @@ export const CreditNoteDefaultViews = [
 
 export const defaultCreditNoteBrandingAttributes = {
   // # Colors
-  primaryColor: '',
-  secondaryColor: '',
+  primaryColor: '#1f6f5c',
+  secondaryColor: '#ad6d0f',
 
   // # Company logo
   showCompanyLogo: true,
@@ -92,7 +92,7 @@ export const defaultCreditNoteBrandingAttributes = {
   companyLogoUri: '',
 
   // # Company name
-  companyName: 'Bigcapital Technology, Inc.',
+  companyName: 'Example Company',
 
   // # Customer address
   showCustomerAddress: true,

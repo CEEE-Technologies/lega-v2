@@ -1,5 +1,5 @@
-import { Icon } from '@/components/Icon';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 
 export function AuthCopyright() {
-  return <Icon width={122} height={22} icon={'bigcapital'} />;
+  return <BrandLogo width={100} />;
 }

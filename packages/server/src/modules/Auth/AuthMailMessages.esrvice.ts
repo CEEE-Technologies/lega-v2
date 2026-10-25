@@ -23,14 +23,14 @@ export class AuthenticationMailMesssages {
     const baseURL = this.configService.get('app.baseUrl');
 
     return new Mail()
-      .setSubject('Bigcapital - Password Reset')
+      .setSubject('LEGA - Password Reset')
       .setView('mail/ResetPassword.html')
       .setTo(user.email)
       .setAttachments([
         {
-          filename: 'bigcapital.png',
-          path: path.join(global.__static_dirname, `/images/bigcapital.png`),
-          cid: 'bigcapital_logo',
+          filename: 'lega.png',
+          path: path.join(global.__static_dirname, `/images/lega.png`),
+          cid: 'lega_logo',
         },
       ])
       .setData({
@@ -58,14 +58,14 @@ export class AuthenticationMailMesssages {
     const verifyUrl = `${baseURL}/auth/email_confirmation?token=${token}&email=${email}`;
 
     return new Mail()
-      .setSubject('Bigcapital - Verify your email')
+      .setSubject('LEGA - Verify your email')
       .setView('mail/SignupVerifyEmail.html')
       .setTo(email)
       .setAttachments([
         {
-          filename: 'bigcapital.png',
-          path: path.join(global.__static_dirname, `/images/bigcapital.png`),
-          cid: 'bigcapital_logo',
+          filename: 'lega.png',
+          path: path.join(global.__static_dirname, `/images/lega.png`),
+          cid: 'lega_logo',
         },
       ])
       .setData({ verifyUrl, fullName });

@@ -2,6 +2,7 @@ import { Button, Intent } from '@blueprintjs/core';
 import React from 'react';
 import { useHistory } from 'react-router-dom';
 import { EmptyStatus, FormattedMessage as T } from '@/components';
+import { brandLinks } from '@/constants/branding';
 
 export function WarehouseTransfersEmptyStatus() {
   const history = useHistory();
@@ -25,9 +26,17 @@ export function WarehouseTransfersEmptyStatus() {
           >
             <T id={'warehouse_transfer.action.new_warehouse_transfer'} />
           </Button>
-          <Button intent={Intent.NONE} large={true}>
-            <T id={'learn_more'} />
-          </Button>
+          {brandLinks.docs && (
+            <Button
+              intent={Intent.NONE}
+              large={true}
+              onClick={() =>
+                window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+              }
+            >
+              <T id={'learn_more'} />
+            </Button>
+          )}
         </>
       }
     />

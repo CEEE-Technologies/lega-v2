@@ -1,16 +1,32 @@
-const theme =
-  localStorage.getItem('theme') ||
-  (window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light');
+// Loaded synchronously before rendering; also used by runtime controls.
+(function () {
+  var preference = 'light';
+  try {
+    preference = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+  } catch (_) {
+    // Storage restrictions must not prevent application boot.
+  }
 
-if (theme === 'dark') {
-  document.documentElement.classList.add('bp4-dark');
-  document.body.classList.add('bp4-dark');
-}
+  function apply() {
+    var dark =
+      preference === 'dark' &&
+      !/^\/payment(?:\/|$)/.test(window.location.pathname);
+    document.documentElement.classList.toggle('bp4-dark', dark);
+    if (document.body) document.body.classList.toggle('bp4-dark', dark);
+  }
 
-// Remove dark mode for payment portal pages
-if (window.location.pathname.startsWith('/payment')) {
-  document.documentElement.classList.remove('bp4-dark');
-  document.body.classList.remove('bp4-dark');
-}
+  window.legaTheme = {
+    get: function () {
+      return preference;
+    },
+    apply: apply,
+    set: function (theme) {
+      preference = theme === 'dark' ? 'dark' : 'light';
+      try {
+        localStorage.setItem('theme', preference);
+      } catch (_) {}
+      apply();
+    },
+  };
+  apply();
+})();

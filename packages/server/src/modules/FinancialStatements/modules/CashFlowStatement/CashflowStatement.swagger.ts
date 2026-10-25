@@ -387,7 +387,7 @@ export const CashflowStatementResponseExample = {
     basis: AccountingBasis.Cash,
   },
   meta: {
-    organization_name: 'BIGCAPITAL, INC',
+    organization_name: 'Example Company',
     base_currency: 'USD',
     date_format: 'DD MMM yyyy',
     is_cost_compute_running: false,

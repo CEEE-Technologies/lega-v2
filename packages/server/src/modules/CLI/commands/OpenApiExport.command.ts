@@ -29,7 +29,7 @@ export class OpenApiExportCommand extends CommandRunner {
     app.use(new ClsMiddleware({}).use);
 
     const config = new DocumentBuilder()
-      .setTitle('Bigcapital')
+      .setTitle('LEGA')
       .setDescription('Financial accounting software')
       .setVersion('1.0')
       .build();

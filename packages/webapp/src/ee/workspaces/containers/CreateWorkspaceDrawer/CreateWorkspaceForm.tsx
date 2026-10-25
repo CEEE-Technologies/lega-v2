@@ -13,8 +13,6 @@ import {
   FSelect,
   FTimezoneSelect,
   FormattedMessage as T,
-  DrawerBody,
-  DrawerActionsBar,
 } from '@/components';
 import { getAllCurrenciesOptions } from '@/constants/currencies';
 import { getFiscalYear } from '@/constants/fiscalYearOptions';
@@ -24,7 +22,6 @@ import {
   type SetupOrganizationFormValues,
 } from '@/containers/Setup/SetupOrganization.schema';
 import { useCreateWorkspace } from '@/ee/workspaces/hooks/query';
-import { useIsDarkMode } from '@/hooks/useDarkMode';
 
 /** Blueprint FormGroup supports `fastField`; package typings omit it. */
 type FFormGroupWithFastField = typeof FFormGroup & {
@@ -65,7 +62,6 @@ export default function CreateWorkspaceForm({
   const FiscalYear = getFiscalYear();
   const Languages = getLanguages();
   const currencies = getAllCurrenciesOptions();
-  const isDarkMode = useIsDarkMode();
   const { mutateAsync: createWorkspaceMutate } = useCreateWorkspace();
   const validationSchema = getSetupOrganizationValidation();
 
@@ -106,7 +102,13 @@ export default function CreateWorkspaceForm({
     >
       {(formikProps) => (
         <>
-          <x.div flex={1} pt={'22px'} overflow={'auto'}>
+          <x.div
+            flex={1}
+            minHeight={0}
+            pt={'22px'}
+            px={'24px'}
+            overflow={'auto'}
+          >
             <x.div maxWidth={'600px'} w="100%" mx="auto">
               <Form>
                 {/* ---------- Organization name ----------  */}
@@ -229,7 +231,8 @@ export default function CreateWorkspaceForm({
           </x.div>
 
           <x.div
-            borderTop={'1px solid rgba(255, 255, 255, 0.1)'}
+            flexShrink={0}
+            borderTop={'1px solid var(--color-border)'}
             pt={'12px'}
             pb={'12px'}
           >

@@ -22,6 +22,7 @@ import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { WorkspaceSwitchingOverlay } from '@/ee/workspaces/components/WorkspaceSwitchingOverlay';
 import { useSetDefaultWorkspace } from '@/ee/workspaces/hooks/query';
 import { useSwitchOrganization } from '@/ee/workspaces/hooks/useSwitchOrganization';
+import { canSwitchWorkspace } from '@/ee/workspaces/utils';
 import { useAuthOrganizationId } from '@/hooks/state';
 
 /**
@@ -143,8 +144,7 @@ function OrganizationsListTable({
             workspace.isBuildRunning ||
             workspace.isDeleting;
           const isOwner = workspace.role === 'owner';
-          const canSwitch =
-            !isCurrentOrganization && !isDisabled && workspace.isActive;
+          const canSwitch = canSwitchWorkspace(workspace, activeOrganizationId);
           const defaultDisabled =
             !workspace.isReady ||
             workspace.isBuildRunning ||

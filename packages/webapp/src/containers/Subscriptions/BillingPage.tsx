@@ -29,7 +29,7 @@ function BillingPageRoot({
     changePreferencesPageTitle('Billing');
   }, [changePreferencesPageTitle]);
 
-  // In case the edition is not Bigcapital Cloud, redirect to the homepage.
+  // In case the edition is not LEGA Cloud, redirect to the homepage.
   if (!dashboardMeta!.isBigcapitalCloud) {
     return <Redirect to={{ pathname: '/' }} />;
   }

@@ -13,7 +13,9 @@ import { FormattedMessage as T } from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useAuthenticatedAccount } from '@/hooks/query';
 import { useAuthActions, useAuthOrganizationId } from '@/hooks/state';
+import { useIsDarkMode } from '@/hooks/useDarkMode';
 import { firstLettersArgs } from '@/utils';
+import { toggleColorTheme } from '@/utils/theme';
 
 /**
  * Dashboard topbar user.
@@ -28,6 +30,7 @@ function DashboardTopbarUser({
   // Retrieve authenticated user information.
   const { data: user } = useAuthenticatedAccount();
   const organizationId = useAuthOrganizationId();
+  const isDarkMode = useIsDarkMode();
 
   const onClickLogout = () => {
     setLogout();
@@ -63,6 +66,11 @@ function DashboardTopbarUser({
           <MenuItem
             text={<T id={'preferences'} />}
             onClick={() => history.push('/preferences')}
+          />
+          <MenuItem
+            icon={isDarkMode ? 'flash' : 'moon'}
+            text={<T id={isDarkMode ? 'theme.light' : 'theme.dark'} />}
+            onClick={toggleColorTheme}
           />
           <MenuItem text={<T id={'logout'} />} onClick={onClickLogout} />
         </Menu>

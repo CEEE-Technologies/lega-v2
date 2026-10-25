@@ -7,6 +7,7 @@ import {
   PaymentReceiveAction,
   AbilitySubject,
 } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 
 export function PaymentsReceivedEmptyStatus() {
   const history = useHistory();
@@ -37,9 +38,17 @@ export function PaymentsReceivedEmptyStatus() {
               <T id={'new_payment_received'} />
             </Button>
 
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

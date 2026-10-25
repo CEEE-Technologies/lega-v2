@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import styled from 'styled-components';
-import { Icon } from '@/components';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 
 interface AuthContainerProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ export function AuthContainer({ children }: AuthContainerProps) {
     <AuthPage>
       <AuthInsider>
         <AuthLogo>
-          <Icon icon="bigcapital" height={37} width={214} />
+          <BrandLogo width={184} />
         </AuthLogo>
 
         {children}

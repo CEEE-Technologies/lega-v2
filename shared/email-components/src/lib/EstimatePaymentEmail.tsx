@@ -1,5 +1,5 @@
-import { CSSProperties } from 'react';
-import isEmpty from 'lodash.isempty';
+import { CSSProperties } from "react";
+import isEmpty from "lodash.isempty";
 import {
   Button,
   Column,
@@ -8,9 +8,9 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components';
-import { EmailTemplateLayout } from './EmailTemplateLayout';
-import { EmailTemplate } from './EmailTemplate';
+} from "@react-email/components";
+import { EmailTemplateLayout } from "./EmailTemplateLayout";
+import { EmailTemplate } from "./EmailTemplate";
 
 export interface EstimatePaymentEmailProps {
   preview: string;
@@ -63,42 +63,42 @@ export const EstimatePaymentEmail: React.FC<
   preview,
 
   // # Company
-  companyName = 'Bigcapital, Inc.',
+  companyName = "Example Company",
   companyLogoUri,
 
   // # Colors
-  primaryColor = 'rgb(0, 82, 204)',
+  primaryColor = "#1f6f5c",
 
   // # Total
   total,
-  totalLabel = 'Total',
+  totalLabel = "Total",
 
   // # Adjustment
   adjustment,
-  adjustmentLabel = 'Adjustment',
+  adjustmentLabel = "Adjustment",
 
   // # Discount
   discount,
-  discountLabel = 'Discount',
+  discountLabel = "Discount",
 
   // # Subtotal
   subtotal,
-  subtotalLabel = 'Subtotal',
+  subtotalLabel = "Subtotal",
 
   // # Estimate No#
-  estimateNumberLabel = 'Estimate No: {estimateNumber}',
-  estimateNumber = 'EST-00001',
+  estimateNumberLabel = "Estimate No: {estimateNumber}",
+  estimateNumber = "EST-00001",
 
   // # Expiration date
-  expirationDateLabel = 'Expiration Date: {expirationDate}',
-  expirationDate = '12/12/2021',
+  expirationDateLabel = "Expiration Date: {expirationDate}",
+  expirationDate = "12/12/2021",
 
   // # View invoice button
-  viewEstimateButtonLabel = 'View Estimate',
+  viewEstimateButtonLabel = "View Estimate",
   viewEstimateButtonUrl,
 
   // # Message
-  message = '',
+  message = "",
 
   // # Items
   items = [],
@@ -117,12 +117,12 @@ export const EstimatePaymentEmail: React.FC<
           </Row>
           <Row>
             <Text style={estimateNumberStyle}>
-              {estimateNumberLabel?.replace('{estimateNumber}', estimateNumber)}
+              {estimateNumberLabel?.replace("{estimateNumber}", estimateNumber)}
             </Text>
           </Row>
           <Row>
             <Text style={estimateExpirationStyle}>
-              {expirationDateLabel.replace('{expirationDate}', expirationDate)}
+              {expirationDateLabel.replace("{expirationDate}", expirationDate)}
             </Text>
           </Row>
         </Section>
@@ -141,11 +141,11 @@ export const EstimatePaymentEmail: React.FC<
         <Section style={totalsSectionStyle}>
           {items.map((item, index) => (
             <Row key={index} style={itemLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{item.label}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>
                   {item.quantity} x {item.rate}
                 </Text>
@@ -154,22 +154,22 @@ export const EstimatePaymentEmail: React.FC<
           ))}
 
           <Row style={totalLineRowStyle}>
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemLabelStyle}>{subtotalLabel}</Text>
             </Column>
 
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemAmountStyle}>{subtotal}</Text>
             </Column>
           </Row>
 
           {!isEmpty(discount) && (
             <Row style={totalLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{discountLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>{discount}</Text>
               </Column>
             </Row>
@@ -177,22 +177,22 @@ export const EstimatePaymentEmail: React.FC<
 
           {!isEmpty(adjustment) && (
             <Row style={totalLineRowStyle}>
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemLabelStyle}>{adjustmentLabel}</Text>
               </Column>
 
-              <Column width={'50%'}>
+              <Column width={"50%"}>
                 <Text style={listItemAmountStyle}>{adjustment}</Text>
               </Column>
             </Row>
           )}
 
           <Row style={totalLineRowStyle}>
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemLabelStyle}>{totalLabel}</Text>
             </Column>
 
-            <Column width={'50%'}>
+            <Column width={"50%"}>
               <Text style={totalLineItemAmountStyle}>{total}</Text>
             </Column>
           </Row>
@@ -209,51 +209,51 @@ export const EstimatePaymentEmail: React.FC<
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export const renderEstimateEmailTemplate = (
-  props: EstimatePaymentEmailProps
+  props: EstimatePaymentEmailProps,
 ) => {
   return render(<EstimatePaymentEmail {...props} />);
 };
 
 const headerInfoStyle: CSSProperties = {
-  textAlign: 'center',
+  textAlign: "center",
   marginBottom: 20,
 };
 
 const estimateAmountStyle: CSSProperties = {
   margin: 0,
-  color: '#383E47',
+  color: "#383E47",
   fontWeight: 500,
 };
 
 const estimateNumberStyle: CSSProperties = {
   margin: 0,
-  fontSize: '13px',
-  color: '#404854',
+  fontSize: "13px",
+  color: "#404854",
 };
 
 const estimateExpirationStyle: CSSProperties = {
   margin: 0,
-  fontSize: '13px',
-  color: '#404854',
+  fontSize: "13px",
+  color: "#404854",
 };
 
 const invoiceCompanyNameStyle: CSSProperties = {
   margin: 0,
-  fontSize: '18px',
+  fontSize: "18px",
   fontWeight: 500,
-  color: '#404854',
+  color: "#404854",
 };
 
 const viewEstimateButtonStyle: CSSProperties = {
-  display: 'block',
-  cursor: 'pointer',
-  textAlign: 'center',
+  display: "block",
+  cursor: "pointer",
+  textAlign: "center",
   fontSize: 16,
-  padding: '10px 15px',
-  lineHeight: '1',
-  backgroundColor: 'rgb(0, 82, 204)',
-  color: '#fff',
-  borderRadius: '5px',
+  padding: "10px 15px",
+  lineHeight: "1",
+  backgroundColor: "#1f6f5c",
+  color: "#fff",
+  borderRadius: "5px",
 };
 
 const listItemLabelStyle: CSSProperties = {
@@ -262,16 +262,16 @@ const listItemLabelStyle: CSSProperties = {
 
 const listItemAmountStyle: CSSProperties = {
   margin: 0,
-  textAlign: 'right',
+  textAlign: "right",
 };
 
 const estimateMessageStyle: CSSProperties = {
-  whiteSpace: 'pre-line',
-  margin: '0 0 20px 0',
-  lineHeight: '20px',
+  whiteSpace: "pre-line",
+  margin: "0 0 20px 0",
+  lineHeight: "20px",
 };
 const totalLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #000',
+  borderBottom: "1px solid #000",
   height: 40,
 };
 
@@ -286,11 +286,11 @@ const totalLineItemAmountStyle: CSSProperties = {
 };
 
 const itemLineRowStyle: CSSProperties = {
-  borderBottom: '1px solid #D9D9D9',
+  borderBottom: "1px solid #D9D9D9",
   height: 40,
 };
 
 const totalsSectionStyle = {
-  marginTop: '20px',
-  borderTop: '1px solid #D9D9D9',
+  marginTop: "20px",
+  borderTop: "1px solid #D9D9D9",
 };

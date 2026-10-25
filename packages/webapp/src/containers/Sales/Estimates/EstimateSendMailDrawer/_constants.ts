@@ -1,5 +1,5 @@
 export const defaultEstimateMailReceiptProps = {
-  companyName: 'Bigcapital Technology, Inc.',
+  companyName: 'Example Company',
   companyLogoUri: ' ',
 
   total: '$1,000.00',
@@ -8,7 +8,7 @@ export const defaultEstimateMailReceiptProps = {
   expirationDate: '2 Oct 2024',
   dueAmount: '$1,000.00',
   items: [{ label: 'Web development', total: '$1000.00', quantity: 1 }],
-  message: `Hi Ahmed Bouhuolia,
+  message: `Hi Example Customer,
 
 Here's invoice # INV-00002 for $738.30
 
@@ -19,5 +19,5 @@ From your online payment page you can print a PDF or view your outstanding bills
 If you have any questions, please let us know.
 
 Thanks,
-Bigcapital`,
+LEGA`,
 };

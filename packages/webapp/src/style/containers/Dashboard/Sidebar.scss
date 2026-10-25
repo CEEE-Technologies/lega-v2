@@ -61,7 +61,7 @@
         outline: 0;
         font-size: 15px;
 
-        &:not([class*="bp4-intent-"]):not(.bp4-minimal) {
+        &:not([class*='bp4-intent-']):not(.bp4-minimal) {
           color: rgb(255, 255, 255);
         }
 
@@ -126,10 +126,10 @@
   }
 
   &__head-organization {
-    .bp4-button:not([class*=bp4-intent-]):not(.bp4-minimal) {
+    .bp4-button:not([class*='bp4-intent-']):not(.bp4-minimal) {
       background-color: transparent;
       border-color: transparent;
-      box-shadow: 0 0 0
+      box-shadow: 0 0 0;
     }
   }
 
@@ -159,13 +159,13 @@
         background: var(--color-sidebar-menu-item-active-background);
         color: var(--color-sidebar-menu-item-active-text);
       }
-      >.#{$ns}-icon {
+      > .#{$ns}-icon {
         color: #767b9b;
         margin-right: 16px;
         margin-top: 0;
       }
 
-      >.#{$ns}-icon-caret-right {
+      > .#{$ns}-icon-caret-right {
         margin-right: -4px;
         margin-top: 3px;
         color: rgba(255, 255, 255, 0.25);
@@ -181,7 +181,7 @@
         font-weight: 500;
         letter-spacing: 1px;
 
-        html[lang^="ar"] & {
+        html[lang^='ar'] & {
           font-size: 12px;
           letter-spacing: 0;
         }
@@ -255,8 +255,8 @@
         visibility: visible;
       }
 
-      // Hide text of bigcapital logo.
-      &-logo {}
+      &-logo {
+      }
 
       &-organization {
         opacity: 0;

@@ -13,6 +13,7 @@ import PreferencesPage from '@/components/Preferences/PreferencesPage';
 import { AlertsContainer } from '@/containers/AlertsContainer';
 import { Sidebar } from '@/containers/Dashboard/Sidebar/Sidebar';
 import { DashboardUniversalSearch } from '@/containers/UniversalSearch/DashboardUniversalSearch';
+import { WorkspacesSidebar } from '@/ee/workspaces/containers/Dashboard/WorkspacesSidebar';
 
 /**
  * Dashboard preferences.
@@ -26,6 +27,7 @@ function DashboardPreferences() {
           <PreferencesPage />
         </DashboardSplitPane>
       </div>
+      <WorkspacesSidebar />
     </div>
   );
 }
@@ -42,6 +44,7 @@ function DashboardAnyPage() {
           <DashboardContent />
         </DashboardSplitPane>
       </div>
+      <WorkspacesSidebar />
     </div>
   );
 }

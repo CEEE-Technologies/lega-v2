@@ -1,12 +1,13 @@
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createBrowserHistory, History } from 'history';
-import { lazy, Suspense } from 'react';
-import { Router, Switch, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Router, Switch, Route, useLocation } from 'react-router-dom';
 import '@/style/App.scss';
 import { SplashScreen, DashboardThemeProvider } from '../components';
 import { queryConfig } from '../hooks/query/base';
 import AppIntlLoader from './AppIntlLoader';
+import { BootLoading } from './Dashboard/BootLoading';
 import { EnsureUserEmailNotVerified } from './Guards/EnsureUserEmailNotVerified';
 import { EnsureAuthenticated } from '@/components/Guards/EnsureAuthenticated';
 import { GlobalErrors } from '@/containers/GlobalErrors/GlobalErrors';
@@ -35,15 +36,20 @@ const PaymentPortalPage = lazy(() =>
   })),
 );
 
-/**
- * App inner.
- */
+function RouteTheme() {
+  const { pathname } = useLocation();
+  useEffect(() => window.legaTheme.apply(), [pathname]);
+  return null;
+}
+
+/** App inner. */
 function AppInsider({ history }: { history: History }) {
   return (
     <div className="App">
       <DashboardThemeProvider>
-        <Suspense fallback={'Loading...'}>
+        <Suspense fallback={<BootLoading />}>
           <Router history={history}>
+            <RouteTheme />
             <Switch>
               <Route path={'/auth/register/verify'}>
                 <EnsureAuthenticated>
@@ -78,20 +84,21 @@ function AppInsider({ history }: { history: History }) {
  */
 export default function App() {
   // Browser history.
-  const history = createBrowserHistory();
+  const [history] = useState(() => createBrowserHistory());
 
   // Query client.
-  const queryClient = new QueryClient(queryConfig);
+  const [queryClient] = useState(() => new QueryClient(queryConfig));
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SplashScreen />
+      <SplashScreen>
+        <AppIntlLoader>
+          <AppInsider history={history} />
+        </AppIntlLoader>
+      </SplashScreen>
 
-      <AppIntlLoader>
-        <AppInsider history={history} />
-      </AppIntlLoader>
-
-      {import.meta.env.VITE_REACT_QUERY_DEVTOOLS !== 'false' &&
+      {import.meta.env.DEV &&
+        import.meta.env.VITE_REACT_QUERY_DEVTOOLS === 'true' &&
         !navigator.webdriver && <ReactQueryDevtools initialIsOpen />}
     </QueryClientProvider>
   );

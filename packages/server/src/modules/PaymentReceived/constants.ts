@@ -50,15 +50,15 @@ export const PaymentsReceiveSampleData = [
 
 export const defaultPaymentReceivedPdfTemplateAttributes = {
   // # Colors
-  primaryColor: '#000',
-  secondaryColor: '#000',
+  primaryColor: '#1f6f5c',
+  secondaryColor: '#ad6d0f',
 
   // # Company logo
   showCompanyLogo: true,
   companyLogoUri: '',
 
   // # Company name
-  companyName: 'Bigcapital Technology, Inc.',
+  companyName: 'Example Company',
 
   // # Customer address
   showCustomerAddress: true,

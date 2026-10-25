@@ -1,0 +1,32 @@
+{
+  "name": "@lega/qbo-import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone QuickBooks Online extraction and portable bundles for LEGA",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "lega-qbo-import": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "cli": "pnpm run build && node dist/cli.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "dotenv": "16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.25",
+    "typescript": "5.6.3"
+  }
+}

@@ -45,7 +45,7 @@ export function OrganizationsListWorkspaceCell({
           h="28px"
           minWidth="28px"
           minHeight="28px"
-          backgroundColor="#5c7c99"
+          backgroundColor="#245b4d"
           borderRadius="10px"
           color="#ffffff"
           display="flex"
@@ -81,7 +81,7 @@ export function OrganizationsListWorkspaceCell({
           <x.span
             fontWeight={500}
             fontSize="14px"
-            color="rgba(255, 255, 255, 0.88)"
+            color="var(--color-text)"
             overflow="hidden"
             textOverflow="ellipsis"
             whiteSpace="nowrap"

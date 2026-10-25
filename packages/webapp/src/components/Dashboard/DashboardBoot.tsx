@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
-import { useWatch, useWatchImmediate, useWhen } from '@/hooks';
+import React from 'react';
+import { useWhen } from '@/hooks';
 import {
   useAuthenticatedAccount,
   useCurrentOrganization,
   useDashboardMeta,
 } from '@/hooks/query';
-import { useSplashLoading } from '@/hooks/state';
+import { useSplashLoadingState } from '@/hooks/state';
 import { setCookie, getCookie } from '@/utils';
 
 /**
@@ -19,15 +19,7 @@ export function useDashboardMetaBoot() {
     isLoading: isDashboardMetaLoading,
     isSuccess: isDashboardMetaSuccess,
   } = useDashboardMeta();
-  const [startLoading, stopLoading] = useSplashLoading();
-
-  useWatchImmediate((value) => {
-    value && startLoading();
-  }, isDashboardMetaLoading);
-
-  useWatchImmediate(() => {
-    isDashboardMetaSuccess && stopLoading();
-  }, isDashboardMetaSuccess);
+  useSplashLoadingState(isDashboardMetaLoading);
 
   return {
     meta: dashboardMeta,
@@ -80,30 +72,6 @@ export function useApplicationBoot() {
     }
   }, [localeCookie, organization]);
 
-  const [startLoading, stopLoading] = useSplashLoading();
-
-  // Splash loading when organization request loading and
-  // application still not booted.
-  useWatchImmediate((value) => {
-    value && !isBooted.current && startLoading();
-  }, isOrgLoading);
-
-  // Splash loading when request authenticated user loading and
-  // application still not booted yet.
-  useWatchImmediate((value) => {
-    value && !isBooted.current && startLoading();
-  }, isAuthUserLoading);
-
-  // Stop splash loading once organization request success.
-  useWatch((value) => {
-    value && stopLoading();
-  }, isCurrentOrganizationSuccess);
-
-  // Stop splash loading once authenticated user request success.
-  useWatch((value) => {
-    value && stopLoading();
-  }, isAuthUserSuccess);
-
   // Once the all requests complete change the app loading state.
   useWhen(
     isAuthUserSuccess &&
@@ -113,15 +81,6 @@ export function useApplicationBoot() {
       isBooted.current = true;
     },
   );
-  // Reset the loading states once the hook unmount.
-  useEffect(
-    () => () => {
-      isAuthUserLoading && !isBooted.current && stopLoading();
-      isOrgLoading && !isBooted.current && stopLoading();
-    },
-    [isAuthUserLoading, isOrgLoading, stopLoading],
-  );
-
   return {
     isLoading: isOrgLoading || isAuthUserLoading,
   };

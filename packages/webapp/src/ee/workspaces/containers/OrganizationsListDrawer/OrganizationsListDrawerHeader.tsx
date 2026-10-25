@@ -11,7 +11,7 @@ const organizationsSwitchLabelBpCss = css`
     margin: 0;
   }
   .bp4-control.bp4-switch input:checked ~ .bp4-control-indicator {
-    background: rgb(0, 82, 204);
+    background: var(--color-primary);
     box-shadow: none;
   }
 `;
@@ -46,7 +46,7 @@ export function OrganizationsListDrawerHeader({
       justifyContent="space-between"
       px="10px"
       py="10px"
-      borderBottom="1px solid rgba(255, 255, 255, 0.08)"
+      borderBottom="1px solid var(--color-border)"
     >
       <x.label
         className={organizationsSwitchLabelBpCss}
@@ -58,7 +58,7 @@ export function OrganizationsListDrawerHeader({
         userSelect="none"
       >
         <Switch checked={isCurrentOrgDefault} onChange={handleChange} />
-        <x.span fontSize="14px" color="rgb(255, 255, 255)">
+        <x.span fontSize="14px" color="var(--color-text)">
           {intl.get('workspaces.set_default_workspace', {
             fallback: 'Set default workspace',
           })}

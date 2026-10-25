@@ -230,7 +230,7 @@ export const ProfitLossSheetResponseExample = {
     },
   ],
   meta: {
-    organizationName: 'BIGCAPITAL, INC',
+    organizationName: 'Example Company',
     baseCurrency: 'USD',
     dateFormat: 'DD MMM yyyy',
     isCostComputeRunning: false,

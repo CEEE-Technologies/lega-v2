@@ -50,14 +50,6 @@ export const AuthInsiderCopyright = styled.div`
   font-size: 12px;
   color: #666;
   margin-top: 1.2rem;
-
-  .bp4-icon-bigcapital {
-    svg {
-      path {
-        fill: #a3a3a3;
-      }
-    }
-  }
 `;
 
 export const AuthFooterLinks = styled.div`
@@ -83,11 +75,11 @@ export const AuthSubmitButton = styled(Button)`
   margin-top: 20px;
 
   &.bp4-intent-primary {
-    // background-color: #0052cc;
+    // background-color: var(--color-primary);
 
     &:disabled,
     &.bp4-disabled {
-      // background-color: rgba(0, 82, 204, 0.4);
+      // background-color: rgba(31, 111, 92, 0.4);
     }
   }
 `;

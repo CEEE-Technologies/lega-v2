@@ -5,30 +5,19 @@ import { Route, Switch, useLocation } from 'react-router-dom';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import styled from 'styled-components';
 import { AuthMetaBootProvider } from './AuthMetaBoot';
-import { Box, Icon } from '@/components';
-import { BigcapitalAlt } from '@/components/Icons/BigcapitalAlt';
-import { useIsDarkMode } from '@/hooks/useDarkMode';
+import { Box } from '@/components';
+import { BrandLogo } from '@/components/Brand/BrandLogo';
 import authenticationRoutes from '@/routes/authentication';
 
 import '@/style/pages/Authentication/Auth.scss';
 
 export function Authentication() {
-  const isDarkMode = useIsDarkMode();
-
   return (
     <BodyClassName className={'authentication'}>
       <AuthPage>
         <AuthInsider>
           <AuthLogo>
-            {isDarkMode ? (
-              <BigcapitalAlt
-                color={'rgba(255, 255, 255, 0.6)'}
-                height={37}
-                width={214}
-              />
-            ) : (
-              <Icon icon="bigcapital" height={37} width={214} />
-            )}
+            <BrandLogo width={184} />
           </AuthLogo>
 
           <AuthMetaBootProvider>

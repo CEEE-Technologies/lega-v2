@@ -23,20 +23,20 @@ export function DataTableEditable({
 }
 
 const DatatableEditableRoot = styled.div`
-  --x-table-background: #fff;
-  --x-table-border: #d2dce2;
-  --x-table-head-border: #d2dce2;
-  --x-table-head-background: #f2f3fb;
-  --x-table-head-text: #415060;
-  --x-color-table-body-input-text: #222;
-  --x-color-table-cell-border: #d8d8d8;
+  --x-table-background: var(--color-surface);
+  --x-table-border: var(--color-border);
+  --x-table-head-border: var(--color-border);
+  --x-table-head-background: var(--color-surface-secondary);
+  --x-table-head-text: var(--color-text);
+  --x-color-table-body-input-text: var(--color-text);
+  --x-color-table-cell-border: var(--color-border);
 
   .bp4-dark & {
     --x-table-background: var(--color-dark-gray1);
     --x-table-border: rgba(255, 255, 255, 0.1);
     --x-table-head-background: var(--color-dark-gray2);
     --x-table-head-border: rgba(255, 255, 255, 0.1);
-    --x-table-head-text: rgba(--color-light-gray1);
+    --x-table-head-text: var(--color-text);
     --x-color-table-body-input-text: var(--color-light-gray2);
     --x-color-table-cell-border: rgba(255, 255, 255, 0.1);
   }
@@ -105,7 +105,7 @@ const DatatableEditableRoot = styled.div`
           padding-right: 14px;
 
           &:focus {
-            box-shadow: 0 0 0 2px #116cd0;
+            box-shadow: 0 0 0 2px var(--color-primary);
           }
         }
         .form-group--select-list .bp4-button {

@@ -14,3 +14,12 @@ e2e/.auth/
 
 
 .pnpm-store
+
+# Local implementation ledger
+.superpowers/
+
+# Private QBO connection state and extracted company bundles
+.qbo-state/
+qbo-data/
+qbo-data.lock/
+packages/qbo-import/dist/

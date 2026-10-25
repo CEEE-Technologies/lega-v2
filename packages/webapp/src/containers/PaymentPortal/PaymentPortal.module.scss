@@ -1,7 +1,6 @@
-
 :root {
   --payment-page-background-color: #fff;
-  --payment-page-primary-button: #0052cc;
+  --payment-page-primary-button: var(--color-primary);
 }
 
 .rootBodyPage {
@@ -18,7 +17,7 @@
 
 .companyLogoWrap {
   height: 50px;
-  width :50px;
+  width: 50px;
   border-radius: 50px;
   background-color: #dfdfdf;
   background-position: center center;
@@ -27,7 +26,7 @@
   border: 1px solid #e8e8e8;
 }
 
-.bigTitle{
+.bigTitle {
   margin: 0;
   font-weight: 500;
   color: #222;
@@ -35,7 +34,7 @@
   line-height: 1.35;
 }
 
-.invoiceDueDate{
+.invoiceDueDate {
   font-size: 14px;
 }
 
@@ -49,20 +48,20 @@
   padding: 30px 26px;
 }
 
-.footer{
+.footer {
   padding: 20px 26px;
-  background-color: #FAFAFA;
-  border-top: 1px solid #DCE0E5;
+  background-color: #fafafa;
+  border-top: 1px solid #dce0e5;
   border-radius: 0 0 8px 8px;
   color: #333;
   font-size: 12px;
 }
 
-.address{
+.address {
   color: #5f6b7c;
 }
 
-.customerName{
+.customerName {
   font-size: 16px;
   font-weight: 600;
   color: #222;
@@ -72,26 +71,27 @@
   padding: 6px 0;
 
   &.borderBottomGray {
-    border-bottom: 1px solid #DADADA;
+    border-bottom: 1px solid #dadada;
   }
-  &.borderBottomDark{
+  &.borderBottomDark {
     border-bottom: 1px solid #000;
   }
 }
 
-.downloadInvoiceButton:global(.bp4-button.bp4-minimal){
-  box-shadow: 0 0 0 1px #DCE0E5;
+.downloadInvoiceButton:global(.bp4-button.bp4-minimal) {
+  box-shadow: 0 0 0 1px #dce0e5;
 }
 
-.viewInvoiceButton:global(.bp4-button:not([class*=bp4-intent-]):not(.bp4-minimal)){
-  background-color: #EDEFF2;
+.viewInvoiceButton:global(
+    .bp4-button:not([class*='bp4-intent-']):not(.bp4-minimal)
+  ) {
+  background-color: #edeff2;
 }
 
-.buyNote{
+.buyNote {
   margin-top: 16px;
   font-size: 12px;
 }
-
 
 // Footer
 // -------------------
@@ -99,16 +99,16 @@
   color: #000;
 }
 
-.footerButtons{
+.footerButtons {
   margin-top: 20px;
 }
 
-.footerButton{
+.footerButton {
   height: 40px;
   line-height: 40px;
   font-size: 16px;
 }
 
-.footerText{
+.footerText {
   color: #666;
 }

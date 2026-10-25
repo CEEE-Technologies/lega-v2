@@ -2,6 +2,7 @@ import { Button, Intent } from '@blueprintjs/core';
 import * as FF from 'fp-ts/function';
 import { EmptyStatus, Can, FormattedMessage as T } from '@/components';
 import { SaleInvoiceAction, AbilitySubject } from '@/constants/abilityOption';
+import { brandLinks } from '@/constants/branding';
 import { DialogsName } from '@/constants/dialogs';
 import {
   withDialogActions,
@@ -32,9 +33,17 @@ function TaxRatesLandingEmptyStateRoot({
             >
               New tax rate
             </Button>
-            <Button intent={Intent.NONE} large={true}>
-              <T id={'learn_more'} />
-            </Button>
+            {brandLinks.docs && (
+              <Button
+                intent={Intent.NONE}
+                large={true}
+                onClick={() =>
+                  window.open(brandLinks.docs, '_blank', 'noopener,noreferrer')
+                }
+              >
+                <T id={'learn_more'} />
+              </Button>
+            )}
           </Can>
         </>
       }

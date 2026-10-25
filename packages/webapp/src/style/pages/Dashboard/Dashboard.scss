@@ -50,17 +50,17 @@ $dashboard-views-bar-height: 44px;
         .bp4-dark & {
           color: var(--color-sidebar-toggle);
 
-        &,
-        &:hover,
-        &:focus {
-          border-radius: 0;
-          box-shadow: none;
-          background-color: transparent;
-          border: 0;
+          &,
+          &:hover,
+          &:focus {
+            border-radius: 0;
+            box-shadow: none;
+            background-color: transparent;
+            border: 0;
+          }
         }
       }
     }
-  }
 
     &-navbar {
       display: flex;
@@ -77,10 +77,10 @@ $dashboard-views-bar-height: 44px;
       }
 
       .#{$ns}-navbar-group {
-          height: auto;
+        height: auto;
       }
       .#{$ns}-button {
-        color: #1552c8;
+        color: var(--color-primary);
         font-weight: 5000;
         font-size: 14px;
 
@@ -90,7 +90,7 @@ $dashboard-views-bar-height: 44px;
         }
 
         .#{$ns}-icon {
-          color: #1552c8;
+          color: var(--color-primary);
         }
       }
 
@@ -100,7 +100,7 @@ $dashboard-views-bar-height: 44px;
 
       .form-group-quick-new-downDrop {
         .bp4-popover-target .bp4-button {
-          color: #1552c8;
+          color: var(--color-primary);
         }
 
         .bp4-button::after {
@@ -129,7 +129,7 @@ $dashboard-views-bar-height: 44px;
         &,
         &:hover,
         &:focus {
-          background-color: #cb20e5;
+          background-color: var(--color-primary);
           border: 0;
           box-shadow: none;
         }
@@ -301,7 +301,7 @@ $dashboard-views-bar-height: 44px;
 
       .button--table-views {
         .#{$ns}-icon {
-          color: #1183da;
+          color: var(--color-primary);
         }
 
         .#{$ns}-button-text {
@@ -332,7 +332,7 @@ $dashboard-views-bar-height: 44px;
         }
 
         input:checked ~ .bp4-control-indicator {
-          background: #0069ff;
+          background: var(--color-primary);
         }
       }
     }
@@ -582,7 +582,7 @@ $dashboard-views-bar-height: 44px;
     padding-top: 2px;
 
     &[aria-selected='true'] {
-      color: #0052cc;
+      color: var(--color-primary);
       font-weight: 600;
     }
   }
@@ -626,7 +626,7 @@ $dashboard-views-bar-height: 44px;
   }
 
   .bp4-tab[aria-selected='true'] {
-    box-shadow: inset 0 -2px 0 #0052cc;
+    box-shadow: inset 0 -2px 0 var(--color-primary);
   }
 
   .bp4-button {

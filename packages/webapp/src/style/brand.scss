@@ -1,0 +1,215 @@
+:root {
+  color-scheme: light;
+  --color-text: #17302b;
+  --color-border: #dce6e1;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #e8f2ee;
+  --color-accent: #ad6d0f;
+  --color-accent-soft: #fff0d4;
+  --color-primary-foreground: #ffffff;
+}
+
+html.bp4-dark {
+  color-scheme: dark;
+}
+
+body.bp4-dark {
+  --color-text: #edf6f2;
+  --color-border: rgba(195, 226, 214, 0.15);
+  --color-surface: #11231e;
+  --color-surface-secondary: #18352d;
+  --color-accent: #e0ac55;
+  --color-accent-soft: #3a2d16;
+  --color-primary-foreground: #0c211b;
+}
+
+body {
+  color: var(--color-text);
+}
+a {
+  color: var(--color-primary);
+}
+a:hover {
+  color: var(--color-primary);
+}
+
+.bp4-button.bp4-intent-primary,
+.bp4-dark .bp4-button.bp4-intent-primary {
+  &,
+  &:hover,
+  &:active,
+  &.bp4-active,
+  &:disabled,
+  &.bp4-disabled {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    box-shadow: none;
+  }
+  &:hover:not(:disabled):not(.bp4-disabled) {
+    filter: brightness(0.92);
+  }
+  &:disabled,
+  &.bp4-disabled {
+    opacity: 0.5;
+    filter: none;
+  }
+}
+
+// Blueprint stores intent maps before the application palette is loaded.
+// Override variant states as well as their defaults, including minimal groups.
+.bp4-button.bp4-intent-primary.bp4-minimal,
+.bp4-button.bp4-intent-primary.bp4-outlined,
+.bp4-button-group.bp4-minimal .bp4-button.bp4-intent-primary,
+.bp4-dark .bp4-button.bp4-intent-primary.bp4-minimal,
+.bp4-dark .bp4-button.bp4-intent-primary.bp4-outlined,
+.bp4-dark .bp4-button-group.bp4-minimal .bp4-button.bp4-intent-primary {
+  &,
+  &:hover,
+  &:active,
+  &.bp4-active,
+  &:disabled,
+  &.bp4-disabled,
+  &:disabled:hover,
+  &.bp4-disabled:hover {
+    color: var(--color-primary);
+    background: transparent;
+    box-shadow: none;
+    filter: none;
+  }
+  &:hover:not(:disabled):not(.bp4-disabled),
+  &:active,
+  &.bp4-active {
+    background: var(--color-surface-secondary);
+  }
+  &.bp4-outlined {
+    border-color: var(--color-primary);
+  }
+  .bp4-icon {
+    color: inherit;
+  }
+}
+
+.bp4-input:focus,
+.bp4-input.bp4-active,
+.bp4-dark .bp4-input:focus,
+.bp4-dark .bp4-input.bp4-active {
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 0 0 3px rgba(31, 111, 92, 0.16);
+}
+
+.bp4-tab[aria-selected='true'],
+.bp4-tab:not([aria-disabled='true']):hover,
+.bp4-dark .bp4-tab[aria-selected='true'],
+.bp4-dark .bp4-tab:not([aria-disabled='true']):hover {
+  color: var(--color-primary);
+}
+.bp4-tab-indicator-wrapper .bp4-tab-indicator {
+  background-color: var(--color-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.sidebar__head {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+}
+.sidebar__brand-symbol {
+  display: none;
+}
+.sidebar--mini-sidebar {
+  .sidebar__brand-full {
+    display: none;
+  }
+  .sidebar__brand-symbol {
+    display: block;
+  }
+  .sidebar__head {
+    padding: 12px;
+  }
+  .sidebar__scroll-wrapper:hover {
+    .sidebar__brand-full {
+      display: block;
+    }
+    .sidebar__brand-symbol {
+      display: none;
+    }
+  }
+}
+.sidebar .bp4-menu-item.bp4-active {
+  border-inline-start: 2px solid var(--color-accent);
+}
+
+.dashboard-layout {
+  direction: ltr;
+}
+html[dir='rtl'] .dashboard-layout__main {
+  direction: rtl;
+}
+.dashboard-current-company {
+  align-self: center;
+  max-width: 180px;
+  min-width: 80px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-muted-text);
+  padding: 0 12px;
+  font-size: 12px;
+}
+.preferences-topbar__user {
+  display: flex;
+  align-items: center;
+}
+
+.authentication {
+  background: linear-gradient(
+    135deg,
+    var(--color-app-body) 50%,
+    var(--color-surface-secondary)
+  );
+  .App::before {
+    content: '';
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 24%;
+    background:
+      linear-gradient(rgba(23, 61, 54, 0.35), rgba(23, 61, 54, 0.35)),
+      url('/brand/lega-abstract-bg.png') center / cover;
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+.setup-page__left-section {
+  background:
+    linear-gradient(rgba(23, 61, 54, 0.88), rgba(23, 61, 54, 0.88)),
+    url('/brand/lega-abstract-bg.png') center / cover;
+}
+.bp4-dark .setup-page__left-section {
+  background-color: #0f2b25;
+}
+
+.organizations-list-table,
+.organizations-list-drawer {
+  color: var(--color-text);
+}
+
+.bp4-dark a {
+  color: var(--color-primary);
+}
+.sidebar .bp4-menu,
+.bp4-dark .sidebar .bp4-menu {
+  background: transparent;
+}
+.bp4-dark .bp4-spinner .bp4-spinner-head {
+  stroke: var(--color-primary);
+}
