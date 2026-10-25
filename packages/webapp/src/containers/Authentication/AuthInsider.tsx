@@ -18,7 +18,7 @@ export interface AuthInsiderProps {
  */
 export function AuthInsider({
   logo = true,
-  copyright = true,
+  copyright = false,
   children,
   classNames,
 }: AuthInsiderProps) {

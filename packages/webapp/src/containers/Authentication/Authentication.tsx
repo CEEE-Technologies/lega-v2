@@ -58,15 +58,21 @@ function AuthenticationRoutes() {
   );
 }
 
-const AuthPage = styled.div``;
+// Centers the form in the space to the right of the decorative panel.
+const AuthPage = styled.div`
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 48px calc(var(--auth-panel-width, 0px) + 24px);
+`;
 const AuthInsider = styled.div`
-  width: 384px;
-  margin: 0 auto;
-  margin-bottom: 40px;
-  padding-top: 80px;
+  width: 100%;
+  max-width: 384px;
 `;
 
 const AuthLogo = styled.div`
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
 `;

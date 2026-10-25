@@ -171,6 +171,12 @@ html[dir='rtl'] .dashboard-layout__main {
 }
 
 .authentication {
+  // Shared width of the decorative left panel on auth screens.
+  --auth-panel-width: clamp(320px, 36vw, 640px);
+
+  @media only screen and (max-width: 900px) {
+    --auth-panel-width: 0px;
+  }
   background: linear-gradient(
     135deg,
     var(--color-app-body) 50%,
@@ -180,7 +186,7 @@ html[dir='rtl'] .dashboard-layout__main {
     content: '';
     position: fixed;
     inset: 0 auto 0 0;
-    width: 24%;
+    width: var(--auth-panel-width);
     background:
       linear-gradient(rgba(23, 61, 54, 0.35), rgba(23, 61, 54, 0.35)),
       url('/brand/lega-abstract-bg.png') center / cover;
