@@ -1,10 +1,7 @@
 import { DiscountType } from '@/common/types/Discount';
 import { BaseModel } from '@/models/Model';
 import { Item } from '@/modules/Items/models/Item';
-import {
-  getExlusiveTaxAmount,
-  getInclusiveTaxAmount,
-} from '@/modules/TaxRates/utils';
+import { calcLineMoney, ILineMoney, subtractMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 
 export class ItemEntry extends BaseModel {
@@ -87,8 +84,28 @@ export class ItemEntry extends BaseModel {
    * Amount of item entry includes tax and subtracted discount amount.
    * @returns {number}
    */
+  /**
+   * The money amounts of the line, each rounded to cents, with the tax on
+   * the amount after the line discount (same calculator as the webapp).
+   * @returns {ILineMoney}
+   */
+  get lineMoney(): ILineMoney {
+    return calcLineMoney({
+      quantity: this.quantity,
+      rate: this.rate,
+      discount: this.discount,
+      discountType: this.discountType || DiscountType.Percentage,
+      taxRate: this.taxRate,
+      isInclusiveTax: this.isInclusiveTax,
+    });
+  }
+
+  /**
+   * Line total after the discount, tax included.
+   * @returns {number}
+   */
   get total() {
-    return this.subtotal - this.discountAmount;
+    return this.lineMoney.total;
   }
 
   /**
@@ -96,7 +113,7 @@ export class ItemEntry extends BaseModel {
    * @returns {number}
    */
   get totalExcludingTax() {
-    return this.subtotalExcludingTax - this.discountAmount;
+    return this.lineMoney.totalExcludingTax;
   }
 
   /**
@@ -105,7 +122,7 @@ export class ItemEntry extends BaseModel {
    * @returns {number}
    */
   get amount() {
-    return this.quantity * this.rate;
+    return this.lineMoney.amount;
   }
 
   /**
@@ -137,9 +154,7 @@ export class ItemEntry extends BaseModel {
    * @returns {number}
    */
   get discountAmount() {
-    return this.discountType === DiscountType.Percentage
-      ? this.amount * (this.discount / 100)
-      : this.discount;
+    return this.lineMoney.discountAmount;
   }
 
   /**
@@ -155,9 +170,7 @@ export class ItemEntry extends BaseModel {
    * @returns {number}
    */
   get taxAmount() {
-    return this.isInclusiveTax
-      ? getInclusiveTaxAmount(this.amount, this.taxRate)
-      : getExlusiveTaxAmount(this.amount, this.taxRate);
+    return this.lineMoney.taxAmount;
   }
 
   /**
@@ -165,18 +178,20 @@ export class ItemEntry extends BaseModel {
    * @return {number}
    */
   get unallocatedCostAmount() {
-    return Math.max(this.amount - this.allocatedCostAmount, 0);
+    return Math.max(subtractMoney(this.amount, this.allocatedCostAmount), 0);
   }
 
   static calcAmount(itemEntry) {
     const { discount, discountType, quantity, rate } = itemEntry;
-    const total = quantity * rate;
 
-    if (!discount) return total;
-
-    return discountType === DiscountType.Amount
-      ? total - discount
-      : total - total * discount * 0.01;
+    // The line amount after the discount, rounded to cents (tax inclusive
+    // lines keep their tax inside it).
+    return calcLineMoney({
+      quantity,
+      rate,
+      discount,
+      discountType: discountType || DiscountType.Percentage,
+    }).taxableAmount;
   }
 
   /**

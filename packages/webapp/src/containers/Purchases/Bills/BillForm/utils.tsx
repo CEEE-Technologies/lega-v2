@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext, type FormikErrors } from 'formik';
 import * as FF from 'fp-ts/function';
@@ -40,6 +46,8 @@ export type BillFormEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -76,6 +84,7 @@ export const defaultBillEntry: BillFormEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -403,9 +412,7 @@ export const useBillDiscountAmount = (): number => {
   const subtotal = useBillSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (subtotal * discount) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -426,7 +433,7 @@ export const useBillDiscountAmountFormatted = (): string => {
 export const useBillAdjustmentAmount = (): number => {
   const { values } = useFormikContext<BillFormValues>();
 
-  return toSafeNumber(values.adjustment);
+  return roundMoney(values.adjustment);
 };
 
 /**
@@ -448,10 +455,10 @@ export const useBillTotalTaxAmount = (): number => {
   const { values } = useFormikContext<BillFormValues>();
 
   return React.useMemo(() => {
-    return chain(values.entries)
-      .filter((entry) => Boolean(entry.taxAmount))
-      .sumBy('taxAmount')
-      .value();
+    return sumMoneyBy(
+      values.entries.filter((entry) => Boolean(entry.taxAmount)),
+      'taxAmount',
+    );
   }, [values.entries]);
 };
 
@@ -476,11 +483,13 @@ export const useBillTotal = (): number => {
   const discountAmount = useBillDiscountAmount();
   const adjustmentAmount = useBillAdjustmentAmount();
 
-  let total = subtotal + adjustmentAmount - discountAmount;
-  if (isExclusiveTax) {
-    total += totalTaxAmount;
-  }
-  return total;
+  // In whole cents; the tax is added only when it is exclusive.
+  return sumMoney(
+    subtotal,
+    adjustmentAmount,
+    -discountAmount,
+    isExclusiveTax ? totalTaxAmount : 0,
+  );
 };
 
 /**

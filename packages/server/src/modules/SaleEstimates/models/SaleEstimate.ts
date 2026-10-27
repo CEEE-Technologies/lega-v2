@@ -1,3 +1,4 @@
+import { calcDiscountMoney, roundMoney, sumMoney } from '@bigcapital/utils';
 import * as moment from 'moment';
 import { Model } from 'objection';
 import { defaultTo } from 'lodash';
@@ -114,9 +115,14 @@ export class SaleEstimate extends TenantBaseModel {
    * @returns {number}
    */
   get discountAmount() {
+    // Rounded to cents; a missing discount counts as 0 (never NaN).
     return this.discountType === DiscountType.Amount
-      ? this.discount
-      : this.subtotal * (this.discount / 100);
+      ? roundMoney(this.discount)
+      : calcDiscountMoney(
+          this.subtotal,
+          this.discount,
+          DiscountType.Percentage,
+        );
   }
 
   /**
@@ -134,7 +140,9 @@ export class SaleEstimate extends TenantBaseModel {
   get total() {
     const adjustmentAmount = defaultTo(this.adjustment, 0);
 
-    return this.subtotal - this.discountAmount - adjustmentAmount;
+    // In whole cents. The adjustment is added, as on every other document
+    // (it was subtracted).
+    return sumMoney(this.subtotal, -this.discountAmount, adjustmentAmount);
   }
 
   /**

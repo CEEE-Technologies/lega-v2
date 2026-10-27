@@ -1,8 +1,9 @@
+import { moneyGt, sumMoneyBy } from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { css } from '@emotion/css';
 import { Formik, Form, FormikHelpers } from 'formik';
 import * as FF from 'fp-ts/function';
-import { defaultTo, sumBy, isEmpty } from 'lodash';
+import { defaultTo, isEmpty } from 'lodash';
 import React, { useMemo } from 'react';
 import intl from 'react-intl-universal';
 import { useHistory } from 'react-router-dom';
@@ -73,9 +74,10 @@ function ExpenseFormInner() {
     { setSubmitting, setErrors, resetForm }: FormikHelpers<ExpenseFormValues>,
   ) => {
     setSubmitting(true);
-    const totalAmount = sumBy(values.categories, 'amount');
+    // In whole cents; a blank row counts as 0 (no text concatenation).
+    const totalAmount = sumMoneyBy(values.categories, 'amount');
 
-    if (totalAmount <= 0) {
+    if (!moneyGt(totalAmount, 0)) {
       AppToaster.show({
         message: intl.get('amount_cannot_be_zero_or_empty'),
         intent: Intent.DANGER,

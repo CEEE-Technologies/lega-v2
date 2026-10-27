@@ -1,6 +1,7 @@
+import { roundMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Injectable } from '@nestjs/common';
 import * as R from 'ramda';
-import { omit, sumBy } from 'lodash';
+import { omit } from 'lodash';
 import { formatDateFields } from '@/utils/format-date-fields';
 import { assocItemEntriesDefaultIndex } from '@/utils/associate-item-entries-index';
 import { BranchTransactionDTOTransformer } from '@/modules/Branches/integrations/BranchTransactionDTOTransform';
@@ -30,8 +31,11 @@ export class CommandBillPaymentDTOTransformer {
     vendor: Vendor,
     _oldBillPayment?: BillPayment,
   ): Promise<BillPayment> {
-    const amount =
-      billPaymentDTO.amount ?? sumBy(billPaymentDTO.entries, 'paymentAmount');
+    // Payment amounts are saved in whole cents.
+    const amount = roundMoney(
+      billPaymentDTO.amount ??
+        sumMoneyBy(billPaymentDTO.entries, 'paymentAmount'),
+    );
 
     // Associate the default index to each item entry.
     const entries = R.compose(
@@ -39,7 +43,10 @@ export class CommandBillPaymentDTOTransformer {
       assocItemEntriesDefaultIndex,
     )(
       (billPaymentDTO.entries || []).map((entry) =>
-        normalizePaymentEntryType(entry, 'billId'),
+        normalizePaymentEntryType(
+          { ...entry, paymentAmount: roundMoney(entry.paymentAmount) },
+          'billId',
+        ),
       ),
     );
 

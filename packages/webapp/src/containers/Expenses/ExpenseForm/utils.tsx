@@ -1,7 +1,8 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
-import { first, sumBy } from 'lodash';
+import { first } from 'lodash';
 import moment from 'moment';
 import React from 'react';
 import intl from 'react-intl-universal';
@@ -182,7 +183,10 @@ export const useExpenseSubtotal = () => {
     values: { categories },
   } = useFormikContext<ExpenseFormValues>();
 
-  return React.useMemo(() => sumBy(categories, 'amount'), [categories]);
+  return React.useMemo(
+    () => sumMoneyBy(categories, (category) => category.amount as number),
+    [categories],
+  );
 };
 
 /**

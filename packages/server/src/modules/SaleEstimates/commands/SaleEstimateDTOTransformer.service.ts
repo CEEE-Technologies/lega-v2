@@ -1,6 +1,7 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import * as R from 'ramda';
 import { Inject, Injectable } from '@nestjs/common';
-import { omit, sumBy } from 'lodash';
+import { omit } from 'lodash';
 import * as composeAsync from 'async/compose';
 import { SaleEstimateValidators } from './SaleEstimateValidators.service';
 import { formatDateFields } from '@/utils/format-date-fields';
@@ -42,7 +43,7 @@ export class SaleEstimateDTOTransformer {
     paymentCustomer: Customer,
     oldSaleEstimate?: SaleEstimate,
   ): Promise<SaleEstimate> {
-    const amount = sumBy(estimateDTO.entries, (e) =>
+    const amount = sumMoneyBy(estimateDTO.entries, (e) =>
       this.itemEntryModel().calcAmount(e),
     );
     // Retrieve the next invoice number.

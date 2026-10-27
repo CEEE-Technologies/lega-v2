@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
@@ -40,6 +46,8 @@ export type InvoiceEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -89,6 +97,7 @@ export const defaultInvoiceEntry: InvoiceEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -129,6 +138,7 @@ export const defaultReqInvoiceEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   taxRateId: '',
@@ -410,9 +420,7 @@ export const useInvoiceDiscountAmount = () => {
   const subtotal = useInvoiceSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (subtotal * discount) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -434,7 +442,7 @@ export const useInvoiceDiscountAmountFormatted = () => {
  */
 export const useInvoiceAdjustmentAmount = () => {
   const { values } = useFormikContext<InvoiceFormValues>();
-  const adjustment = toSafeNumber(values.adjustment);
+  const adjustment = roundMoney(values.adjustment);
 
   return adjustment;
 };
@@ -529,7 +537,7 @@ export const useInvoiceTotalTaxAmount = () => {
 
   return React.useMemo(() => {
     const filteredEntries = values.entries.filter((entry) => entry.taxAmount);
-    return sumBy(filteredEntries, 'taxAmount');
+    return sumMoneyBy(filteredEntries, 'taxAmount');
   }, [values.entries]);
 };
 
@@ -544,8 +552,13 @@ export const useInvoiceTotal = () => {
   const discountAmount = useInvoiceDiscountAmount();
   const adjustmentAmount = useInvoiceAdjustmentAmount();
 
-  const total = subtotal + adjustmentAmount - discountAmount;
-  return isExclusiveTax ? total + totalTaxAmount : total;
+  // In whole cents; the tax is added only when it is exclusive.
+  return sumMoney(
+    subtotal,
+    adjustmentAmount,
+    -discountAmount,
+    isExclusiveTax ? totalTaxAmount : 0,
+  );
 };
 
 /**

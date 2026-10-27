@@ -258,7 +258,13 @@ export class SaleInvoice extends TenantBaseModel {
       ? 0
       : defaultTo(0, this.taxAmountWithheld);
 
-    return this.subtotal - this.discountAmount + adjustmentAmount + totalTax;
+    // In whole cents.
+    return sumMoney(
+      this.subtotal,
+      -this.discountAmount,
+      adjustmentAmount,
+      totalTax,
+    );
   }
 
   /**

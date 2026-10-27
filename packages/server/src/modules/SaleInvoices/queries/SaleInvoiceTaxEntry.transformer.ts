@@ -1,3 +1,4 @@
+import { roundMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Transformer } from '@/modules/Transformer/Transformer';
 import {
   getExlusiveTaxAmount,
@@ -61,11 +62,23 @@ export class SaleInvoiceTaxEntryTransformer extends Transformer {
    * @param taxEntry
    */
   protected taxRateAmount = (taxEntry) => {
+    // The sum of the rounded taxes of the document lines with this tax rate,
+    // so the tax shown matches the document total and its ledger.
+    if (Array.isArray(this.options.entries)) {
+      return sumMoneyBy(
+        this.options.entries.filter(
+          (entry) => entry.taxRateId === taxEntry.taxRateId,
+        ),
+        (entry) => entry.taxAmount,
+      );
+    }
     const taxRate = this.taxRate(taxEntry);
 
-    return this.options.isInclusiveTax
-      ? getInclusiveTaxAmount(this.options.subtotal, taxRate)
-      : getExlusiveTaxAmount(this.options.subtotal, taxRate);
+    return roundMoney(
+      this.options.isInclusiveTax
+        ? getInclusiveTaxAmount(this.options.subtotal, taxRate)
+        : getExlusiveTaxAmount(this.options.subtotal, taxRate),
+    );
   };
 
   /**

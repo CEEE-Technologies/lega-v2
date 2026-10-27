@@ -1,6 +1,8 @@
 import {
+  calcDiscountMoney,
   moneyGt,
   moneyIsZero,
+  roundMoney,
   subtractMoney,
   sumMoney,
 } from '@bigcapital/utils';
@@ -92,9 +94,14 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get discountAmount() {
+    // Rounded to cents; a missing discount counts as 0 (never NaN).
     return this.discountType === DiscountType.Amount
-      ? this.discount
-      : this.subtotal * (this.discount / 100);
+      ? roundMoney(this.discount)
+      : calcDiscountMoney(
+          this.subtotal,
+          this.discount,
+          DiscountType.Percentage,
+        );
   }
 
   /**
@@ -126,7 +133,8 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get total() {
-    return this.subtotal - this.discountAmount + this.adjustment;
+    // In whole cents; a missing adjustment counts as 0.
+    return sumMoney(this.subtotal, -this.discountAmount, this.adjustment);
   }
 
   /**

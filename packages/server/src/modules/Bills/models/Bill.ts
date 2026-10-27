@@ -222,7 +222,13 @@ export class Bill extends TenantBaseModel {
       ? 0
       : defaultTo(this.taxAmountWithheld, 0);
 
-    return this.subtotal - this.discountAmount + adjustmentAmount + totalTax;
+    // In whole cents.
+    return sumMoney(
+      this.subtotal,
+      -this.discountAmount,
+      adjustmentAmount,
+      totalTax,
+    );
   }
 
   /**

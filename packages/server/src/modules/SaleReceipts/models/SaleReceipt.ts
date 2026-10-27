@@ -1,3 +1,4 @@
+import { calcDiscountMoney, roundMoney, sumMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 import { defaultTo } from 'lodash';
 import * as R from 'ramda';
@@ -137,9 +138,14 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get discountAmount() {
+    // Rounded to cents; a missing discount counts as 0 (never NaN).
     return this.discountType === DiscountType.Amount
-      ? this.discount
-      : this.subtotal * (this.discount / 100);
+      ? roundMoney(this.discount)
+      : calcDiscountMoney(
+          this.subtotal,
+          this.discount,
+          DiscountType.Percentage,
+        );
   }
 
   /**
@@ -165,7 +171,8 @@ export class SaleReceipt extends ExtendedModel {
   get total(): number {
     const adjustmentAmount = defaultTo(this.adjustment, 0);
 
-    return this.subtotal - this.discountAmount + adjustmentAmount;
+    // In whole cents.
+    return sumMoney(this.subtotal, -this.discountAmount, adjustmentAmount);
   }
 
   /**

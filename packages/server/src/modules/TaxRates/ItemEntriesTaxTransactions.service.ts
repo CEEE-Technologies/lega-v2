@@ -1,5 +1,6 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { keyBy, sumBy } from 'lodash';
+import { keyBy } from 'lodash';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { TaxRateModel } from './models/TaxRate.model';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
@@ -27,7 +28,7 @@ export class ItemEntriesTaxTransactions {
     const entries = model.entries.map((entry) =>
       this.itemEntryModel().fromJson(entry),
     );
-    const taxAmountWithheld = sumBy(entries, 'taxAmount');
+    const taxAmountWithheld = sumMoneyBy(entries, 'taxAmount');
 
     if (taxAmountWithheld) {
       model.taxAmountWithheld = taxAmountWithheld;

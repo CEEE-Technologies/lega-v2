@@ -1,3 +1,4 @@
+import { calcLineMoney, sumMoneyBy } from '@bigcapital/utils';
 import * as FF from 'fp-ts/function';
 import { isEmpty, last, keyBy, groupBy } from 'lodash';
 import React, { useCallback } from 'react';
@@ -6,8 +7,6 @@ import type { ItemEntry } from '@/interfaces/ItemEntries';
 import type { TaxRate } from '@bigcapital/sdk-ts';
 import { useItem } from '@/hooks/query';
 import {
-  toSafeNumber,
-  safeSumBy,
   saveInvoke,
   updateTableCell,
   updateAutoAddNewLine,
@@ -33,6 +32,7 @@ interface ItemsEntryRow {
   quantity?: string | number;
   rate?: string | number;
   discount?: string | number;
+  discountType?: 'percentage' | 'amount' | string | null;
   amount?: string | number;
   taxRateId?: string | number;
   taxRate?: string | number;
@@ -50,12 +50,16 @@ export const calcItemEntryTotal = (
   discount?: string | number,
   quantity?: string | number,
   rate?: string | number,
+  discountType?: string | null,
 ): number => {
-  const _quantity = toSafeNumber(quantity);
-  const _rate = toSafeNumber(rate);
-  const _discount = toSafeNumber(discount);
-
-  return _quantity * _rate - (_quantity * _rate * _discount) / 100;
+  // Same calculator as the server: quantity x rate and the discount (% or a
+  // fixed amount) are each rounded to cents.
+  return calcLineMoney({
+    quantity: quantity as number,
+    rate: rate as number,
+    discount: discount as number,
+    discountType: discountType || 'percentage',
+  }).taxableAmount;
 };
 
 /**
@@ -66,7 +70,12 @@ export function updateItemsEntriesTotal<T extends ItemsEntryRow>(
 ): Array<T & { amount: number }> {
   return rows.map((row) => ({
     ...row,
-    amount: calcItemEntryTotal(row.discount, row.quantity, row.rate),
+    amount: calcItemEntryTotal(
+      row.discount,
+      row.quantity,
+      row.rate,
+      row.discountType,
+    ),
   }));
 }
 
@@ -78,7 +87,8 @@ export function getEntriesTotal<T extends { amount?: string | number }>(
 ): number {
   // The blank "Enter an item" row has amount '' and plain sumBy would turn
   // the total into text (70000 + '' = "70000"), so treat blanks as 0.
-  return safeSumBy(entries, 'amount');
+  // The sum is in whole cents.
+  return sumMoneyBy(entries, (entry) => entry.amount as number);
 }
 
 /**
@@ -316,9 +326,10 @@ export function assignEntriesTaxAmount<T extends TaxableEntry>(
  * @param {number} taxRate
  * @returns {number}
  */
-export const getInclusiveTaxAmount = (amount: number, taxRate: number) => {
-  return (amount * taxRate) / (100 + taxRate);
-};
+export const getInclusiveTaxAmount = (amount: number, taxRate: number) =>
+  // Rounded to cents per line, as the server does.
+  calcLineMoney({ quantity: 1, rate: amount, taxRate, isInclusiveTax: true })
+    .taxAmount;
 
 /**
  * Get exclusive tax amount.
@@ -326,9 +337,10 @@ export const getInclusiveTaxAmount = (amount: number, taxRate: number) => {
  * @param {number} taxRate
  * @returns {number}
  */
-export const getExlusiveTaxAmount = (amount: number, taxRate: number) => {
-  return (amount * taxRate) / 100;
-};
+export const getExlusiveTaxAmount = (amount: number, taxRate: number) =>
+  // Rounded to cents per line, as the server does.
+  calcLineMoney({ quantity: 1, rate: amount, taxRate, isInclusiveTax: false })
+    .taxAmount;
 
 /**
  * Compose rows when edit a table cell.
@@ -402,7 +414,10 @@ export const aggregateItemEntriesTaxRates =
     return Object.keys(groupedTaxRates).map((taxRateId) => {
       const taxRate = taxRatesById[taxRateId];
       const groupedEntries = groupedTaxRates[taxRateId];
-      const totalTaxAmount = safeSumBy(groupedEntries, 'taxAmount');
+      const totalTaxAmount = sumMoneyBy(
+        groupedEntries,
+        (entry) => (entry as { taxAmount?: number }).taxAmount,
+      );
       const taxAmountFormatted = formattedAmount(totalTaxAmount, currencyCode);
 
       return {

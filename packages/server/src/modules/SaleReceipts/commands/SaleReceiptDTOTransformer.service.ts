@@ -1,6 +1,7 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import * as R from 'ramda';
-import { sumBy, omit } from 'lodash';
+import { omit } from 'lodash';
 import * as composeAsync from 'async/compose';
 import * as moment from 'moment';
 import { SaleReceiptIncrement } from './SaleReceiptIncrement.service';
@@ -54,7 +55,7 @@ export class SaleReceiptDTOTransformer {
     paymentCustomer: Customer,
     oldSaleReceipt?: SaleReceipt,
   ): Promise<SaleReceipt> {
-    const amount = sumBy(saleReceiptDTO.entries, (e) =>
+    const amount = sumMoneyBy(saleReceiptDTO.entries, (e) =>
       this.itemEntryModel().calcAmount(e),
     );
     // Retrieve the next invoice number.

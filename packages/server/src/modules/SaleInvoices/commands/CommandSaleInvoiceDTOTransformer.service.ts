@@ -1,5 +1,6 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Injectable } from '@nestjs/common';
-import { omit, sumBy } from 'lodash';
+import { omit } from 'lodash';
 import * as R from 'ramda';
 import * as moment from 'moment';
 import '../../../utils/moment-mysql';
@@ -157,6 +158,9 @@ export class CommandSaleInvoiceDTOTransformer {
    * @returns {number}
    */
   private getDueBalanceItemEntries = (entries: ItemEntry[]) => {
-    return sumBy(entries, (e) => e.amount);
+    // The subtotal is the sum of the line amounts after the line discounts
+    // (each rounded to cents), as for the other documents; the gross amount
+    // left the line discounts out of the invoice total.
+    return sumMoneyBy(entries, (e) => ItemEntry.calcAmount(e));
   };
 }

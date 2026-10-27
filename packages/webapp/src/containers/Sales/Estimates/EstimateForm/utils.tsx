@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
 import { omit, first } from 'lodash';
@@ -32,6 +38,8 @@ export type EstimateEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -64,6 +72,7 @@ export const defaultEstimateEntry: EstimateEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -74,6 +83,7 @@ const defaultEstimateEntryReq = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
 };
@@ -323,9 +333,7 @@ export const useEstimateDiscount = () => {
   const subtotal = useEstimateSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (subtotal * discount) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -347,7 +355,7 @@ export const useEstimateDiscountFormatted = () => {
  */
 export const useEstimateAdjustment = () => {
   const { values } = useFormikContext<EstimateFormValues>();
-  const adjustmentAmount = toSafeNumber(values.adjustment);
+  const adjustmentAmount = roundMoney(values.adjustment);
 
   return adjustmentAmount;
 };
@@ -374,7 +382,7 @@ export const useEstimateTotal = () => {
   const discount = useEstimateDiscount();
   const adjustment = useEstimateAdjustment();
 
-  return subtotal + adjustment - discount;
+  return sumMoney(subtotal, adjustment, -discount);
 };
 
 /**
