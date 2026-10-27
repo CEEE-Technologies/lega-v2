@@ -1,4 +1,11 @@
 // @ts-nocheck
+import {
+  MONEY_PRECISION,
+  fromCents,
+  roundHalfAwayFromZero,
+  subtractMoney,
+  toCents,
+} from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import accounting from 'accounting';
 import clsx from 'classnames';
@@ -9,7 +16,6 @@ import _ from 'lodash';
 import { isEqual, castArray, isEmpty, includes, pickBy } from 'lodash';
 import moment from 'moment';
 import { createSelectorCreator, defaultMemoize } from 'reselect';
-import { fromCents, subtractMoney, toCents } from '@bigcapital/utils';
 import { deepMapKeys } from './map-key-deep';
 import type { IResourceField } from '@/components/AdvancedFilter/interfaces';
 export * from './deep';
@@ -203,9 +209,10 @@ export const defaultExpanderReducer = (tableRows, level) => {
 export function formattedAmount(cents, currencyCode = '', props = {}) {
   const currency = Currency[currencyCode];
 
+  // An unknown currency shows 2 decimals (money is whole cents), not 0.
   const parsedCurrency = {
     symbol: '',
-    decimal_digits: 0,
+    decimal_digits: MONEY_PRECISION,
     ...currency,
   };
   const parsedProps = {
@@ -222,7 +229,12 @@ export function formattedAmount(cents, currencyCode = '', props = {}) {
     },
   };
 
-  return accounting.formatMoney(cents, formatOptions);
+  // Rounded halves away from zero first (1.005 shows as 1.01, not 1.00):
+  // accounting.js rounds the float as it is.
+  return accounting.formatMoney(
+    roundHalfAwayFromZero(cents, parsedCurrency.decimal_digits),
+    formatOptions,
+  );
 }
 
 export function formattedNumber(amount, props) {
@@ -240,7 +252,10 @@ export function formattedNumber(amount, props) {
     },
     ...props,
   };
-  return accounting.formatMoney(amount, formatOptions);
+  return accounting.formatMoney(
+    roundHalfAwayFromZero(amount, formatOptions.precision),
+    formatOptions,
+  );
 }
 
 export function formattedExchangeRate(amount, currency) {

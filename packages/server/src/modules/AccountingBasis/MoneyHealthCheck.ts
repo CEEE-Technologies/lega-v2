@@ -1,3 +1,4 @@
+import { moneyGt, moneyGte } from '@bigcapital/utils';
 import { Knex } from 'knex';
 import * as moment from 'moment';
 import {
@@ -497,9 +498,7 @@ const getCashDocumentDifferences = async (knex: Knex, isLocked: IsLockedFn) => {
       const totalLocal = totals.get(documentId) || 0;
       const totalDoc = totalLocal / Number(document?.exchangeRate || 1);
       return (
-        totalDoc > 0 &&
-        Math.round((paid.get(documentId) || 0) * 100) >=
-          Math.round(totalDoc * 100)
+        moneyGt(totalDoc, 0) && moneyGte(paid.get(documentId) || 0, totalDoc)
       );
     };
 
