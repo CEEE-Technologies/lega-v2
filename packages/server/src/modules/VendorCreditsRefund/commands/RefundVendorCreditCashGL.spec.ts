@@ -224,9 +224,9 @@ describe('RefundVendorCreditCashGL — rounding', () => {
     });
     const entries = buildLedger(refund).getEntries();
 
-    expect(entries.find((e) => e.accountId === 501).credit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 502).credit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 503).credit).toBe(33.334);
+    expect(entries.find((e) => e.accountId === 501).credit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 502).credit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 503).credit).toBe(33.34);
     expect(sumBy(entries, 'debit')).toBe(100);
     expect(sumBy(entries, 'credit')).toBe(100);
   });

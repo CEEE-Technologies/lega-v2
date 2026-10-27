@@ -1,5 +1,5 @@
 import { Knex } from 'knex';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ILedger } from './types/Ledger.types';
 import { LedgerContactsBalanceStorage } from './LedgerContactStorage.service';
 import { LedegrAccountsStorage } from './LedgetAccountStorage.service';
@@ -9,9 +9,18 @@ import { Ledger } from './Ledger';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
 import { LedgerClickHouseSink } from '../Analytics/services/LedgerClickHouseSink.service';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { Account } from '../Accounts/models/Account.model';
+import {
+  formatUnbalancedGroup,
+  isLedgerStrictMode,
+  normalizeLedgerEntries,
+  recordLedgerStrictViolation,
+} from './LedgerNormalizer';
 
 @Injectable()
 export class LedgerStorageService {
+  private readonly logger = new Logger(LedgerStorageService.name);
+
   /**
    * @param {LedgerContactsBalanceStorage} ledgerContactsBalance - Ledger contacts balance storage.
    * @param {LedegrAccountsStorage} ledgerAccountsBalance - Ledger accounts balance storage.
@@ -28,7 +37,60 @@ export class LedgerStorageService {
     >,
 
     private ledgerClickHouseSink: LedgerClickHouseSink,
+
+    @Inject(Account.name)
+    private accountModel: TenantModelProxy<typeof Account>,
   ) {}
+
+  /**
+   * Rounds every entry to cents and balances each transaction set (per
+   * basis) to the cent, putting a rounding leftover on the largest
+   * income/expense line. A set off by more than rounding is logged, or
+   * throws in the strict ledger mode (tests).
+   * Stored entries (reversals) pass through unchanged.
+   * @param {ILedger} ledger
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<ILedger>}
+   */
+  public normalize = async (
+    ledger: ILedger,
+    trx?: Knex.Transaction,
+  ): Promise<ILedger> => {
+    const entries = ledger.getEntries();
+
+    if (entries.length === 0 || entries.every((entry) => entry.entryId)) {
+      return ledger;
+    }
+    const accountsIds = [
+      ...new Set(entries.map((entry) => entry.accountId).filter(Boolean)),
+    ];
+    const accounts =
+      accountsIds.length > 0
+        ? await this.accountModel()
+            .query(trx)
+            .whereIn('id', accountsIds)
+            .select('id', 'accountType')
+        : [];
+    const accountTypes = new Map(
+      accounts.map((account) => [account.id, account.accountType]),
+    );
+    const { entries: normalized, unbalanced } = normalizeLedgerEntries(
+      entries,
+      accountTypes,
+    );
+    if (unbalanced.length > 0) {
+      const message = `Unbalanced ledger entries: ${unbalanced
+        .map(formatUnbalancedGroup)
+        .join('; ')}`;
+
+      if (isLedgerStrictMode()) {
+        recordLedgerStrictViolation(message);
+        throw new Error(message);
+      }
+      this.logger.warn(message);
+    }
+    return new Ledger(normalized);
+  };
 
   /**
    * Commit the ledger to the storage layer as one unit-of-work.
@@ -36,9 +98,13 @@ export class LedgerStorageService {
    * @returns {Promise<void>}
    */
   public commit = async (
-    ledger: ILedger,
+    _ledger: ILedger,
     trx?: Knex.Transaction,
   ): Promise<void> => {
+    // The same rounded entries feed the ledger rows, the account and
+    // contact balances and the analytics copy, so they can't drift apart.
+    const ledger = await this.normalize(_ledger, trx);
+
     const tasks = [
       // Saves the ledger entries.
       this.ledgerEntriesService.saveEntries(ledger, trx),

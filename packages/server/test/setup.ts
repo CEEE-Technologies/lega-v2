@@ -14,3 +14,7 @@ process.emitWarning = ((warning: string | Error, options?: any) => {
     options ?? { type: warning?.name },
   );
 }) as typeof process.emitWarning;
+
+// Strict ledger mode: an entry set that doesn't balance to the cent throws
+// (and is recorded, see setup-after-env.ts) instead of only logging.
+process.env.LEDGER_STRICT_MODE = process.env.LEDGER_STRICT_MODE ?? 'true';

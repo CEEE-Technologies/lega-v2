@@ -221,7 +221,7 @@ describe('PaymentReceivedCostCashGL', () => {
 });
 
 describe('PaymentReceivedCostCashGL — rounding', () => {
-  it('rounds the pro-rata cost to the ledger precision on both sides', () => {
+  it('rounds the pro-rata cost to cents on both sides', () => {
     const invoice = buildInvoice({ totalLocal: 3 });
     const payment = buildPayment([buildPaymentEntry(invoice, 1)]);
     const entries = buildGL(payment, {
@@ -231,7 +231,7 @@ describe('PaymentReceivedCostCashGL — rounding', () => {
     const costEntry = entries.find((e) => e.accountId === 600);
     const inventoryEntry = entries.find((e) => e.accountId === 700);
 
-    expect(costEntry.debit).toBe(33.333);
-    expect(inventoryEntry.credit).toBe(33.333);
+    expect(costEntry.debit).toBe(33.33);
+    expect(inventoryEntry.credit).toBe(33.33);
   });
 });

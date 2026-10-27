@@ -188,7 +188,7 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
       .setPrepaidExpensesAccountId(PREPAID_EXPENSES);
 
   const sum = (entries: any[], key: 'debit' | 'credit') =>
-    Math.round(sumBy(entries, key) * 1000) / 1000;
+    Math.round(sumBy(entries, key) * 100) / 100;
 
   const sumAccount = (
     entries: any[],
@@ -317,9 +317,9 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
       }),
     ).GLEntries();
 
-    expect(entries.find((e) => e.accountId === 201).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 202).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 203).debit).toBe(33.334);
+    expect(entries.find((e) => e.accountId === 201).debit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 202).debit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 203).debit).toBe(33.34);
     expect(sum(entries, 'debit')).toBe(100);
     expect(sum(entries, 'credit')).toBe(100);
   });

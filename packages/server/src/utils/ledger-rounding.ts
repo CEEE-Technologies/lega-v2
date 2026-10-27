@@ -1,23 +1,24 @@
-import { round } from 'lodash';
+import {
+  MONEY_PRECISION,
+  allocateMoney,
+  fromCents,
+  roundMoney,
+  toCents,
+} from '@bigcapital/utils';
 
 /**
- * Decimal places stored by the ledger amount columns (DECIMAL(13, 3)).
+ * Decimal places of a ledger amount: money is whole cents.
+ * (The amount columns are DECIMAL(13, 3), but every amount is stored in
+ * cents since the ledger storage normalises the entries.)
  */
-export const LEDGER_AMOUNT_PRECISION = 3;
+export const LEDGER_AMOUNT_PRECISION = MONEY_PRECISION;
 
 /**
- * Smallest amount the ledger can store.
- */
-const LEDGER_AMOUNT_UNIT = 1 / 10 ** LEDGER_AMOUNT_PRECISION;
-
-/**
- * Rounds the given amount to the ledger precision.
+ * Rounds the given amount to cents, halves away from zero.
  * @param {number} amount
  * @returns {number}
  */
-export const roundLedgerAmount = (amount: number): number => {
-  return round(amount || 0, LEDGER_AMOUNT_PRECISION);
-};
+export const roundLedgerAmount = (amount: number): number => roundMoney(amount);
 
 interface IDebitCreditEntry {
   debit: number;
@@ -25,11 +26,11 @@ interface IDebitCreditEntry {
 }
 
 /**
- * Rounds the debit and credit of every entry to the ledger precision and puts
- * the rounding remainder on the last non-zero entry, so a set of pro-rata
- * lines still balances once stored.
+ * Rounds the debit and credit of every entry to cents and puts the rounding
+ * remainder on the last non-zero entry, so a set of pro-rata lines still
+ * balances once stored.
  *
- * Only a rounding-sized remainder (one unit per entry at most) is absorbed.
+ * Only a rounding-sized remainder (one cent per entry at most) is absorbed.
  * A bigger difference means the set itself is wrong, so it is left visible
  * instead of being hidden on the last line.
  * @param {T[]} entries
@@ -40,16 +41,14 @@ export const roundLedgerEntries = <T extends IDebitCreditEntry>(
 ): T[] => {
   const rounded = entries.map((entry) => ({
     ...entry,
-    debit: roundLedgerAmount(entry.debit),
-    credit: roundLedgerAmount(entry.credit),
+    debit: roundMoney(entry.debit),
+    credit: roundMoney(entry.credit),
   }));
-  const totalDebit = rounded.reduce((sum, e) => sum + e.debit, 0);
-  const totalCredit = rounded.reduce((sum, e) => sum + e.credit, 0);
-  const remainder = roundLedgerAmount(totalDebit - totalCredit);
-
-  const tolerance = rounded.length * LEDGER_AMOUNT_UNIT + 1e-9;
-
-  if (remainder === 0 || Math.abs(remainder) > tolerance) {
+  const remainderCents = rounded.reduce(
+    (sum, e) => sum + toCents(e.debit) - toCents(e.credit),
+    0,
+  );
+  if (remainderCents === 0 || Math.abs(remainderCents) > rounded.length) {
     return rounded;
   }
   const lastIndex = findLastIndex(
@@ -61,47 +60,24 @@ export const roundLedgerEntries = <T extends IDebitCreditEntry>(
   }
   const last = rounded[lastIndex];
 
-  // Debits exceed credits by `remainder`: grow the credit, or shrink the debit.
+  // Debits exceed credits by the remainder: grow the credit, or shrink the debit.
   rounded[lastIndex] =
     last.credit !== 0
-      ? { ...last, credit: roundLedgerAmount(last.credit + remainder) }
-      : { ...last, debit: roundLedgerAmount(last.debit - remainder) };
+      ? { ...last, credit: fromCents(toCents(last.credit) + remainderCents) }
+      : { ...last, debit: fromCents(toCents(last.debit) - remainderCents) };
 
   return rounded;
 };
 
 /**
- * Splits the given total over the given weights, rounding each part to the
- * ledger precision and putting the remainder on the last part, so the parts
- * always add up to the rounded total.
+ * Splits the given total over the given weights in whole cents with the
+ * largest remainder method, so the parts always add up to the rounded total.
  * @param {number} total
  * @param {number[]} weights
  * @returns {number[]}
  */
-export const splitLedgerAmount = (
-  total: number,
-  weights: number[],
-): number[] => {
-  const roundedTotal = roundLedgerAmount(total);
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-
-  if (weights.length === 0) {
-    return [];
-  }
-  if (totalWeight === 0) {
-    return weights.map((_, index) =>
-      index === weights.length - 1 ? roundedTotal : 0,
-    );
-  }
-  const parts = weights.map((weight) =>
-    roundLedgerAmount((roundedTotal * weight) / totalWeight),
-  );
-  const allocated = parts.slice(0, -1).reduce((sum, part) => sum + part, 0);
-
-  parts[parts.length - 1] = roundLedgerAmount(roundedTotal - allocated);
-
-  return parts;
-};
+export const splitLedgerAmount = (total: number, weights: number[]): number[] =>
+  allocateMoney(total, weights);
 
 const findLastIndex = <T>(items: T[], predicate: (item: T) => boolean) => {
   for (let index = items.length - 1; index >= 0; index -= 1) {

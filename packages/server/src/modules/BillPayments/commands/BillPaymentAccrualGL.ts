@@ -1,5 +1,10 @@
 import * as moment from 'moment';
-import { sumBy } from 'lodash';
+import {
+  multiplyMoney,
+  roundMoney,
+  subtractMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { BillPayment } from '../models/BillPayment';
 import { AccountNormal } from '@/interfaces/Account';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
@@ -87,17 +92,24 @@ export class BillPaymentAccrualGL {
    * @returns {number}
    */
   private get paymentExGainOrLoss(): number {
-    return sumBy(this.billPayment.entries, (entry) => {
-      const paymentLocalAmount =
-        entry.paymentAmount * this.billPayment.exchangeRate;
+    const entries = this.billPayment.entries || [];
+
+    // Difference method: the paid amount at the payment rate and at the
+    // bills' rates are each rounded to cents, and the gain/loss is what is
+    // left, so nothing is lost to rounding.
+    const paidAtPaymentRate = multiplyMoney(
+      sumMoneyBy(entries, 'paymentAmount'),
+      this.billPayment.exchangeRate,
+    );
+    const paidAtBillRates = sumMoneyBy(entries, (entry) =>
       // Opening balance lines have no bill: no exchange difference
       // (foreign currency opening balances are not handled here).
-      const billExchangeRate =
-        entry.bill?.exchangeRate ?? this.billPayment.exchangeRate;
-      const invoicePayment = entry.paymentAmount * billExchangeRate;
-
-      return invoicePayment - paymentLocalAmount;
-    });
+      multiplyMoney(
+        entry.paymentAmount,
+        entry.bill?.exchangeRate ?? this.billPayment.exchangeRate,
+      ),
+    );
+    return subtractMoney(paidAtBillRates, paidAtPaymentRate);
   }
 
   /**
@@ -146,7 +158,7 @@ export class BillPaymentAccrualGL {
 
     return {
       ...commonEntry,
-      credit: this.billPayment.localAmount,
+      credit: roundMoney(this.billPayment.localAmount),
       accountId: this.billPayment.paymentAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 2,
@@ -163,7 +175,7 @@ export class BillPaymentAccrualGL {
     return {
       ...commonEntry,
       exchangeRate: this.billPayment.exchangeRate,
-      debit: this.billPayment.localAmount,
+      debit: roundMoney(this.billPayment.localAmount),
       contactId: this.billPayment.vendorId,
       accountId: this.APAccountId,
       accountNormal: AccountNormal.CREDIT,

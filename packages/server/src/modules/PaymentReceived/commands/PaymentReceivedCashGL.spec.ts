@@ -253,7 +253,7 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
     buildGL(payment).setUnearnedRevenueAccountId(UNEARNED_REVENUE);
 
   const sum = (entries: any[], key: 'debit' | 'credit') =>
-    Math.round(entries.reduce((total, e) => total + e[key], 0) * 1000) / 1000;
+    Math.round(entries.reduce((total, e) => total + e[key], 0) * 100) / 100;
 
   const sumAccount = (
     entries: any[],
@@ -379,8 +379,8 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
 
     expect(gl.getExcessAmount()).toBe(0);
     expect(entries).toHaveLength(2);
-    expect(sumAccount(entries, BANK, 'debit')).toBe(100.555);
-    expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(100.555);
+    expect(sumAccount(entries, BANK, 'debit')).toBe(100.56);
+    expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(100.56);
   });
 
   it('keeps the bank line when the invoice total is zero', () => {
@@ -442,9 +442,9 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
     } as unknown as PaymentReceived;
     const entries = buildExcessGL(payment).GLEntries();
 
-    expect(findEntry(entries, 501).credit).toBe(33.333);
-    expect(findEntry(entries, 502).credit).toBe(33.333);
-    expect(findEntry(entries, 503).credit).toBe(33.334);
+    expect(findEntry(entries, 501).credit).toBe(33.33);
+    expect(findEntry(entries, 502).credit).toBe(33.33);
+    expect(findEntry(entries, 503).credit).toBe(33.34);
     expect(sum(entries, 'debit')).toBe(100);
     expect(sum(entries, 'credit')).toBe(100);
   });
@@ -484,8 +484,8 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
       .GLEntries();
 
     entries.forEach((e) => {
-      expect(Math.round(e.debit * 1000) / 1000).toBe(e.debit);
-      expect(Math.round(e.credit * 1000) / 1000).toBe(e.credit);
+      expect(Math.round(e.debit * 100) / 100).toBe(e.debit);
+      expect(Math.round(e.credit * 100) / 100).toBe(e.credit);
     });
     expect(sumAccount(entries, BANK, 'debit')).toBe(2000);
     expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(300);
