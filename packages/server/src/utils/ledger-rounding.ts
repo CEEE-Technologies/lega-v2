@@ -85,3 +85,25 @@ const findLastIndex = <T>(items: T[], predicate: (item: T) => boolean) => {
   }
   return -1;
 };
+
+/**
+ * The credit side of an amount: a positive amount is a credit, a negative
+ * one a debit (e.g. a running-total part that rounds below zero).
+ * @param {number} amount
+ * @returns {{ credit: number; debit: number }}
+ */
+export const creditSide = (amount: number) =>
+  amount >= 0
+    ? { credit: amount || 0, debit: 0 }
+    : { credit: 0, debit: -amount };
+
+/**
+ * The debit side of an amount: a positive amount is a debit, a negative one
+ * a credit.
+ * @param {number} amount
+ * @returns {{ credit: number; debit: number }}
+ */
+export const debitSide = (amount: number) =>
+  amount >= 0
+    ? { debit: amount || 0, credit: 0 }
+    : { debit: 0, credit: -amount };

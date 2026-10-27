@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
-import { uniq } from 'lodash';
+import * as moment from 'moment';
+import { sortBy, uniq } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
 import { BillPaymentGLEntries } from './BillPaymentGLEntries';
 import { BillPaymentEntry } from '../models/BillPaymentEntry';
@@ -54,9 +55,20 @@ export class BillPaymentsGLEntriesRewrite {
   ): Promise<void> => {
     const billPaymentEntries = await this.billPaymentEntryModel()
       .query(trx)
-      .where('billId', billId);
+      .where('billId', billId)
+      .withGraphFetched('payment');
 
-    const paymentsIds = uniq(billPaymentEntries.map((e) => e.billPaymentId));
+    // The payments in date, then id order: each payment's cash basis split
+    // starts from what the earlier payments paid.
+    const paymentsIds = uniq(
+      sortBy(
+        billPaymentEntries.filter((entry) => entry.payment),
+        [
+          (entry) => moment(entry.payment.paymentDate).format('YYYY-MM-DD'),
+          (entry) => entry.payment.id,
+        ],
+      ).map((entry) => entry.billPaymentId),
+    );
 
     await this.rewritePaymentsGLEntries(paymentsIds, trx);
   };

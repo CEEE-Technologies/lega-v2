@@ -28,11 +28,23 @@ describe('BillPaymentsGLEntriesRewrite', () => {
       query: (t) => {
         queryTrx(t);
         return {
-          where: async () => [
-            { billPaymentId: 1 },
-            { billPaymentId: 2 },
-            { billPaymentId: 1 },
-          ],
+          where: () => ({
+            // Payment 2 is dated before payment 1: rewritten first.
+            withGraphFetched: async () => [
+              {
+                billPaymentId: 1,
+                payment: { id: 1, paymentDate: '2026-02-01' },
+              },
+              {
+                billPaymentId: 2,
+                payment: { id: 2, paymentDate: '2026-01-15' },
+              },
+              {
+                billPaymentId: 1,
+                payment: { id: 1, paymentDate: '2026-02-01' },
+              },
+            ],
+          }),
         };
       },
     });
@@ -46,8 +58,8 @@ describe('BillPaymentsGLEntriesRewrite', () => {
 
     expect(queryTrx).toHaveBeenCalledWith(trx);
     expect(glEntries.rewritePaymentGLEntries.mock.calls).toEqual([
-      [1, trx],
       [2, trx],
+      [1, trx],
     ]);
   });
 });

@@ -5,7 +5,19 @@ import { AccountNormal } from '@/interfaces/Account';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { RefundVendorCredit } from '../models/RefundVendorCredit';
-import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
+import {
+  allocateCumulativeShare,
+  balanceEntries,
+  moneyGt,
+  multiplyMoney,
+  roundMoney,
+  subtractMoney,
+} from '@bigcapital/utils';
+import {
+  creditSide,
+  debitSide,
+  roundLedgerAmount,
+} from '@/utils/ledger-rounding';
 
 /**
  * Records the cash basis journal entries of the vendor credit refund.
@@ -61,6 +73,20 @@ export class RefundVendorCreditCashGL {
    * @param {number} prepaidExpensesAccountId - Prepaid expenses account id.
    * @returns {RefundVendorCreditCashGL}
    */
+  /**
+   * Amount refunded of the vendor credit by the earlier refunds.
+   */
+  private refundedBefore = 0;
+
+  /**
+   * Sets the amount refunded of the vendor credit by the earlier refunds.
+   * @param {number} refundedBefore
+   */
+  public setRefundedBefore(refundedBefore: number) {
+    this.refundedBefore = refundedBefore || 0;
+    return this;
+  }
+
   public setPrepaidExpensesAccountId(prepaidExpensesAccountId: number) {
     this.prepaidExpensesAccountId = prepaidExpensesAccountId;
     return this;
@@ -71,7 +97,11 @@ export class RefundVendorCreditCashGL {
    * @returns {boolean}
    */
   public isExpenseReversible(): boolean {
-    return !!this.vendorCredit && this.refundRatio > 0;
+    return (
+      !!this.vendorCredit &&
+      moneyGt(this.vendorCredit.total, 0) &&
+      moneyGt(this.recognizedAmount, 0)
+    );
   }
 
   /**
@@ -128,17 +158,58 @@ export class RefundVendorCreditCashGL {
   }
 
   /**
-   * Retrieves the refunded proportion of the vendor credit.
-   * The refund amount over the vendor credit total in local currency keeps
-   * the cash basis entries balanced for partial refunds.
+   * The exchange rate of the vendor credit (falls back to the refund's).
+   */
+  private get vendorCreditRate(): number {
+    return defaultTo(
+      this.vendorCredit?.exchangeRate,
+      defaultTo(this.refundVendorCredit.exchangeRate, 1),
+    );
+  }
+
+  /**
+   * Retrieves the part of the refund that reverses the vendor credit
+   * expenses (vendor credit currency): no more than what the earlier refunds
+   * left of its total. Anything above it is a prepaid expense.
    * @returns {number}
    */
-  private get refundRatio(): number {
-    const vendorCreditTotalLocal = defaultTo(this.vendorCredit?.totalLocal, 0);
-    if (vendorCreditTotalLocal <= 0) {
-      return 0;
-    }
-    return this.refundLocalAmount / vendorCreditTotalLocal;
+  private get recognizedAmount(): number {
+    const remaining = Math.max(
+      subtractMoney(
+        defaultTo(this.vendorCredit?.total, 0),
+        this.refundedBefore,
+      ),
+      0,
+    );
+    return Math.min(
+      roundMoney(defaultTo(this.refundVendorCredit.amount, 0)),
+      remaining,
+    );
+  }
+
+  /**
+   * Splits the refund over the vendor credit lines with the running-total
+   * method, in the vendor credit currency, converted with its rate. Once the
+   * vendor credit is fully refunded every line ends exactly at its amount.
+   */
+  private get shares() {
+    const items = this.vendorCredit.entries || [];
+    const parts = allocateCumulativeShare(
+      this.refundedBefore,
+      this.recognizedAmount,
+      this.vendorCredit.total,
+      [
+        ...items.map((item) => item.totalExcludingTax),
+        -defaultTo(this.vendorCredit.discountAmount, 0),
+        defaultTo(this.vendorCredit.adjustment, 0),
+      ],
+    ).map((part) => multiplyMoney(part, this.vendorCreditRate));
+
+    return {
+      items: parts.slice(0, items.length),
+      discount: -parts[items.length],
+      adjustment: parts[items.length + 1],
+    };
   }
 
   /**
@@ -164,13 +235,13 @@ export class RefundVendorCreditCashGL {
   private getVendorCreditItemEntry(
     item: ItemEntry,
     index: number,
+    share: number,
   ): ILedgerEntry {
     const commonEntry = this.cashEntriesCommonEntry;
-    const exchangeRate = defaultTo(this.vendorCredit?.exchangeRate, 1);
 
     return {
       ...commonEntry,
-      credit: item.totalExcludingTax * exchangeRate * this.refundRatio,
+      ...creditSide(share),
       accountId:
         'inventory' === item.item.type
           ? item.item.inventoryAccountId
@@ -187,15 +258,15 @@ export class RefundVendorCreditCashGL {
    * @returns {ILedgerEntry[]}
    */
   private get discountEntry(): ILedgerEntry[] {
-    const discountAmountLocal = this.vendorCredit?.discountAmountLocal;
+    const share = this.shares.discount;
 
-    if (!discountAmountLocal) {
+    if (!share) {
       return [];
     }
     return [
       {
         ...this.cashEntriesCommonEntry,
-        debit: discountAmountLocal * this.refundRatio,
+        ...debitSide(share),
         accountId: this.purchaseDiscountAccountId,
         accountNormal: AccountNormal.DEBIT,
         index: 1,
@@ -209,18 +280,15 @@ export class RefundVendorCreditCashGL {
    * @returns {ILedgerEntry[]}
    */
   private get adjustmentEntry(): ILedgerEntry[] {
-    const adjustmentLocal = this.vendorCredit?.adjustmentLocal;
+    const share = this.shares.adjustment;
 
-    if (!adjustmentLocal) {
+    if (!share) {
       return [];
     }
-    const adjustmentAmount = Math.abs(adjustmentLocal) * this.refundRatio;
-
     return [
       {
         ...this.cashEntriesCommonEntry,
-        credit: adjustmentLocal > 0 ? adjustmentAmount : 0,
-        debit: adjustmentLocal < 0 ? adjustmentAmount : 0,
+        ...creditSide(share),
         accountId: this.otherExpensesAccountId,
         accountNormal: AccountNormal.DEBIT,
         index: 1,
@@ -239,16 +307,29 @@ export class RefundVendorCreditCashGL {
     if (!this.isExpenseReversible()) {
       return [this.refundEntry, this.prepaidExpensesEntry];
     }
+    const shares = this.shares;
     const itemsEntries = (this.vendorCredit.entries || []).map((item, index) =>
-      this.getVendorCreditItemEntry(item, index),
+      this.getVendorCreditItemEntry(item, index, shares.items[index]),
     );
+    // A refund above what is left of the vendor credit is a prepaid expense.
+    const overAmount = subtractMoney(
+      this.refundLocalAmount,
+      multiplyMoney(this.recognizedAmount, this.vendorCreditRate),
+    );
+    const overEntries = moneyGt(overAmount, 0)
+      ? [{ ...this.prepaidExpensesEntry, credit: overAmount }]
+      : [];
 
-    return roundLedgerEntries([
-      this.refundEntry,
-      ...this.discountEntry,
-      ...this.adjustmentEntry,
-      ...itemsEntries,
-    ]);
+    return balanceEntries(
+      [
+        this.refundEntry,
+        ...this.discountEntry,
+        ...this.adjustmentEntry,
+        ...itemsEntries,
+        ...overEntries,
+      ],
+      { canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null },
+    ).entries;
   }
 
   /**

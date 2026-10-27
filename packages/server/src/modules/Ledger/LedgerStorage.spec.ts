@@ -210,6 +210,23 @@ describe('LedgerStorageService.commit', () => {
     expect(debits(entries)).toBe(credits(entries));
   });
 
+  it('takes the account normal from the account type', async () => {
+    const { service, received } = buildService();
+    // A cost line marked credit-normal on a debit-normal (COGS) account.
+    await service.commit(
+      new Ledger([
+        entry({ accountId: INVENTORY, debit: 200, accountNormal: 'debit' }),
+        entry({ accountId: COGS, credit: 200, accountNormal: 'credit' }),
+      ]),
+    );
+    const entries = received.accounts.getEntries();
+    expect(entries.map((e) => e.accountNormal)).toEqual(['debit', 'debit']);
+    // The COGS balance goes down by the credit.
+    expect(received.accounts.whereAccountId(COGS).getClosingBalance()).toBe(
+      -200,
+    );
+  });
+
   it('logs a set off by more than rounding, and throws in strict mode', async () => {
     const unbalanced = () =>
       new Ledger([

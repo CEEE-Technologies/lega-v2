@@ -8,7 +8,15 @@ import { Bill } from '@/modules/Bills/models/Bill';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { BillPayment } from '../models/BillPayment';
 import { BillPaymentEntry } from '../models/BillPaymentEntry';
-import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
+import {
+  allocateCumulativeShare,
+  balanceEntries,
+  moneyGt,
+  multiplyMoney,
+  roundMoney,
+  subtractMoney,
+} from '@bigcapital/utils';
+import { debitSide, roundLedgerAmount } from '@/utils/ledger-rounding';
 import {
   isDocumentEntry,
   isOpeningBalanceEntry,
@@ -38,6 +46,22 @@ export class BillPaymentCashGL {
   private otherExpensesAccountId: number;
   private prepaidExpensesAccountId: number;
   private openingBalanceAccountId: number | null = null;
+
+  /**
+   * Amount paid on each bill by the earlier payments (bill currency), by
+   * bill id: the running-total split starts from there.
+   */
+  private paidBefore: Record<number, number> = {};
+
+  /**
+   * Sets the amount paid on each bill by the earlier payments.
+   * @param {Record<number, number>} paidBefore - By bill id.
+   * @returns {BillPaymentCashGL}
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore ?? {};
+    return this;
+  }
 
   /**
    * Constructor method.
@@ -146,20 +170,74 @@ export class BillPaymentCashGL {
   };
 
   /**
-   * Retrieves the paid proportion of the associated bill.
-   * The paid amount in local currency over the bill total in local currency
-   * keeps the cash basis entries balanced for partial payments.
+   * Retrieves the part of the payment entry that pays the bill (bill
+   * currency): no more than what the earlier payments left to pay. Anything
+   * above it is unapplied (prepaid expense), so the set always balances.
    * @param {BillPaymentEntry} entry - Bill payment entry.
    * @returns {number}
    */
-  private getPaymentEntryRatio = (entry: BillPaymentEntry): number => {
-    const billTotalLocal = defaultTo(entry.bill?.totalLocal, 0);
-    const paidLocalAmount = this.getPaymentEntryLocalAmount(entry);
+  private getPaymentEntryRecognizedAmount = (
+    entry: BillPaymentEntry,
+  ): number => {
+    const remaining = Math.max(
+      subtractMoney(
+        defaultTo(entry.bill?.total, 0),
+        this.paidBefore[entry.billId] || 0,
+      ),
+      0,
+    );
+    return Math.min(roundMoney(entry.paymentAmount), remaining);
+  };
 
-    if (billTotalLocal <= 0) {
-      return 0;
-    }
-    return paidLocalAmount / billTotalLocal;
+  /**
+   * Retrieves the recognized part of the payment entry in local currency.
+   * @param {BillPaymentEntry} entry - Bill payment entry.
+   * @returns {number}
+   */
+  private getPaymentEntryRecognizedLocalAmount = (
+    entry: BillPaymentEntry,
+  ): number => {
+    return multiplyMoney(
+      this.getPaymentEntryRecognizedAmount(entry),
+      defaultTo(this.billPayment.exchangeRate, 1),
+    );
+  };
+
+  /**
+   * Splits the payment entry over the bill lines with the running-total
+   * method (the bill lines recognized after this payment minus those
+   * recognized before it), in the bill currency, then converted with the
+   * payment rate. Once the bill is fully paid every line ends exact.
+   * @param {BillPaymentEntry} entry - Bill payment entry.
+   */
+  private getPaymentEntryShares = (entry: BillPaymentEntry) => {
+    const bill = entry.bill;
+    const items = bill.entries || [];
+    const taxedItems = items.filter((item) => item.taxAmount > 0);
+    const lines = [
+      ...items.map((item) => item.totalExcludingTax),
+      ...taxedItems.map((item) => item.taxAmount),
+      -defaultTo(bill.discountAmount, 0),
+      defaultTo(bill.adjustment, 0),
+    ];
+    const exchangeRate = defaultTo(this.billPayment.exchangeRate, 1);
+    const parts = allocateCumulativeShare(
+      this.paidBefore[entry.billId] || 0,
+      this.getPaymentEntryRecognizedAmount(entry),
+      bill.total,
+      lines,
+    ).map((part) => multiplyMoney(part, exchangeRate));
+
+    const itemsCount = items.length;
+    const taxesCount = taxedItems.length;
+
+    return {
+      items: parts.slice(0, itemsCount),
+      taxedItems,
+      taxes: parts.slice(itemsCount, itemsCount + taxesCount),
+      discount: -parts[itemsCount + taxesCount],
+      adjustment: parts[itemsCount + taxesCount + 1],
+    };
   };
 
   /**
@@ -172,7 +250,7 @@ export class BillPaymentCashGL {
   ): ILedgerEntry => {
     return {
       ...this.cashEntriesCommonEntry,
-      credit: this.getPaymentEntryLocalAmount(entry),
+      credit: this.getPaymentEntryRecognizedLocalAmount(entry),
       accountId: this.billPayment.paymentAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -182,62 +260,56 @@ export class BillPaymentCashGL {
   /**
    * Retrieves the cost/inventory accounts debit entries mirroring the bill items.
    * @param {Bill} bill - Bill.
-   * @param {number} ratio - Paid proportion of the bill.
+   * @param {number[]} shares - The recognized part of each item (local).
    * @returns {ILedgerEntry[]}
    */
   private getPaymentEntryItemEntries = (
     bill: Bill,
-    ratio: number,
+    shares: number[],
   ): ILedgerEntry[] => {
     const billEntries = bill.entries || [];
-    const billExchangeRate = defaultTo(bill.exchangeRate, 1);
 
     return billEntries.map((item, index) =>
-      this.getBillItemCashEntry(item, index, ratio, billExchangeRate),
+      this.getBillItemCashEntry(item, index, shares[index]),
     );
   };
 
   /**
    * Retrieves the tax payable debit entries mirroring the bill taxes.
    * @param {Bill} bill - Bill.
-   * @param {number} ratio - Paid proportion of the bill.
+   * @param {ItemEntry[]} taxedItems - The bill items with tax.
+   * @param {number[]} shares - The recognized part of each tax (local).
    * @returns {ILedgerEntry[]}
    */
   private getPaymentEntryTaxEntries = (
     bill: Bill,
-    ratio: number,
+    taxedItems: ItemEntry[],
+    shares: number[],
   ): ILedgerEntry[] => {
     const billEntries = bill.entries || [];
-    const billExchangeRate = defaultTo(bill.exchangeRate, 1);
 
-    return billEntries
-      .filter((item) => item.taxAmount > 0)
-      .map((item, index) => ({
-        ...this.cashEntriesCommonEntry,
-        debit: item.taxAmount * billExchangeRate * ratio,
-        accountId: this.taxPayableAccountId,
-        index: billEntries.length + index + 2,
-        accountNormal: AccountNormal.CREDIT,
-        taxRateId: item.taxRateId,
-        taxRate: item.taxRate,
-      }));
+    return taxedItems.map((item, index) => ({
+      ...this.cashEntriesCommonEntry,
+      ...debitSide(shares[index]),
+      accountId: this.taxPayableAccountId,
+      index: billEntries.length + index + 2,
+      accountNormal: AccountNormal.CREDIT,
+      taxRateId: item.taxRateId,
+      taxRate: item.taxRate,
+    }));
   };
 
   /**
    * Retrieves the discount entry mirroring the bill discount.
-   * @param {Bill} bill - Bill.
-   * @param {number} ratio - Paid proportion of the bill.
+   * @param {number} share - The recognized part of the discount (local).
    * @returns {ILedgerEntry[]}
    */
-  private getPaymentEntryDiscountEntry = (
-    bill: Bill,
-    ratio: number,
-  ): ILedgerEntry[] => {
-    return bill.discountAmountLocal
+  private getPaymentEntryDiscountEntry = (share: number): ILedgerEntry[] => {
+    return share
       ? [
           {
             ...this.cashEntriesCommonEntry,
-            credit: bill.discountAmountLocal * ratio,
+            ...debitSide(-share),
             accountId: this.purchaseDiscountAccountId,
             accountNormal: AccountNormal.DEBIT,
             index: 1,
@@ -248,23 +320,15 @@ export class BillPaymentCashGL {
 
   /**
    * Retrieves the other charges (adjustment) entry mirroring the bill adjustment.
-   * @param {Bill} bill - Bill.
-   * @param {number} ratio - Paid proportion of the bill.
+   * @param {number} share - The recognized part of the adjustment (local).
    * @returns {ILedgerEntry[]}
    */
-  private getPaymentEntryAdjustmentEntry = (
-    bill: Bill,
-    ratio: number,
-  ): ILedgerEntry[] => {
-    const adjustmentAmount = defaultTo(bill.adjustmentLocal, 0);
-
-    return bill.adjustmentLocal
+  private getPaymentEntryAdjustmentEntry = (share: number): ILedgerEntry[] => {
+    return share
       ? [
           {
             ...this.cashEntriesCommonEntry,
-            debit: adjustmentAmount > 0 ? adjustmentAmount * ratio : 0,
-            credit:
-              adjustmentAmount < 0 ? Math.abs(adjustmentAmount) * ratio : 0,
+            ...debitSide(share),
             accountId: this.otherExpensesAccountId,
             accountNormal: AccountNormal.DEBIT,
             index: 1,
@@ -290,15 +354,24 @@ export class BillPaymentCashGL {
       return [];
     }
     const bill = entry.bill;
-    const ratio = this.getPaymentEntryRatio(entry);
+    const shares = this.getPaymentEntryShares(entry);
 
-    return roundLedgerEntries([
-      this.getPaymentEntryPaymentAccountEntry(entry),
-      ...this.getPaymentEntryItemEntries(bill, ratio),
-      ...this.getPaymentEntryTaxEntries(bill, ratio),
-      ...this.getPaymentEntryDiscountEntry(bill, ratio),
-      ...this.getPaymentEntryAdjustmentEntry(bill, ratio),
-    ]);
+    // Converting each part with a foreign rate can leave a rounding cent:
+    // it goes on the largest expense line, never the bank line.
+    return balanceEntries(
+      [
+        this.getPaymentEntryPaymentAccountEntry(entry),
+        ...this.getPaymentEntryItemEntries(bill, shares.items),
+        ...this.getPaymentEntryTaxEntries(
+          bill,
+          shares.taxedItems,
+          shares.taxes,
+        ),
+        ...this.getPaymentEntryDiscountEntry(shares.discount),
+        ...this.getPaymentEntryAdjustmentEntry(shares.adjustment),
+      ],
+      { canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null },
+    ).entries;
   };
 
   /**
@@ -310,8 +383,8 @@ export class BillPaymentCashGL {
     return (
       isDocumentEntry(entry) &&
       !!entry.bill &&
-      this.getPaymentEntryRatio(entry) > 0 &&
-      this.getPaymentEntryLocalAmount(entry) > 0
+      moneyGt(entry.bill.total, 0) &&
+      moneyGt(this.getPaymentEntryRecognizedLocalAmount(entry), 0)
     );
   };
 
@@ -392,7 +465,7 @@ export class BillPaymentCashGL {
     return roundLedgerAmount(
       sumBy(
         (this.billPayment.entries || []).filter(this.isExpenseRecognizable),
-        this.getPaymentEntryLocalAmount,
+        this.getPaymentEntryRecognizedLocalAmount,
       ),
     );
   }
@@ -467,19 +540,17 @@ export class BillPaymentCashGL {
    * Retrieves the cash basis entry of the given bill item.
    * @param {ItemEntry} item - Bill item entry.
    * @param {number} index - Item entry index.
-   * @param {number} ratio - Paid proportion of the bill.
-   * @param {number} billExchangeRate - Bill exchange rate.
+   * @param {number} share - The recognized part of the item (local).
    * @returns {ILedgerEntry}
    */
   private getBillItemCashEntry = (
     item: ItemEntry,
     index: number,
-    ratio: number,
-    billExchangeRate: number,
+    share: number,
   ): ILedgerEntry => {
     return {
       ...this.cashEntriesCommonEntry,
-      debit: item.totalExcludingTax * billExchangeRate * ratio,
+      ...debitSide(share),
       accountId:
         ['inventory'].indexOf(item.item.type) !== -1
           ? item.item.inventoryAccountId

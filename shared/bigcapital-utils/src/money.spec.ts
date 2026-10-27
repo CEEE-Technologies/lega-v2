@@ -1,5 +1,6 @@
 import {
   allocateCumulative,
+  allocateCumulativeShare,
   allocateMoney,
   balanceEntries,
   calcDiscountMoney,
@@ -433,5 +434,33 @@ describe('hasAtMostDecimals', () => {
     [null, true],
   ])('%p -> %p', (value, expected) => {
     expect(hasAtMostDecimals(value as any)).toBe(expected);
+  });
+});
+
+describe('allocateCumulativeShare', () => {
+  it('equals allocateCumulative when the lines add up to the total', () => {
+    const lines = [100, 100, 100];
+    expect(allocateCumulativeShare(0, 100, 300, lines)).toEqual(
+      allocateCumulative(0, 100, lines),
+    );
+    expect(allocateCumulativeShare(100, 100, 300, lines)).toEqual(
+      allocateCumulative(100, 100, lines),
+    );
+  });
+
+  it('recognizes cost lines in proportion to the paid part, ending exact', () => {
+    // Invoice of 300, cost of goods 100 + 33.33.
+    const costs = [100, 33.33];
+    const p1 = allocateCumulativeShare(0, 100, 300, costs);
+    const p2 = allocateCumulativeShare(100, 100, 300, costs);
+    const p3 = allocateCumulativeShare(200, 100, 300, costs);
+    expect(p1).toEqual([33.33, 11.11]);
+    expect(sum(p1)).toBe(44.44);
+    costs.forEach((cost, i) => expect(sum([p1[i], p2[i], p3[i]])).toBe(cost));
+  });
+
+  it('returns zeros for a zero total and caps at the total', () => {
+    expect(allocateCumulativeShare(0, 10, 0, [5, 5])).toEqual([0, 0]);
+    expect(allocateCumulativeShare(0, 500, 300, [100, 200])).toEqual([100, 200]);
   });
 });

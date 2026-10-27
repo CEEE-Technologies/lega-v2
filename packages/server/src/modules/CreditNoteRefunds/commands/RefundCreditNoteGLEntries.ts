@@ -1,3 +1,9 @@
+import {
+  CREDIT_NOTE_REFUND_PAID_BEFORE,
+  getDocumentsPaidBefore,
+  getLaterPayments,
+  rewritePaymentsInOrder,
+} from '@/modules/AccountingBasis/CashBasisPaidBefore';
 import { LedgerStorageService } from '@/modules/Ledger/LedgerStorage.service';
 import { Inject, Injectable } from '@nestjs/common';
 import { RefundCreditNote } from '../models/RefundCreditNote';
@@ -166,19 +172,25 @@ export class RefundCreditNoteGLEntries {
     const adjustmentAccount =
       await this.accountRepository.findOrCreateOtherChargesAccount({}, trx);
 
-    const refundCreditNoteCashGL = new RefundCreditNoteCashGL(refundCreditNote)
-      .setDiscountAccountId(discountAccount.id)
-      .setAdjustmentAccountId(adjustmentAccount.id);
+    // What the earlier refunds took of the credit note: the running-total
+    // split of this refund starts from there.
+    const refundedBefore = await getDocumentsPaidBefore(
+      trx ?? this.refundCreditNoteModel().knex(),
+      CREDIT_NOTE_REFUND_PAID_BEFORE,
+      { id: refundCreditNote.id, date: refundCreditNote.date },
+      [refundCreditNote.creditNoteId],
+      !!trx,
+    );
+    // A credit note with no income to reverse (or a refund above what is
+    // left of it) takes the refund from the customer's unearned revenue.
+    const unearnedRevenueAccount =
+      await this.accountRepository.findOrCreateUnearnedRevenue({}, trx);
 
-    // A credit note with no income to reverse takes the refund from the
-    // customer's unearned revenue.
-    if (!refundCreditNoteCashGL.isIncomeReversible()) {
-      const unearnedRevenueAccount =
-        await this.accountRepository.findOrCreateUnearnedRevenue({}, trx);
-      refundCreditNoteCashGL.setUnearnedRevenueAccountId(
-        unearnedRevenueAccount.id,
-      );
-    }
+    const refundCreditNoteCashGL = new RefundCreditNoteCashGL(refundCreditNote)
+      .setRefundedBefore(refundedBefore[refundCreditNote.creditNoteId] || 0)
+      .setDiscountAccountId(discountAccount.id)
+      .setAdjustmentAccountId(adjustmentAccount.id)
+      .setUnearnedRevenueAccountId(unearnedRevenueAccount.id);
     return refundCreditNoteCashGL.getLedger();
   };
 
@@ -244,7 +256,12 @@ export class RefundCreditNoteGLEntries {
   ) => {
     const refunds = await this.refundCreditNoteModel()
       .query(trx)
-      .where('creditNoteId', creditNoteId);
+      .where('creditNoteId', creditNoteId)
+      // In date, then id order: each refund's split starts from the earlier.
+      .orderBy([
+        { column: 'date', order: 'asc' },
+        { column: 'id', order: 'asc' },
+      ]);
 
     for (const refund of refunds) {
       await this.rewriteRefundCreditCashGLEntries(refund.id, trx);
@@ -296,6 +313,34 @@ export class RefundCreditNoteGLEntries {
       refundCreditNoteId,
       'RefundCreditNote',
       trx,
+    );
+  };
+  /**
+   * Rebuilds, one at a time and in order, the cash basis entries of the
+   * refunds of the credit note that come after the given position (date, then
+   * id): their running-total split starts from the refunds before them.
+   * Refunds in a locked period are skipped (and logged).
+   * @param {number} creditNoteId
+   * @param {{ id: number; date: any }} after - The position to start after.
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteLaterRefundsCashGLEntries = async (
+    creditNoteId: number,
+    after: { id: number; date: any },
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const knex = trx ?? this.refundCreditNoteModel().knex();
+    const laterRefunds = await getLaterPayments(
+      knex,
+      CREDIT_NOTE_REFUND_PAID_BEFORE,
+      [creditNoteId],
+      after,
+    );
+    await rewritePaymentsInOrder(
+      knex,
+      laterRefunds.filter((refund) => refund.id !== after.id),
+      'RefundCreditNote',
+      (refundId) => this.rewriteRefundCreditCashGLEntries(refundId, trx),
     );
   };
 }

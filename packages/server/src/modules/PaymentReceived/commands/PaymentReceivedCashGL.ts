@@ -6,7 +6,15 @@ import { PaymentReceived } from '../models/PaymentReceived';
 import { PaymentReceivedEntry } from '../models/PaymentReceivedEntry';
 import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
+import {
+  allocateCumulativeShare,
+  balanceEntries,
+  moneyGt,
+  multiplyMoney,
+  roundMoney,
+  subtractMoney,
+} from '@bigcapital/utils';
+import { creditSide, roundLedgerAmount } from '@/utils/ledger-rounding';
 import {
   isDocumentEntry,
   isOpeningBalanceEntry,
@@ -36,6 +44,12 @@ export class PaymentReceivedCashGL {
   private otherChargesAccountId: number;
   private unearnedRevenueAccountId: number;
   private openingBalanceAccountId: number | null = null;
+
+  /**
+   * Amount paid on each invoice by the earlier payments (invoice currency),
+   * by invoice id: the running-total split starts from there.
+   */
+  private paidBefore: Record<number, number> = {};
 
   /**
    * Constructor method.
@@ -97,6 +111,16 @@ export class PaymentReceivedCashGL {
   }
 
   /**
+   * Sets the amount paid on each invoice by the earlier payments.
+   * @param {Record<number, number>} paidBefore - By invoice id.
+   * @returns {PaymentReceivedCashGL}
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore ?? {};
+    return this;
+  }
+
+  /**
    * Determines whether the payment has a line paying the opening balance.
    * @returns {boolean}
    */
@@ -146,20 +170,76 @@ export class PaymentReceivedCashGL {
   };
 
   /**
-   * Retrieves the paid proportion of the associated invoice.
-   * The paid amount in local currency over the invoice total in local
-   * currency keeps the cash basis entries balanced for partial payments.
+   * Retrieves the part of the payment entry that pays the invoice (invoice
+   * currency): no more than what the earlier payments left to pay. Anything
+   * above it is unapplied (unearned revenue), so the set always balances.
    * @param {PaymentReceivedEntry} entry - Payment received entry.
    * @returns {number}
    */
-  private getPaymentEntryRatio = (entry: PaymentReceivedEntry): number => {
-    const invoiceTotalLocal = defaultTo(entry.invoice?.totalLocal, 0);
-    const paidLocalAmount = this.getPaymentEntryLocalAmount(entry);
+  private getPaymentEntryRecognizedAmount = (
+    entry: PaymentReceivedEntry,
+  ): number => {
+    const remaining = Math.max(
+      subtractMoney(
+        defaultTo(entry.invoice?.total, 0),
+        this.paidBefore[entry.invoiceId] || 0,
+      ),
+      0,
+    );
+    return Math.min(roundMoney(entry.paymentAmount), remaining);
+  };
 
-    if (invoiceTotalLocal <= 0) {
-      return 0;
-    }
-    return paidLocalAmount / invoiceTotalLocal;
+  /**
+   * Retrieves the recognized part of the payment entry in local currency.
+   * @param {PaymentReceivedEntry} entry - Payment received entry.
+   * @returns {number}
+   */
+  private getPaymentEntryRecognizedLocalAmount = (
+    entry: PaymentReceivedEntry,
+  ): number => {
+    return multiplyMoney(
+      this.getPaymentEntryRecognizedAmount(entry),
+      defaultTo(this.paymentReceived.exchangeRate, 1),
+    );
+  };
+
+  /**
+   * Splits the payment entry over the invoice lines with the running-total
+   * method: the invoice lines recognized after this payment (the earlier
+   * payments on the invoice plus this one) minus those recognized before
+   * it. The split is in the invoice currency, then converted with the
+   * payment rate. Once the invoice is fully paid, every line ends exactly
+   * at its amount (no 99.999 / 100.002 cent gaps).
+   * @param {PaymentReceivedEntry} entry - Payment received entry.
+   */
+  private getPaymentEntryShares = (entry: PaymentReceivedEntry) => {
+    const invoice = entry.invoice;
+    const items = invoice.entries || [];
+    const taxedItems = items.filter((item) => item.taxAmount > 0);
+    const lines = [
+      ...items.map((item) => item.totalExcludingTax),
+      ...taxedItems.map((item) => item.taxAmount),
+      -defaultTo(invoice.discountAmount, 0),
+      defaultTo(invoice.adjustment, 0),
+    ];
+    const exchangeRate = defaultTo(this.paymentReceived.exchangeRate, 1);
+    const parts = allocateCumulativeShare(
+      this.paidBefore[entry.invoiceId] || 0,
+      this.getPaymentEntryRecognizedAmount(entry),
+      invoice.total,
+      lines,
+    ).map((part) => multiplyMoney(part, exchangeRate));
+
+    const itemsCount = items.length;
+    const taxesCount = taxedItems.length;
+
+    return {
+      items: parts.slice(0, itemsCount),
+      taxedItems,
+      taxes: parts.slice(itemsCount, itemsCount + taxesCount),
+      discount: -parts[itemsCount + taxesCount],
+      adjustment: parts[itemsCount + taxesCount + 1],
+    };
   };
 
   /**
@@ -172,7 +252,7 @@ export class PaymentReceivedCashGL {
   ): ILedgerEntry => {
     return {
       ...this.cashEntriesCommonEntry,
-      debit: this.getPaymentEntryLocalAmount(entry),
+      debit: this.getPaymentEntryRecognizedLocalAmount(entry),
       accountId: this.paymentReceived.depositAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -182,18 +262,18 @@ export class PaymentReceivedCashGL {
   /**
    * Retrieves the income accounts credit entries mirroring the invoice items.
    * @param {SaleInvoice} invoice - Sale invoice.
-   * @param {number} ratio - Paid proportion of the invoice.
+   * @param {number[]} shares - The recognized part of each item (local).
    * @returns {ILedgerEntry[]}
    */
   private getPaymentEntryIncomeEntries = (
     invoice: SaleInvoice,
-    ratio: number,
+    shares: number[],
   ): ILedgerEntry[] => {
     const invoiceEntries = invoice.entries || [];
 
     return invoiceEntries.map((item, index) => ({
       ...this.cashEntriesCommonEntry,
-      credit: item.totalExcludingTax * invoice.exchangeRate * ratio,
+      ...creditSide(shares[index]),
       accountId: item.sellAccountId,
       note: item.description,
       index: index + 2,
@@ -207,43 +287,39 @@ export class PaymentReceivedCashGL {
   /**
    * Retrieves the tax payable credit entries mirroring the invoice taxes.
    * @param {SaleInvoice} invoice - Sale invoice.
-   * @param {number} ratio - Paid proportion of the invoice.
+   * @param {ItemEntry[]} taxedItems - The invoice items with tax.
+   * @param {number[]} shares - The recognized part of each tax (local).
    * @returns {ILedgerEntry[]}
    */
   private getPaymentEntryTaxEntries = (
     invoice: SaleInvoice,
-    ratio: number,
+    taxedItems: SaleInvoice['entries'],
+    shares: number[],
   ): ILedgerEntry[] => {
     const invoiceEntries = invoice.entries || [];
 
-    return invoiceEntries
-      .filter((item) => item.taxAmount > 0)
-      .map((item, index) => ({
-        ...this.cashEntriesCommonEntry,
-        credit: item.taxAmount * invoice.exchangeRate * ratio,
-        accountId: this.taxPayableAccountId,
-        index: invoiceEntries.length + index + 2,
-        accountNormal: AccountNormal.CREDIT,
-        taxRateId: item.taxRateId,
-        taxRate: item.taxRate,
-      }));
+    return taxedItems.map((item, index) => ({
+      ...this.cashEntriesCommonEntry,
+      ...creditSide(shares[index]),
+      accountId: this.taxPayableAccountId,
+      index: invoiceEntries.length + index + 2,
+      accountNormal: AccountNormal.CREDIT,
+      taxRateId: item.taxRateId,
+      taxRate: item.taxRate,
+    }));
   };
 
   /**
    * Retrieves the discount entry mirroring the invoice discount.
-   * @param {SaleInvoice} invoice - Sale invoice.
-   * @param {number} ratio - Paid proportion of the invoice.
+   * @param {number} share - The recognized part of the discount (local).
    * @returns {ILedgerEntry[]}
    */
-  private getPaymentEntryDiscountEntry = (
-    invoice: SaleInvoice,
-    ratio: number,
-  ): ILedgerEntry[] => {
-    return invoice.discountAmountLocal
+  private getPaymentEntryDiscountEntry = (share: number): ILedgerEntry[] => {
+    return share
       ? [
           {
             ...this.cashEntriesCommonEntry,
-            debit: invoice.discountAmountLocal * ratio,
+            ...creditSide(-share),
             accountId: this.discountAccountId,
             accountNormal: AccountNormal.CREDIT,
             index: 1,
@@ -254,23 +330,15 @@ export class PaymentReceivedCashGL {
 
   /**
    * Retrieves the other charges (adjustment) entry mirroring the invoice adjustment.
-   * @param {SaleInvoice} invoice - Sale invoice.
-   * @param {number} ratio - Paid proportion of the invoice.
+   * @param {number} share - The recognized part of the adjustment (local).
    * @returns {ILedgerEntry[]}
    */
-  private getPaymentEntryAdjustmentEntry = (
-    invoice: SaleInvoice,
-    ratio: number,
-  ): ILedgerEntry[] => {
-    const adjustmentAmount = defaultTo(invoice.adjustmentLocal, 0);
-
-    return invoice.adjustmentLocal
+  private getPaymentEntryAdjustmentEntry = (share: number): ILedgerEntry[] => {
+    return share
       ? [
           {
             ...this.cashEntriesCommonEntry,
-            debit:
-              adjustmentAmount < 0 ? Math.abs(adjustmentAmount) * ratio : 0,
-            credit: adjustmentAmount > 0 ? adjustmentAmount * ratio : 0,
+            ...creditSide(share),
             accountId: this.otherChargesAccountId,
             accountNormal: AccountNormal.CREDIT,
             index: 1,
@@ -296,15 +364,24 @@ export class PaymentReceivedCashGL {
       return [];
     }
     const invoice = entry.invoice;
-    const ratio = this.getPaymentEntryRatio(entry);
+    const shares = this.getPaymentEntryShares(entry);
 
-    return roundLedgerEntries([
-      this.getPaymentEntryDepositEntry(entry),
-      ...this.getPaymentEntryIncomeEntries(invoice, ratio),
-      ...this.getPaymentEntryTaxEntries(invoice, ratio),
-      ...this.getPaymentEntryDiscountEntry(invoice, ratio),
-      ...this.getPaymentEntryAdjustmentEntry(invoice, ratio),
-    ]);
+    // Converting each part with a foreign rate can leave a rounding cent:
+    // it goes on the largest income line, never the bank line.
+    return balanceEntries(
+      [
+        this.getPaymentEntryDepositEntry(entry),
+        ...this.getPaymentEntryIncomeEntries(invoice, shares.items),
+        ...this.getPaymentEntryTaxEntries(
+          invoice,
+          shares.taxedItems,
+          shares.taxes,
+        ),
+        ...this.getPaymentEntryDiscountEntry(shares.discount),
+        ...this.getPaymentEntryAdjustmentEntry(shares.adjustment),
+      ],
+      { canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null },
+    ).entries;
   };
 
   /**
@@ -316,8 +393,8 @@ export class PaymentReceivedCashGL {
     return (
       isDocumentEntry(entry) &&
       !!entry.invoice &&
-      this.getPaymentEntryRatio(entry) > 0 &&
-      this.getPaymentEntryLocalAmount(entry) > 0
+      moneyGt(entry.invoice.total, 0) &&
+      moneyGt(this.getPaymentEntryRecognizedLocalAmount(entry), 0)
     );
   };
 
@@ -400,7 +477,7 @@ export class PaymentReceivedCashGL {
     return roundLedgerAmount(
       sumBy(
         (this.paymentReceived.entries || []).filter(this.isIncomeRecognizable),
-        this.getPaymentEntryLocalAmount,
+        this.getPaymentEntryRecognizedLocalAmount,
       ),
     );
   }

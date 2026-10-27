@@ -276,6 +276,48 @@ export const allocateCumulative = (
   return after.map((part, index) => fromCents(part - before[index]));
 };
 
+/**
+ * Splits one payment over lines recognized in proportion to the paid part
+ * of a document, with the running-total method: after a payment, the lines
+ * recognized so far are `sum(lines) x paid / documentTotal` (rounded to
+ * cents, split with the largest remainder method), and this payment's parts
+ * are that minus the same before it. Once the payments reach the document
+ * total, every line ends exactly at its amount.
+ *
+ * Same as `allocateCumulative` when the lines add up to the document total;
+ * also works for lines that don't, such as the cost of goods of an invoice:
+ *   allocateCumulativeShare(0, 50, 100, [30, 30]) -> [15, 15]
+ * @param {MoneyInput} paidBefore - Amount paid by the earlier payments.
+ * @param {MoneyInput} payment - Amount of this payment.
+ * @param {MoneyInput} documentTotal - Total of the document being paid.
+ * @param {MoneyInput[]} lines - Amounts of the lines to recognize.
+ * @returns {number[]}
+ */
+export const allocateCumulativeShare = (
+  paidBefore: MoneyInput,
+  payment: MoneyInput,
+  documentTotal: MoneyInput,
+  lines: MoneyInput[],
+): number[] => {
+  const totalCents = toCents(documentTotal);
+  const linesCents = lines.reduce<number>((sum, line) => sum + toCents(line), 0);
+  const beforeCents = Math.max(toCents(paidBefore), 0);
+  const afterCents = Math.max(beforeCents + toCents(payment), 0);
+
+  if (totalCents <= 0) return lines.map(() => 0);
+
+  // The lines recognized after the given paid amount, in cents.
+  const recognizedCents = (paidCents: number) =>
+    paidCents >= totalCents
+      ? linesCents
+      : roundHalfAwayFromZero((linesCents * paidCents) / totalCents, 0);
+
+  const before = allocateCents(recognizedCents(beforeCents), lines);
+  const after = allocateCents(recognizedCents(afterCents), lines);
+
+  return after.map((part, index) => fromCents(part - before[index]));
+};
+
 export type LineDiscountType = 'percentage' | 'amount';
 
 export interface ILineMoneyInput {

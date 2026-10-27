@@ -49,6 +49,7 @@ export class TenantsMoneyHealthCheckCommand extends BaseCommand {
     try {
       const tenants = await this.getTenants(options.organization);
       let failed = 0;
+      let skipped = 0;
 
       for (const tenant of tenants) {
         const knex = this.initTenantKnex(tenant.organizationId);
@@ -72,8 +73,19 @@ export class TenantsMoneyHealthCheckCommand extends BaseCommand {
           }
           if (!clean) failed += 1;
         } catch (error) {
-          failed += 1;
-          this.log(`[${tenant.organizationId}] Check failed: ${error.message}`);
+          // A tenant whose database was never built (e.g. an organization
+          // left half set up by a test) has no money to check.
+          if (['ER_BAD_DB_ERROR', 'ER_NO_SUCH_TABLE'].includes(error?.code)) {
+            skipped += 1;
+            this.log(
+              `[${tenant.organizationId}] Skipped: the tenant database is not set up (${error.code}).`,
+            );
+          } else {
+            failed += 1;
+            this.log(
+              `[${tenant.organizationId}] Check failed: ${error.message}`,
+            );
+          }
         } finally {
           await knex.destroy();
         }
@@ -83,7 +95,10 @@ export class TenantsMoneyHealthCheckCommand extends BaseCommand {
           `${failed} of ${tenants.length} organizations have problems.`,
         );
       }
-      this.success(`${tenants.length} organizations checked: clean.`);
+      this.success(
+        `${tenants.length - skipped} organizations checked: clean.` +
+          (skipped ? ` ${skipped} skipped (database not set up).` : ''),
+      );
     } catch (error) {
       this.exit(error);
     }

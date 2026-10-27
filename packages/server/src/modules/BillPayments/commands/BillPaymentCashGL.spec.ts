@@ -2,22 +2,33 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { sumBy } from 'lodash';
 import { BillPaymentCashGL } from './BillPaymentCashGL';
 
-const buildBill = (overrides: Record<string, any> = {}) => ({
-  exchangeRate: 1,
-  totalLocal: 1000,
-  discountAmountLocal: null,
-  adjustmentLocal: null,
-  entries: [
-    {
-      itemId: 10,
-      totalExcludingTax: 1000,
-      taxAmount: 0,
-      costAccountId: 200,
-      item: { type: 'service' },
-    },
-  ],
-  ...overrides,
-});
+const buildBill = (overrides: Record<string, any> = {}) => {
+  const bill = {
+    id: 1,
+    exchangeRate: 1,
+    totalLocal: 1000,
+    discountAmountLocal: null,
+    adjustmentLocal: null,
+    entries: [
+      {
+        itemId: 10,
+        totalExcludingTax: 1000,
+        taxAmount: 0,
+        costAccountId: 200,
+        item: { type: 'service' },
+      },
+    ],
+    ...overrides,
+  };
+  // The bill currency figures the running-total split uses.
+  const rate = bill.exchangeRate || 1;
+  return {
+    ...bill,
+    total: bill.totalLocal / rate,
+    discountAmount: (bill.discountAmountLocal || 0) / rate,
+    adjustment: (bill.adjustmentLocal || 0) / rate,
+  };
+};
 
 const buildBillPayment = (overrides: Record<string, any> = {}) => ({
   id: 1,
@@ -299,12 +310,12 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     expect(sumAccount(entries, PREPAID_EXPENSES, 'debit')).toBe(400);
   });
 
-  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+  it('splits a full payment of 100 over 3 lines with the largest remainder', () => {
     const bill = buildBill({
-      totalLocal: 3,
-      entries: [201, 202, 203].map((costAccountId) => ({
+      totalLocal: 100,
+      entries: [201, 202, 203].map((costAccountId, index) => ({
         itemId: costAccountId,
-        totalExcludingTax: 1,
+        totalExcludingTax: index === 2 ? 33.34 : 33.33,
         taxAmount: 0,
         costAccountId,
         item: { type: 'service' },
@@ -313,7 +324,7 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     const entries = buildExcessGL(
       buildBillPayment({
         amount: 100,
-        entries: [{ paymentAmount: 100, bill }],
+        entries: [{ billId: 1, paymentAmount: 100, bill }],
       }),
     ).GLEntries();
 
@@ -322,5 +333,40 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     expect(entries.find((e) => e.accountId === 203).debit).toBe(33.34);
     expect(sum(entries, 'debit')).toBe(100);
     expect(sum(entries, 'credit')).toBe(100);
+  });
+
+  it('ends every line at exactly 100: 3 x 100 paid in three payments of 100', () => {
+    const bill = buildBill({
+      totalLocal: 300,
+      entries: [201, 202, 203].map((costAccountId) => ({
+        itemId: costAccountId,
+        totalExcludingTax: 100,
+        taxAmount: 0,
+        costAccountId,
+        item: { type: 'service' },
+      })),
+    });
+    const debitsOf = (paidBefore: number) => {
+      const entries = new BillPaymentCashGL(
+        buildBillPayment({
+          amount: 100,
+          entries: [{ billId: 1, paymentAmount: 100, bill }],
+        }) as any,
+      )
+        .setTaxPayableAccountId(1)
+        .setPurchaseDiscountAccountId(2)
+        .setOtherExpensesAccountId(3)
+        .setPaidBefore({ 1: paidBefore })
+        .GLEntries();
+      return [201, 202, 203].map(
+        (id) => entries.find((e) => e.accountId === id).debit,
+      );
+    };
+    const parts = [debitsOf(0), debitsOf(100), debitsOf(200)];
+    expect(parts).toEqual([
+      [33.34, 33.33, 33.33],
+      [33.33, 33.34, 33.33],
+      [33.33, 33.33, 33.34],
+    ]);
   });
 });

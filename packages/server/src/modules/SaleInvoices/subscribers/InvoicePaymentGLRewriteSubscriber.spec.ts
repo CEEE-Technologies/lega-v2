@@ -8,7 +8,16 @@ describe('InvoicePaymentGLRewriteSubscriber', () => {
     const entryModel = () => ({
       query: (t) => {
         queryTrx(t);
-        return { where: async () => [{ paymentReceiveId: 3 }] };
+        return {
+          where: () => ({
+            withGraphFetched: async () => [
+              {
+                paymentReceiveId: 3,
+                payment: { id: 3, paymentDate: '2026-01-01' },
+              },
+            ],
+          }),
+        };
       },
     });
     const glEntries = { rewritePaymentGLEntries: jest.fn() };

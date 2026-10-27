@@ -203,6 +203,13 @@ export class TenantsRebuildCashBasisCommand extends BaseCommand {
     this.log(
       `[${rebuild.organizationId}] Rebuilt: ${counts}. Orphan cash sets removed: ${rebuild.orphansRemoved}.`,
     );
+    if ((rebuild.lockedSkipped || []).length > 0) {
+      this.log(
+        `  Skipped (locked period): ${rebuild.lockedSkipped
+          .map((doc) => `${doc.referenceType} #${doc.referenceId}`)
+          .join(', ')}`,
+      );
+    }
     rebuild.failures.forEach((failure) => {
       this.log(
         `  Failed ${failure.referenceType} #${failure.referenceId}: ${failure.error}`,

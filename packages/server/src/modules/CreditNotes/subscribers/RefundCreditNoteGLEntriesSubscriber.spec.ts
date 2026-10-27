@@ -77,6 +77,7 @@ describe('RefundCreditNoteGLEntries.rewriteRefundCreditCashGLEntries', () => {
         customerId: 1,
         exchangeRate: 1,
         totalLocal: 100,
+        total: 100,
         entries: [
           { itemId: 1, totalExcludingTax: 100, sellAccountId: 500, item: {} },
         ],

@@ -1,3 +1,9 @@
+import {
+  getDocumentsPaidBefore,
+  getLaterPayments,
+  rewritePaymentsInOrder,
+  VENDOR_CREDIT_REFUND_PAID_BEFORE,
+} from '@/modules/AccountingBasis/CashBasisPaidBefore';
 import { LedgerStorageService } from '@/modules/Ledger/LedgerStorage.service';
 import { Inject, Injectable } from '@nestjs/common';
 import { RefundVendorCredit } from '../models/RefundVendorCredit';
@@ -170,21 +176,27 @@ export class RefundVendorCreditGLEntries {
     const otherExpensesAccount =
       await this.accountRepository.findOrCreateOtherExpensesAccount({}, trx);
 
+    // What the earlier refunds took of the vendor credit: the running-total
+    // split of this refund starts from there.
+    const refundedBefore = await getDocumentsPaidBefore(
+      trx ?? this.refundVendorCreditModel().knex(),
+      VENDOR_CREDIT_REFUND_PAID_BEFORE,
+      { id: refundVendorCredit.id, date: refundVendorCredit.date },
+      [refundVendorCredit.vendorCreditId],
+      !!trx,
+    );
+    // A vendor credit with no expense to reverse (or a refund above what is
+    // left of it) returns the refund to the vendor's prepaid expenses.
+    const prepaidExpensesAccount =
+      await this.accountRepository.findOrCreatePrepardExpenses({}, trx);
+
     const refundVendorCreditCashGL = new RefundVendorCreditCashGL(
       refundVendorCredit,
     )
+      .setRefundedBefore(refundedBefore[refundVendorCredit.vendorCreditId] || 0)
       .setPurchaseDiscountAccountId(purchaseDiscountAccount.id)
-      .setOtherExpensesAccountId(otherExpensesAccount.id);
-
-    // A vendor credit with no expense to reverse returns the refund to the
-    // vendor's prepaid expenses.
-    if (!refundVendorCreditCashGL.isExpenseReversible()) {
-      const prepaidExpensesAccount =
-        await this.accountRepository.findOrCreatePrepardExpenses({}, trx);
-      refundVendorCreditCashGL.setPrepaidExpensesAccountId(
-        prepaidExpensesAccount.id,
-      );
-    }
+      .setOtherExpensesAccountId(otherExpensesAccount.id)
+      .setPrepaidExpensesAccountId(prepaidExpensesAccount.id);
     return refundVendorCreditCashGL.getLedger();
   };
 
@@ -250,7 +262,12 @@ export class RefundVendorCreditGLEntries {
   ) => {
     const refunds = await this.refundVendorCreditModel()
       .query(trx)
-      .where('vendorCreditId', vendorCreditId);
+      .where('vendorCreditId', vendorCreditId)
+      // In date, then id order: each refund's split starts from the earlier.
+      .orderBy([
+        { column: 'date', order: 'asc' },
+        { column: 'id', order: 'asc' },
+      ]);
 
     for (const refund of refunds) {
       await this.rewriteRefundVendorCreditCashGLEntries(refund.id, trx);
@@ -303,6 +320,34 @@ export class RefundVendorCreditGLEntries {
       refundVendorCreditId,
       'RefundVendorCredit',
       trx,
+    );
+  };
+  /**
+   * Rebuilds, one at a time and in order, the cash basis entries of the
+   * refunds of the vendor credit that come after the given position (date, then
+   * id): their running-total split starts from the refunds before them.
+   * Refunds in a locked period are skipped (and logged).
+   * @param {number} vendorCreditId
+   * @param {{ id: number; date: any }} after - The position to start after.
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteLaterRefundsCashGLEntries = async (
+    vendorCreditId: number,
+    after: { id: number; date: any },
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const knex = trx ?? this.refundVendorCreditModel().knex();
+    const laterRefunds = await getLaterPayments(
+      knex,
+      VENDOR_CREDIT_REFUND_PAID_BEFORE,
+      [vendorCreditId],
+      after,
+    );
+    await rewritePaymentsInOrder(
+      knex,
+      laterRefunds.filter((refund) => refund.id !== after.id),
+      'RefundVendorCredit',
+      (refundId) => this.rewriteRefundVendorCreditCashGLEntries(refundId, trx),
     );
   };
 }

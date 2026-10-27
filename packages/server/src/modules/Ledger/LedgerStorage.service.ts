@@ -10,12 +10,17 @@ import { TenantModelProxy } from '../System/models/TenantBaseModel';
 import { LedgerClickHouseSink } from '../Analytics/services/LedgerClickHouseSink.service';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { Account } from '../Accounts/models/Account.model';
+import { ACCOUNT_TYPES } from '@/constants/accounts';
 import {
   formatUnbalancedGroup,
   isLedgerStrictMode,
   normalizeLedgerEntries,
   recordLedgerStrictViolation,
 } from './LedgerNormalizer';
+
+const ACCOUNT_NORMAL_BY_TYPE = new Map<string, string>(
+  ACCOUNT_TYPES.map((type) => [type.key, type.normal]),
+);
 
 @Injectable()
 export class LedgerStorageService {
@@ -74,8 +79,20 @@ export class LedgerStorageService {
     const accountTypes = new Map(
       accounts.map((account) => [account.id, account.accountType]),
     );
+    // The account normal comes from the account type, not from the
+    // builder: a builder that marks a debit-normal account as credit (the
+    // landed cost cost line did) moved the stored balance the wrong way, so
+    // it drifted from the sum of its ledger rows.
+    const withAccountNormal = entries.map((entry) => {
+      const normal = ACCOUNT_NORMAL_BY_TYPE.get(
+        accountTypes.get(entry.accountId),
+      );
+      return normal && entry.accountNormal !== normal
+        ? { ...entry, accountNormal: normal }
+        : entry;
+    });
     const { entries: normalized, unbalanced } = normalizeLedgerEntries(
-      entries,
+      withAccountNormal,
       accountTypes,
     );
     if (unbalanced.length > 0) {

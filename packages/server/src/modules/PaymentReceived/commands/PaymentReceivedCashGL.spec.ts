@@ -37,18 +37,33 @@ const buildItemEntry = (
 const buildInvoice = (
   entries: TestItemEntry[],
   overrides: Partial<TestInvoice> = {},
-): TestInvoice => ({
-  id: 10,
-  exchangeRate: 1,
-  totalLocal: entries.reduce(
-    (total, entry) => total + entry.totalExcludingTax + (entry.taxAmount || 0),
-    0,
-  ),
-  discountAmountLocal: null,
-  adjustmentLocal: null,
-  entries,
-  ...overrides,
-});
+): TestInvoice & {
+  total: number;
+  discountAmount: number;
+  adjustment: number;
+} => {
+  const invoice = {
+    id: 10,
+    exchangeRate: 1,
+    totalLocal: entries.reduce(
+      (total, entry) =>
+        total + entry.totalExcludingTax + (entry.taxAmount || 0),
+      0,
+    ),
+    discountAmountLocal: null,
+    adjustmentLocal: null,
+    entries,
+    ...overrides,
+  };
+  // The invoice currency figures the running-total split uses.
+  const rate = invoice.exchangeRate || 1;
+  return {
+    ...invoice,
+    total: invoice.totalLocal / rate,
+    discountAmount: (invoice.discountAmountLocal || 0) / rate,
+    adjustment: (invoice.adjustmentLocal || 0) / rate,
+  };
+};
 
 const buildPayment = () =>
   ({
@@ -66,7 +81,7 @@ const buildPayment = () =>
     entries: [],
   }) as unknown as PaymentReceived;
 
-const buildPaymentEntry = (invoice: TestInvoice, paymentAmount: number) => ({
+const buildPaymentEntry = (invoice: any, paymentAmount: number) => ({
   invoiceId: invoice.id,
   paymentAmount,
   invoice,
@@ -426,14 +441,14 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
     expect(sumAccount(entries, BANK, 'debit')).toBe(1000);
   });
 
-  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+  it('splits a full payment of 100 over 3 lines with the largest remainder', () => {
     const invoice = buildInvoice(
       [
-        buildItemEntry({ sellAccountId: 501, totalExcludingTax: 1 }),
-        buildItemEntry({ sellAccountId: 502, totalExcludingTax: 1 }),
-        buildItemEntry({ sellAccountId: 503, totalExcludingTax: 1 }),
+        buildItemEntry({ sellAccountId: 501, totalExcludingTax: 33.33 }),
+        buildItemEntry({ sellAccountId: 502, totalExcludingTax: 33.33 }),
+        buildItemEntry({ sellAccountId: 503, totalExcludingTax: 33.34 }),
       ],
-      { totalLocal: 3 },
+      { totalLocal: 100 },
     );
     const payment = {
       ...buildPayment(),
@@ -447,6 +462,20 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
     expect(findEntry(entries, 503).credit).toBe(33.34);
     expect(sum(entries, 'debit')).toBe(100);
     expect(sum(entries, 'credit')).toBe(100);
+  });
+
+  it('posts a payment above what is left to pay as unearned revenue', () => {
+    const invoice = buildInvoice([buildItemEntry({ totalExcludingTax: 3 })]);
+    const payment = {
+      ...buildPayment(),
+      amount: 100,
+      entries: [buildPaymentEntry(invoice, 100)],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment).GLEntries();
+
+    expect(findEntry(entries, 500).credit).toBe(3);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(97);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
   });
 
   it('balances every set (multi-invoice, tax, discount, excess, opening balance)', () => {
@@ -490,5 +519,142 @@ describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
     expect(sumAccount(entries, BANK, 'debit')).toBe(2000);
     expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(300);
     expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+});
+
+describe('PaymentReceivedCashGL — running-total split (cumulative)', () => {
+  const INCOME = [501, 502, 503];
+  const sum = (entries: any[], key: 'debit' | 'credit') =>
+    Math.round(entries.reduce((total, e) => total + e[key], 0) * 100) / 100;
+  const sumAccount = (
+    entries: any[],
+    accountId: number,
+    key: 'debit' | 'credit',
+  ) =>
+    sum(
+      entries.filter((e) => e.accountId === accountId),
+      key,
+    );
+  const invoice3x100 = () =>
+    buildInvoice(
+      INCOME.map((sellAccountId) =>
+        buildItemEntry({ sellAccountId, totalExcludingTax: 100 }),
+      ),
+    );
+  const pay = (invoice: any, amount: number, paidBefore: number, id = 1) =>
+    buildGL({
+      ...buildPayment(),
+      id,
+      amount,
+      entries: [buildPaymentEntry(invoice, amount)],
+    } as unknown as PaymentReceived)
+      .setPaidBefore({ [invoice.id]: paidBefore })
+      .GLEntries();
+  const incomeOf = (entries: any[]) =>
+    INCOME.map((accountId) => findEntry(entries, accountId).credit);
+
+  it('ends every line at exactly 100: 3 x 100 paid in three payments of 100', () => {
+    const invoice = invoice3x100();
+    const p1 = incomeOf(pay(invoice, 100, 0, 1));
+    const p2 = incomeOf(pay(invoice, 100, 100, 2));
+    const p3 = incomeOf(pay(invoice, 100, 200, 3));
+
+    expect(p1).toEqual([33.34, 33.33, 33.33]);
+    expect(p2).toEqual([33.33, 33.34, 33.33]);
+    expect(p3).toEqual([33.33, 33.33, 33.34]);
+    INCOME.forEach((_, i) =>
+      expect(Math.round((p1[i] + p2[i] + p3[i]) * 100) / 100).toBe(100),
+    );
+  });
+
+  it('still ends exact when the middle payment is deleted or re-dated', () => {
+    const invoice = invoice3x100();
+    // Payments of 100 then 200 (the middle one deleted, the last re-sized),
+    // and the same two in the other order.
+    [
+      [100, 200],
+      [200, 100],
+    ].forEach(([first, second]) => {
+      const a = incomeOf(pay(invoice, first, 0));
+      const b = incomeOf(pay(invoice, second, first));
+      INCOME.forEach((_, i) =>
+        expect(Math.round((a[i] + b[i]) * 100) / 100).toBe(100),
+      );
+    });
+  });
+
+  it('splits a multi-invoice payment invoice by invoice', () => {
+    const invoiceA = { ...invoice3x100(), id: 10 };
+    const invoiceB = buildInvoice(
+      [buildItemEntry({ sellAccountId: 600, totalExcludingTax: 50 })],
+      { id: 11 } as any,
+    );
+    const entries = buildGL({
+      ...buildPayment(),
+      amount: 150,
+      entries: [
+        buildPaymentEntry(invoiceA, 100),
+        buildPaymentEntry(invoiceB, 50),
+      ],
+    } as unknown as PaymentReceived)
+      .setPaidBefore({ 10: 200, 11: 0 })
+      .GLEntries();
+
+    // Invoice A: the last 100 of 300 completes its lines.
+    expect(incomeOf(entries)).toEqual([33.33, 33.33, 33.34]);
+    expect(findEntry(entries, 600).credit).toBe(50);
+    expect(sum(entries, 'debit')).toBe(150);
+    expect(sum(entries, 'credit')).toBe(150);
+  });
+
+  it('includes the tax, discount and adjustment and ends exact (7 payments)', () => {
+    const invoice = buildInvoice(
+      [
+        buildItemEntry({
+          sellAccountId: 501,
+          totalExcludingTax: 1000,
+          taxAmount: 150,
+        }),
+        buildItemEntry({ sellAccountId: 502, totalExcludingTax: 333.33 }),
+      ],
+      {
+        totalLocal: 1000 + 150 + 333.33 - 83.33 + 0.01,
+        discountAmountLocal: 83.33,
+        adjustmentLocal: 0.01,
+      },
+    );
+    const payments = [100, 0.01, 333.33, 250.5, 16.17, 600, 100];
+    let paid = 0;
+    const totals: Record<string, number> = {};
+    const add = (key: string, value: number) => {
+      totals[key] = Math.round(((totals[key] || 0) + value) * 100) / 100;
+    };
+    payments.forEach((amount) => {
+      const entries = pay(invoice, amount, paid);
+      expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+      add('501', findEntry(entries, 501)?.credit || 0);
+      add('502', findEntry(entries, 502)?.credit || 0);
+      add(
+        'tax',
+        sumAccount(entries, 200, 'credit') - sumAccount(entries, 200, 'debit'),
+      );
+      add(
+        'discount',
+        sumAccount(entries, 300, 'debit') - sumAccount(entries, 300, 'credit'),
+      );
+      add(
+        'adjustment',
+        sumAccount(entries, 400, 'credit') - sumAccount(entries, 400, 'debit'),
+      );
+      paid = Math.round((paid + amount) * 100) / 100;
+    });
+    expect(paid).toBe(1400.01);
+    expect(totals).toEqual({
+      '501': 1000,
+      '502': 333.33,
+      tax: 150,
+      discount: 83.33,
+      adjustment: 0.01,
+    });
   });
 });
