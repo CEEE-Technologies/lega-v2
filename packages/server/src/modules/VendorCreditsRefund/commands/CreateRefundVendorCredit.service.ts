@@ -1,3 +1,4 @@
+import { moneyLt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 
@@ -176,7 +177,7 @@ export class CreateRefundVendorCredit {
     vendorCredit: VendorCredit,
     amount: number,
   ) {
-    if (vendorCredit.creditsRemaining < amount) {
+    if (moneyLt(vendorCredit.creditsRemaining, amount)) {
       throw new ServiceError(ERRORS.VENDOR_CREDIT_HAS_NO_CREDITS_REMAINING);
     }
   }

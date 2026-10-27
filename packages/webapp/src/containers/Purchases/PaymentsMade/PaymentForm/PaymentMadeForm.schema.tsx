@@ -1,5 +1,6 @@
 import intl from 'react-intl-universal';
 import * as Yup from 'yup';
+import { moneyAtMostSibling } from '@/utils/yup-money';
 import { DATATYPES_LENGTH } from '@/constants/dataTypes';
 
 const Schema = Yup.object().shape({
@@ -19,7 +20,7 @@ const Schema = Yup.object().shape({
     Yup.object().shape({
       id: Yup.number().nullable(),
       dueAmount: Yup.number().nullable(),
-      paymentAmount: Yup.number().nullable().max(Yup.ref('dueAmount')),
+      paymentAmount: moneyAtMostSibling('dueAmount'),
       entryType: Yup.string().nullable(),
       // The opening balance line has no bill.
       billId: Yup.number()

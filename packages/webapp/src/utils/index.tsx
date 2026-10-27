@@ -9,7 +9,7 @@ import _ from 'lodash';
 import { isEqual, castArray, isEmpty, includes, pickBy } from 'lodash';
 import moment from 'moment';
 import { createSelectorCreator, defaultMemoize } from 'reselect';
-import { subtractMoney } from '@bigcapital/utils';
+import { fromCents, subtractMoney, toCents } from '@bigcapital/utils';
 import { deepMapKeys } from './map-key-deep';
 import type { IResourceField } from '@/components/AdvancedFilter/interfaces';
 export * from './deep';
@@ -668,16 +668,25 @@ export const fullAmountPaymentEntries = (entries) => {
   }));
 };
 
-export const amountPaymentEntries = (amount, entries) => {
-  let total = amount;
+/**
+ * Fills the given amount over the entries in order (oldest first), each up
+ * to its due amount, in whole cents: 1,250.75 over dues of 1,000 and 500
+ * fills 1,000 and 250.75.
+ */
+export const amountPaymentEntries = <T extends { dueAmount?: unknown }>(
+  amount: unknown,
+  entries: T[],
+): Array<T & { paymentAmount: number }> => {
+  let remainingCents = Math.max(toCents(amount as number), 0);
 
   return entries.map((item) => {
-    const diff = Math.min(item.dueAmount, total);
-    total -= Math.max(diff, 0);
+    const dueCents = Math.max(toCents(item.dueAmount as number), 0);
+    const paidCents = Math.min(dueCents, remainingCents);
+    remainingCents -= paidCents;
 
     return {
       ...item,
-      paymentAmount: diff,
+      paymentAmount: fromCents(paidCents),
     };
   });
 };

@@ -1,4 +1,5 @@
-import { sumBy, difference } from 'lodash';
+import { moneyGt, sumMoneyBy } from '@bigcapital/utils';
+import { difference } from 'lodash';
 import { Knex } from 'knex';
 import { ERRORS, SUPPORTED_EXPENSE_PAYMENT_ACCOUNT_TYPES } from '../constants';
 import { ACCOUNT_ROOT_TYPE } from '@/constants/accounts';
@@ -18,9 +19,9 @@ export class CommandExpenseValidator {
   public validateCategoriesNotEqualZero = (
     expenseDTO: CreateExpenseDto | EditExpenseDto,
   ) => {
-    const totalAmount = sumBy(expenseDTO.categories, 'amount') || 0;
+    const totalAmount = sumMoneyBy(expenseDTO.categories, 'amount');
 
-    if (totalAmount <= 0) {
+    if (!moneyGt(totalAmount, 0)) {
       throw new ServiceError(ERRORS.TOTAL_AMOUNT_EQUALS_ZERO);
     }
   };

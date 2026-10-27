@@ -2,7 +2,8 @@ import { Intent } from '@blueprintjs/core';
 import { css } from '@emotion/css';
 import classNames from 'classnames';
 import { Formik, Form, type FormikHelpers } from 'formik';
-import { sumBy, round, isEmpty } from 'lodash';
+import { isEmpty } from 'lodash';
+import { moneyEq, moneyIsZero, sumMoneyBy } from '@bigcapital/utils';
 import { useMemo } from 'react';
 import intl from 'react-intl-universal';
 import { useHistory } from 'react-router-dom';
@@ -100,27 +101,22 @@ function MakeJournalEntriesFormInner() {
     const entries = values.entries.filter(
       (entry) => entry.debit || entry.credit,
     );
-    // Updated getTotal function using lodash
-    const getTotal = (type: 'credit' | 'debit'): number => {
-      return round(
-        sumBy(entries, (entry: MakeJournalEntry) =>
-          parseFloat(String(entry[type] || 0)),
-        ),
-        2,
-      );
-    };
+    // Totals in whole cents.
+    const getTotal = (type: 'credit' | 'debit'): number =>
+      sumMoneyBy(entries, (entry: MakeJournalEntry) => entry[type] as number);
+
     const totalCredit = getTotal('credit');
     const totalDebit = getTotal('debit');
 
     // Validate the total credit should be equals total debit.
-    if (totalCredit !== totalDebit) {
+    if (!moneyEq(totalCredit, totalDebit)) {
       AppToaster.show({
         message: intl.get('should_total_of_credit_and_debit_be_equal'),
         intent: Intent.DANGER,
       });
       setSubmitting(false);
       return;
-    } else if (totalCredit === 0 || totalDebit === 0) {
+    } else if (moneyIsZero(totalCredit) || moneyIsZero(totalDebit)) {
       AppToaster.show({
         message: intl.get('amount_cannot_be_zero_or_empty'),
         intent: Intent.DANGER,

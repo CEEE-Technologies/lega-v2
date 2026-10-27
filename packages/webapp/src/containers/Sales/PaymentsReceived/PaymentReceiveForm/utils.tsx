@@ -16,6 +16,7 @@ import {
   type PaymentReceiveNewPageEntry,
 } from '@/hooks/query';
 import {
+  amountPaymentEntries as fillAmountPaymentEntries,
   defaultFastFieldShouldUpdate,
   transformToForm,
   safeSumBy,
@@ -192,19 +193,8 @@ export const clearAllPaymentEntries = (
 export const amountPaymentEntries = (
   amount: number,
   entries: PaymentReceiveEntry[],
-): PaymentReceiveEntry[] => {
-  let total = amount;
-
-  return entries.map((item) => {
-    const diff = Math.min(Number(item.dueAmount), total);
-    total -= Math.max(diff, 0);
-
-    return {
-      ...item,
-      paymentAmount: diff,
-    };
-  });
-};
+): PaymentReceiveEntry[] =>
+  fillAmountPaymentEntries(amount, entries) as PaymentReceiveEntry[];
 
 export const fullAmountPaymentEntries = (
   entries: PaymentReceiveEntry[],

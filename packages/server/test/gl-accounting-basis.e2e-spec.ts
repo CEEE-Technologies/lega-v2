@@ -990,8 +990,9 @@ describe('Accounting basis — unapplied amounts and document edits (e2e)', () =
             billPayload(vendorId, 1000, {
               billDate: day(8),
               dueDate: day(8),
-              discount: 100,
-              discountType: 'amount',
+              // Still covers the 1,000 paid (a lower total is refused
+              // before the lock check).
+              adjustment: 100,
             }),
           )
           .expect(400);

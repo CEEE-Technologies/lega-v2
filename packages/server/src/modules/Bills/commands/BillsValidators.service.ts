@@ -1,3 +1,4 @@
+import { moneyLt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import { ERRORS } from '../Bills.constants';
@@ -44,7 +45,7 @@ export class BillsValidators {
     billAmount: number,
     paidAmount: number,
   ) {
-    if (billAmount < paidAmount) {
+    if (moneyLt(billAmount, paidAmount)) {
       throw new ServiceError(ERRORS.BILL_AMOUNT_SMALLER_THAN_PAID_AMOUNT);
     }
   }

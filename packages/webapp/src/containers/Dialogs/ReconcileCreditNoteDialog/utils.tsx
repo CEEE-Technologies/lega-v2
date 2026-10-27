@@ -2,6 +2,7 @@ import { Callout, Intent, Classes } from '@blueprintjs/core';
 import clsx from 'classnames';
 import React from 'react';
 import intl from 'react-intl-universal';
+import { fromCents, toCents } from '@bigcapital/utils';
 import type { ReconcileCreditNoteFormEntry } from './types';
 import { AppToaster, FormatDateCell, MoneyFieldCell, T } from '@/components';
 import { CLASSES } from '@/constants/classes';
@@ -100,17 +101,21 @@ export const useReconcileCreditNoteTableColumns = () => {
 };
 
 /**
- * Sets max credit amount from sale invoice balance.
+ * Caps each credit amount at the invoice's due amount (what is still owed,
+ * tax and adjustment included), in whole cents.
  */
 export const maxAmountCreditFromRemaining = (
   entries: ReconcileCreditNoteFormEntry[],
 ): ReconcileCreditNoteFormEntry[] => {
-  return entries.map((entry) => ({
-    ...entry,
-    amount: entry.amount
-      ? Math.min((entry.balance ?? 0) as number, entry.amount as number)
-      : '',
-  }));
+  return entries.map((entry) => {
+    const due = (entry.dueAmount ?? entry.balance ?? 0) as number;
+    return {
+      ...entry,
+      amount: entry.amount
+        ? fromCents(Math.min(toCents(due), toCents(entry.amount as number)))
+        : '',
+    };
+  });
 };
 
 /**
@@ -119,16 +124,22 @@ export const maxAmountCreditFromRemaining = (
 export const maxCreditNoteAmountEntries =
   (total: number) =>
   (entries: ReconcileCreditNoteFormEntry[]): ReconcileCreditNoteFormEntry[] => {
-    let balance = total;
+    // Running balance in whole cents.
+    let balanceCents = toCents(total);
 
     return entries.map((entry) => {
-      const oldBalance = balance;
-      balance -= entry.amount ? (entry.amount as number) : 0;
+      const oldBalanceCents = balanceCents;
+      balanceCents -= entry.amount ? toCents(entry.amount as number) : 0;
 
       return {
         ...entry,
         amount: entry.amount
-          ? Math.max(Math.min(entry.amount as number, oldBalance), 0)
+          ? fromCents(
+              Math.max(
+                Math.min(toCents(entry.amount as number), oldBalanceCents),
+                0,
+              ),
+            )
           : '',
       };
     });

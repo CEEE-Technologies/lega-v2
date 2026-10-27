@@ -1,4 +1,4 @@
-import { sumBy } from 'lodash';
+import { subtractMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Transformer } from '../../Transformer/Transformer';
 import { PaymentReceived } from '../models/PaymentReceived';
 import { PaymentReceivedEntry } from '../models/PaymentReceivedEntry';
@@ -97,12 +97,7 @@ export class PaymentReceiveTransfromer extends Transformer {
   protected appliedAmount = (payment: PaymentReceived): number | null => {
     if (!payment.entries) return null;
 
-    return (
-      Math.round(
-        sumBy(payment.entries, (entry) => Number(entry.paymentAmount) || 0) *
-          1000,
-      ) / 1000
-    );
+    return sumMoneyBy(payment.entries, 'paymentAmount');
   };
 
   /**
@@ -115,10 +110,7 @@ export class PaymentReceiveTransfromer extends Transformer {
     const applied = this.appliedAmount(payment);
     if (applied === null) return null;
 
-    return Math.max(
-      Math.round(((Number(payment.amount) || 0) - applied) * 1000) / 1000,
-      0,
-    );
+    return Math.max(subtractMoney(payment.amount, applied), 0);
   };
 
   /**

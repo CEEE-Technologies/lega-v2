@@ -1,3 +1,12 @@
+import {
+  calcDiscountMoney,
+  moneyEq,
+  moneyGt,
+  moneyIsZero,
+  roundMoney,
+  subtractMoney,
+  sumMoney,
+} from '@bigcapital/utils';
 import * as moment from 'moment';
 import type { Knex } from 'knex';
 import { Model, raw } from 'objection';
@@ -13,6 +22,30 @@ import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelD
 import { BillDefaultViews } from '../Bills.constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
 import { TaxRateTransaction } from '@/modules/TaxRates/models/TaxRateTransaction.model';
+
+/**
+ * SQL of the bill total: subtotal - discount + adjustment + exclusive tax
+ * (same as the `total` getter).
+ */
+const BILL_TOTAL_SQL = `(COALESCE(AMOUNT, 0)
+  - CASE WHEN DISCOUNT_TYPE = 'percentage'
+      THEN COALESCE(AMOUNT, 0) * COALESCE(DISCOUNT, 0) / 100
+      ELSE COALESCE(DISCOUNT, 0) END
+  + COALESCE(ADJUSTMENT, 0)
+  + CASE WHEN IS_INCLUSIVE_TAX THEN 0 ELSE COALESCE(TAX_AMOUNT_WITHHELD, 0) END)`;
+
+/**
+ * SQL of the bill amount still due in whole cents: the total less the paid
+ * and credited amounts (same as `dueAmount`).
+ */
+const BILL_DUE_SQL = `ROUND(${BILL_TOTAL_SQL}
+  - COALESCE(PAYMENT_AMOUNT, 0)
+  - COALESCE(CREDITED_AMOUNT, 0), 2)`;
+
+/**
+ * SQL of the bill settled amount (paid and credited), in cents.
+ */
+const BILL_SETTLED_SQL = `ROUND(COALESCE(PAYMENT_AMOUNT, 0) + COALESCE(CREDITED_AMOUNT, 0), 2)`;
 
 @InjectAttachable()
 @ExportableModel()
@@ -144,9 +177,14 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get discountAmount(): number {
+    // Rounded to cents; a missing discount counts as 0 (never NaN).
     return this.discountType === DiscountType.Amount
-      ? this.discount
-      : this.subtotal * (this.discount / 100);
+      ? roundMoney(this.discount)
+      : calcDiscountMoney(
+          this.subtotal,
+          this.discount,
+          DiscountType.Percentage,
+        );
   }
 
   /**
@@ -233,7 +271,7 @@ export class Bill extends TenantBaseModel {
    * @return {number}
    */
   get balance(): number {
-    return this.paymentAmount + this.creditedAmount;
+    return sumMoney(this.paymentAmount, this.creditedAmount);
   }
 
   /**
@@ -241,7 +279,7 @@ export class Bill extends TenantBaseModel {
    * @return {number}
    */
   get dueAmount(): number {
-    return Math.max(this.total - this.balance, 0);
+    return Math.max(subtractMoney(this.total, this.balance), 0);
   }
 
   /**
@@ -265,7 +303,7 @@ export class Bill extends TenantBaseModel {
    * @return {boolean}
    */
   get isPartiallyPaid(): boolean {
-    return this.dueAmount !== this.total && this.dueAmount > 0;
+    return !moneyEq(this.dueAmount, this.total) && moneyGt(this.dueAmount, 0);
   }
 
   /**
@@ -273,7 +311,7 @@ export class Bill extends TenantBaseModel {
    * @return {boolean}
    */
   get isFullyPaid(): boolean {
-    return this.dueAmount === 0;
+    return moneyIsZero(this.dueAmount);
   }
 
   /**
@@ -365,18 +403,13 @@ export class Bill extends TenantBaseModel {
        * Filters the unpaid bills.
        */
       unpaid(query) {
-        query.where('payment_amount', 0);
+        query.where(raw('ROUND(COALESCE(PAYMENT_AMOUNT, 0), 2) = 0'));
       },
       /**
        * Filters the due bills.
        */
       dueBills(query) {
-        query.where(
-          raw(`COALESCE(AMOUNT, 0) -
-            COALESCE(PAYMENT_AMOUNT, 0) -
-            COALESCE(CREDITED_AMOUNT, 0) > 0
-          `),
-        );
+        query.where(raw(`${BILL_DUE_SQL} > 0`));
       },
       /**
        * Filters the overdue bills.
@@ -394,14 +427,14 @@ export class Bill extends TenantBaseModel {
        * Filters the partially paid bills.
        */
       partiallyPaid(query) {
-        query.whereNot('payment_amount', 0);
-        query.whereNot(raw('`PAYMENT_AMOUNT` = `AMOUNT`'));
+        query.where(raw(`${BILL_SETTLED_SQL} > 0`));
+        query.where(raw(`${BILL_DUE_SQL} > 0`));
       },
       /**
        * Filters the paid bills.
        */
       paid(query) {
-        query.where(raw('`PAYMENT_AMOUNT` = `AMOUNT`'));
+        query.where(raw(`${BILL_DUE_SQL} <= 0`));
       },
       /**
        * Filters the bills from the given date.
@@ -415,7 +448,7 @@ export class Bill extends TenantBaseModel {
        */
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
-        query.orderByRaw(`PAYMENT_AMOUNT = AMOUNT ${dir}`);
+        query.orderByRaw(`${BILL_DUE_SQL} <= 0 ${dir}`);
       },
 
       /**

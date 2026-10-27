@@ -1,6 +1,6 @@
+import { moneyLt, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { sumBy } from 'lodash';
 import {
   IVendorCreditApplyToBillsCreatedPayload,
   IVendorCreditApplyToInvoicesDTO,
@@ -117,7 +117,7 @@ export class ApplyVendorCreditToBillsService {
     // Validate bills has remaining amount to apply.
     this.validateBillsRemainingAmount(
       appliedBills,
-      vendorCreditAppliedModel.amount,
+      vendorCreditAppliedModel.entries,
     );
     // Validate vendor credit remaining credit amount against the locked row.
     this.vendorCreditDTOTransform.validateCreditRemainingAmount(
@@ -142,7 +142,7 @@ export class ApplyVendorCreditToBillsService {
       amount: entry.amount,
       vendorCreditId: vendorCredit.id,
     }));
-    const amount = sumBy(applyDTO.entries, 'amount');
+    const amount = sumMoneyBy(applyDTO.entries, 'amount');
 
     return {
       amount,
@@ -151,12 +151,25 @@ export class ApplyVendorCreditToBillsService {
   };
 
   /**
-   * Validate bills remaining amount.
+   * Validates each bill has enough due amount for the credit applied to it.
+   * (Each bill's due is compared with its own line, not the total applied.)
    * @param {IBill[]} bills
-   * @param {number} amount
+   * @param {{ billId: number; amount: number }[]} entries
    */
-  private validateBillsRemainingAmount = (bills: Bill[], amount: number) => {
-    const invalidBills = bills.filter((bill) => bill.dueAmount < amount);
+  private validateBillsRemainingAmount = (
+    bills: Bill[],
+    entries: Array<{ billId: number; amount: number }>,
+  ) => {
+    const appliedByBill = new Map<number, number>();
+    entries.forEach((entry) => {
+      appliedByBill.set(
+        entry.billId,
+        sumMoney(appliedByBill.get(entry.billId) || 0, entry.amount),
+      );
+    });
+    const invalidBills = bills.filter((bill) =>
+      moneyLt(bill.dueAmount, appliedByBill.get(bill.id) || 0),
+    );
     if (invalidBills.length > 0) {
       throw new ServiceError(ERRORS.BILLS_HAS_NO_REMAINING_AMOUNT);
     }

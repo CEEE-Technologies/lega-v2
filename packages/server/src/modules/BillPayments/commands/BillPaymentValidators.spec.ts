@@ -105,4 +105,40 @@ describe('BillPaymentValidators — opening balance lines', () => {
       ),
     ).resolves.toBeUndefined();
   });
+  it('compares the bills due amounts in cents', async () => {
+    const validators = makeBillValidators([{ id: 3, dueAmount: 1.1 + 2.2 }]);
+    await expect(
+      validators.validateBillsDueAmount(
+        [{ billId: 3, paymentAmount: 3.3 }] as any,
+        [],
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      validators.validateBillsDueAmount(
+        [{ billId: 3, paymentAmount: 3.305 }] as any,
+        [],
+      ),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        errorType: ERRORS.INVALID_BILL_PAYMENT_AMOUNT,
+      }),
+    );
+  });
+});
+
+describe('BillPaymentValidators — applied vs amount in cents', () => {
+  it('accepts 1.10 + 2.20 for 3.30 and rejects 100.005 for 100', () => {
+    const validators = makeValidators();
+    expect(() =>
+      validators.validateEntriesWithinAmount(3.3, [
+        { billId: 1, paymentAmount: 1.1 },
+        { billId: 2, paymentAmount: 2.2 },
+      ] as any),
+    ).not.toThrow();
+    expect(() =>
+      validators.validateEntriesWithinAmount(100, [
+        { billId: 1, paymentAmount: 100.005 },
+      ] as any),
+    ).toThrow();
+  });
 });

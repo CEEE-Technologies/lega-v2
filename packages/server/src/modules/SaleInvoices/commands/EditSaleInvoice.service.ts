@@ -147,8 +147,13 @@ export class EditSaleInvoice {
     }
     // Validate the invoice amount is not smaller than the invoice payment amount
     // against the locked row.
+    // The payment can cover the whole total (tax, discount and adjustment
+    // included), not just the subtotal.
     this.validators.validateInvoiceAmountBiggerPaymentAmount(
-      saleInvoiceObj.balance,
+      this.saleInvoiceModel().fromJson(
+        { ...saleInvoiceObj, entries: undefined },
+        { skipValidation: true },
+      ).total,
       oldSaleInvoice.paymentAmount,
     );
     return { oldSaleInvoice, saleInvoiceObj };

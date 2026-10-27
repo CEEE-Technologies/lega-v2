@@ -2,7 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import { SaleInvoice } from '../../SaleInvoices/models/SaleInvoice';
 import { IPaymentReceivedEntryDTO } from '../types/PaymentReceived.types';
-import { entriesAmountDiff } from '@/utils/entries-amount-diff';
+import { moneyIsZero } from '@bigcapital/utils';
+import { entriesMoneyDiff } from '@/utils/entries-amount-diff';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
@@ -27,7 +28,7 @@ export class PaymentReceivedInvoiceSync {
     const opers: Promise<void>[] = [];
 
     // Opening balance lines have no invoice; they sync to the customer.
-    const diffEntries = entriesAmountDiff(
+    const diffEntries = entriesMoneyDiff(
       (newPaymentReceiveEntries || []).filter(isDocumentEntry),
       oldPaymentReceiveEntries
         ? oldPaymentReceiveEntries.filter(isDocumentEntry)
@@ -36,7 +37,7 @@ export class PaymentReceivedInvoiceSync {
       'invoiceId',
     );
     diffEntries.forEach((diffEntry: any) => {
-      if (diffEntry.paymentAmount === 0) {
+      if (moneyIsZero(diffEntry.paymentAmount)) {
         return;
       }
       const oper = this.saleInvoiceModel().changePaymentAmount(

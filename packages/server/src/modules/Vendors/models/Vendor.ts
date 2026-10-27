@@ -1,3 +1,4 @@
+import { subtractMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 import { BaseQueryBuilder } from '@/models/Model';
 import { TenantBaseModel } from '@/modules/System/models/TenantBaseModel';
@@ -128,10 +129,7 @@ export class Vendor extends TenantBaseModel {
    */
   get openingBalanceDueAmount() {
     return Math.max(
-      Math.round(
-        ((this.openingBalance || 0) - (this.openingBalancePaymentAmount || 0)) *
-          1000,
-      ) / 1000,
+      subtractMoney(this.openingBalance, this.openingBalancePaymentAmount),
       0,
     );
   }

@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import { Bill } from '../../Bills/models/Bill';
-import { entriesAmountDiff } from '@/utils/entries-amount-diff';
+import { moneyIsZero } from '@bigcapital/utils';
+import { entriesMoneyDiff } from '@/utils/entries-amount-diff';
 import Objection, { ModelObject } from 'objection';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { BillPaymentEntryDto } from '../dtos/BillPayment.dto';
@@ -29,7 +30,7 @@ export class BillPaymentBillSync {
     const opers: Objection.QueryBuilder<Bill, Bill[]>[] = [];
 
     // Opening balance lines have no bill; they sync to the vendor.
-    const diffEntries = entriesAmountDiff(
+    const diffEntries = entriesMoneyDiff(
       (paymentMadeEntries || []).filter(isDocumentEntry),
       oldPaymentMadeEntries
         ? oldPaymentMadeEntries.filter(isDocumentEntry)
@@ -39,7 +40,7 @@ export class BillPaymentBillSync {
     );
     diffEntries.forEach(
       (diffEntry: { paymentAmount: number; billId: number }) => {
-        if (diffEntry.paymentAmount === 0) {
+        if (moneyIsZero(diffEntry.paymentAmount)) {
           return;
         }
         const oper = this.bill().changePaymentAmount(

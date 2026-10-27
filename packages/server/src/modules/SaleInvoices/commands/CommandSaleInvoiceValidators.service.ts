@@ -1,3 +1,4 @@
+import { moneyLt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { SaleInvoice } from '../models/SaleInvoice';
 import { ServiceError } from '@/modules/Items/ServiceError';
@@ -52,7 +53,7 @@ export class CommandSaleInvoiceValidators {
     saleInvoiceAmount: number,
     paymentAmount: number,
   ) {
-    if (saleInvoiceAmount < paymentAmount) {
+    if (moneyLt(saleInvoiceAmount, paymentAmount)) {
       throw new ServiceError(ERRORS.INVOICE_AMOUNT_SMALLER_THAN_PAYMENT_AMOUNT);
     }
   }

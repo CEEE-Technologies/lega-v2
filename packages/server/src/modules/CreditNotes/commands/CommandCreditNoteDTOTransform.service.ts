@@ -1,3 +1,4 @@
+import { moneyLt, sumMoney } from '@bigcapital/utils';
 import { Injectable } from '@nestjs/common';
 import { omit } from 'lodash';
 import * as moment from 'moment';
@@ -111,7 +112,7 @@ export class CommandCreditNoteDTOTransform {
     creditNote: CreditNote,
     amount: number,
   ) => {
-    if (creditNote.creditsRemaining < amount) {
+    if (moneyLt(creditNote.creditsRemaining, amount)) {
       throw new ServiceError(ERRORS.CREDIT_NOTE_HAS_NO_REMAINING_AMOUNT);
     }
   };
@@ -126,9 +127,11 @@ export class CommandCreditNoteDTOTransform {
     creditNote: CreditNote,
     newAmount: number,
   ) => {
-    const usedAmount = creditNote.refundedAmount + creditNote.invoicesAmount;
-
-    if (newAmount < usedAmount) {
+    const usedAmount = sumMoney(
+      creditNote.refundedAmount,
+      creditNote.invoicesAmount,
+    );
+    if (moneyLt(newAmount, usedAmount)) {
       throw new ServiceError(ERRORS.CREDIT_NOTE_AMOUNT_SMALLER_THAN_USED);
     }
   };

@@ -1,3 +1,9 @@
+import {
+  moneyGt,
+  moneyIsZero,
+  subtractMoney,
+  sumMoney,
+} from '@bigcapital/utils';
 import { Model, raw } from 'objection';
 import { Vendor } from '@/modules/Vendors/models/Vendor';
 import { Warehouse } from '@/modules/Warehouses/models/Warehouse.model';
@@ -156,8 +162,9 @@ export class VendorCredit extends TenantBaseModel {
       open(query) {
         query
           .where(
-            raw(`COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICED_AMOUNT) <
-            COALESCE(AMOUNT)`),
+            raw(
+              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) > 0`,
+            ),
           )
           .modify('published');
       },
@@ -168,8 +175,9 @@ export class VendorCredit extends TenantBaseModel {
       closed(query) {
         query
           .where(
-            raw(`COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICED_AMOUNT) =
-            COALESCE(AMOUNT)`),
+            raw(
+              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) <= 0`,
+            ),
           )
           .modify('published');
       },
@@ -201,7 +209,7 @@ export class VendorCredit extends TenantBaseModel {
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
         query.orderByRaw(
-          `COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICED_AMOUNT) = COALESCE(AMOUNT) ${dir}`,
+          `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) <= 0 ${dir}`,
         );
       },
     };
@@ -259,7 +267,7 @@ export class VendorCredit extends TenantBaseModel {
    * @return {boolean}
    */
   get isOpen() {
-    return !!this.openedAt && this.creditsRemaining > 0;
+    return !!this.openedAt && moneyGt(this.creditsRemaining, 0);
   }
 
   /**
@@ -267,7 +275,7 @@ export class VendorCredit extends TenantBaseModel {
    * @return {boolean}
    */
   get isClosed() {
-    return this.openedAt && this.creditsRemaining === 0;
+    return this.openedAt && moneyIsZero(this.creditsRemaining);
   }
 
   /**
@@ -275,7 +283,13 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get creditsRemaining() {
-    return Math.max(this.amount - this.refundedAmount - this.invoicedAmount, 0);
+    return Math.max(
+      subtractMoney(
+        this.amount,
+        sumMoney(this.refundedAmount, this.invoicedAmount),
+      ),
+      0,
+    );
   }
 
   /**

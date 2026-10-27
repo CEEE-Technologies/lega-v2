@@ -1,5 +1,6 @@
+import { moneyLt, sumMoneyBy } from '@bigcapital/utils';
 import { Inject } from '@nestjs/common';
-import { difference, sumBy } from 'lodash';
+import { difference } from 'lodash';
 import {
   ILandedCostTransaction,
   ILandedCostTransactionEntry,
@@ -65,7 +66,7 @@ export class BaseLandedCostService {
     costTransaction: ILandedCostTransaction,
     costTransactionEntry: ILandedCostTransactionEntry,
   ) {
-    const amount = sumBy(landedCostDTO.items, 'cost');
+    const amount = sumMoneyBy(landedCostDTO.items, 'cost');
 
     return {
       billId: bill.id,
@@ -153,7 +154,7 @@ export class BaseLandedCostService {
   protected getAllocateItemsCostTotal = (
     landedCostDTO: AllocateBillLandedCostDto,
   ): number => {
-    return sumBy(landedCostDTO.items, 'cost');
+    return sumMoneyBy(landedCostDTO.items, 'cost');
   };
 
   /**
@@ -165,7 +166,7 @@ export class BaseLandedCostService {
     unallocatedCost: number,
     amount: number,
   ): void => {
-    if (unallocatedCost < amount) {
+    if (moneyLt(unallocatedCost, amount)) {
       throw new ServiceError(ERRORS.COST_AMOUNT_BIGGER_THAN_UNALLOCATED_AMOUNT);
     }
   };

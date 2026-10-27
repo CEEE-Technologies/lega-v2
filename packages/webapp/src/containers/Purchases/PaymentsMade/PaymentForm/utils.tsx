@@ -13,6 +13,7 @@ import {
 } from '@/containers/Attachments/utils';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import {
+  amountPaymentEntries as fillAmountPaymentEntries,
   defaultFastFieldShouldUpdate,
   safeSumBy,
   subtractAmounts,
@@ -408,19 +409,8 @@ export const getPaymentExcessAmountFromValues = (
 export const amountPaymentEntries = (
   amount: number,
   entries: PaymentMadeEntry[],
-): PaymentMadeEntry[] => {
-  let total = amount;
-
-  return entries.map((item) => {
-    const diff = Math.min(Number(item.dueAmount), total);
-    total -= Math.max(diff, 0);
-
-    return {
-      ...item,
-      paymentAmount: diff,
-    };
-  });
-};
+): PaymentMadeEntry[] =>
+  fillAmountPaymentEntries(amount, entries) as PaymentMadeEntry[];
 
 export const fullAmountPaymentEntries = (
   entries: PaymentMadeEntry[],

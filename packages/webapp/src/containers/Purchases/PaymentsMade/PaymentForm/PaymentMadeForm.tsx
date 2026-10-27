@@ -1,4 +1,5 @@
 import { Intent } from '@blueprintjs/core';
+import { moneyGt } from '@bigcapital/utils';
 import { css } from '@emotion/css';
 import { Formik, Form, type FormikHelpers } from 'formik';
 import * as FF from 'fp-ts/function';
@@ -101,7 +102,7 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
   ) => {
     setSubmitting(true);
 
-    if (Number(values.amount) <= 0) {
+    if (!moneyGt(values.amount, 0)) {
       AppToaster.show({
         message: intl.get('you_cannot_make_payment_with_zero_total_amount'),
         intent: Intent.DANGER,

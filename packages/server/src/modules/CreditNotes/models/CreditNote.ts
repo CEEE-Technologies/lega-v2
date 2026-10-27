@@ -1,3 +1,9 @@
+import {
+  moneyGt,
+  moneyIsZero,
+  subtractMoney,
+  sumMoney,
+} from '@bigcapital/utils';
 import { Model, raw } from 'objection';
 import { DiscountType } from '@/common/types/Discount';
 import { Branch } from '@/modules/Branches/models/Branch.model';
@@ -185,7 +191,7 @@ export class CreditNote extends TenantBaseModel {
    * @return {boolean}
    */
   get isOpen() {
-    return !!this.openedAt && this.creditsRemaining > 0;
+    return !!this.openedAt && moneyGt(this.creditsRemaining, 0);
   }
 
   /**
@@ -193,14 +199,20 @@ export class CreditNote extends TenantBaseModel {
    * @return {boolean}
    */
   get isClosed() {
-    return this.openedAt && this.creditsRemaining === 0;
+    return this.openedAt && moneyIsZero(this.creditsRemaining);
   }
 
   /**
    * Retrieve the credits remaining.
    */
   get creditsRemaining() {
-    return Math.max(this.amount - this.refundedAmount - this.invoicesAmount, 0);
+    return Math.max(
+      subtractMoney(
+        this.amount,
+        sumMoney(this.refundedAmount, this.invoicesAmount),
+      ),
+      0,
+    );
   }
 
   /**
@@ -235,8 +247,9 @@ export class CreditNote extends TenantBaseModel {
       open(query) {
         query
           .where(
-            raw(`COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICES_AMOUNT) <
-            COALESCE(AMOUNT)`),
+            raw(
+              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) > 0`,
+            ),
           )
           .modify('published');
       },
@@ -247,8 +260,9 @@ export class CreditNote extends TenantBaseModel {
       closed(query) {
         query
           .where(
-            raw(`COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICES_AMOUNT) =
-            COALESCE(AMOUNT)`),
+            raw(
+              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) <= 0`,
+            ),
           )
           .modify('published');
       },
@@ -280,7 +294,7 @@ export class CreditNote extends TenantBaseModel {
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
         query.orderByRaw(
-          `COALESCE(REFUNDED_AMOUNT) + COALESCE(INVOICES_AMOUNT) = COALESCE(AMOUNT) ${dir}`,
+          `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) <= 0 ${dir}`,
         );
       },
     };

@@ -1,3 +1,4 @@
+import { moneyGt, moneyLt, roundMoney } from '@bigcapital/utils';
 import { ServiceError } from '@/modules/Items/ServiceError';
 
 /**
@@ -69,10 +70,10 @@ export const validateOpeningBalanceNotBelowPaid = (
   openingBalance: number,
   paidAmount: number,
 ) => {
-  const paid = Math.round(Number(paidAmount || 0) * 1000) / 1000;
-  const balance = Math.round(Number(openingBalance || 0) * 1000) / 1000;
+  const paid = roundMoney(paidAmount);
+  const balance = roundMoney(openingBalance);
 
-  if (paid > 0 && balance < paid) {
+  if (moneyGt(paid, 0) && moneyLt(balance, paid)) {
     throw new ServiceError(
       OPENING_BALANCE_ERRORS.OPENING_BALANCE_BELOW_PAID,
       `Payments already paid ${paid} of the opening balance; it can't be set to ${balance}.`,

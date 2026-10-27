@@ -1,3 +1,12 @@
+import {
+  calcDiscountMoney,
+  moneyEq,
+  moneyGt,
+  moneyIsZero,
+  roundMoney,
+  subtractMoney,
+  sumMoney,
+} from '@bigcapital/utils';
 import * as moment from 'moment';
 import { Model, raw } from 'objection';
 import { castArray } from 'lodash';
@@ -20,6 +29,33 @@ import { InjectModelMeta } from '@/modules/Tenancy/TenancyModels/decorators/Inje
 import { SaleInvoiceMeta } from './SaleInvoice.meta';
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { SaleInvoiceDefaultViews } from '../constants';
+
+/**
+ * SQL of the invoice total: subtotal - discount + adjustment + exclusive tax
+ * (same as the `total` getter).
+ */
+const INVOICE_TOTAL_SQL = `(COALESCE(BALANCE, 0)
+  - CASE WHEN DISCOUNT_TYPE = 'percentage'
+      THEN COALESCE(BALANCE, 0) * COALESCE(DISCOUNT, 0) / 100
+      ELSE COALESCE(DISCOUNT, 0) END
+  + COALESCE(ADJUSTMENT, 0)
+  + CASE WHEN IS_INCLUSIVE_TAX THEN 0 ELSE COALESCE(TAX_AMOUNT_WITHHELD, 0) END)`;
+
+/**
+ * SQL of the invoice amount still due in whole cents: the total less the
+ * paid, written-off and credited amounts (same as `dueAmount`).
+ */
+const INVOICE_DUE_SQL = `ROUND(${INVOICE_TOTAL_SQL}
+  - COALESCE(PAYMENT_AMOUNT, 0)
+  - COALESCE(WRITTENOFF_AMOUNT, 0)
+  - COALESCE(CREDITED_AMOUNT, 0), 2)`;
+
+/**
+ * SQL of the invoice settled amount (paid, written-off and credited), in cents.
+ */
+const INVOICE_SETTLED_SQL = `ROUND(COALESCE(PAYMENT_AMOUNT, 0)
+  + COALESCE(WRITTENOFF_AMOUNT, 0)
+  + COALESCE(CREDITED_AMOUNT, 0), 2)`;
 
 @InjectAttachable()
 @ExportableModel()
@@ -178,9 +214,14 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get discountAmount() {
+    // Rounded to cents; a missing discount counts as 0 (never NaN).
     return this.discountType === DiscountType.Amount
-      ? this.discount
-      : this.subtotal * (this.discount / 100);
+      ? roundMoney(this.discount)
+      : calcDiscountMoney(
+          this.subtotal,
+          this.discount,
+          DiscountType.Percentage,
+        );
   }
 
   /**
@@ -249,7 +290,11 @@ export class SaleInvoice extends TenantBaseModel {
    * @return {number}
    */
   get balanceAmount() {
-    return this.paymentAmount + this.writtenoffAmount + this.creditedAmount;
+    return sumMoney(
+      this.paymentAmount,
+      this.writtenoffAmount,
+      this.creditedAmount,
+    );
   }
 
   /**
@@ -258,7 +303,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @return {boolean}
    */
   get dueAmount() {
-    return Math.max(this.total - this.balanceAmount, 0);
+    return Math.max(subtractMoney(this.total, this.balanceAmount), 0);
   }
 
   /**
@@ -274,7 +319,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @return {boolean}
    */
   get isPartiallyPaid() {
-    return this.dueAmount !== this.total && this.dueAmount > 0;
+    return !moneyEq(this.dueAmount, this.total) && moneyGt(this.dueAmount, 0);
   }
 
   /**
@@ -282,7 +327,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @return {boolean}
    */
   get isFullyPaid() {
-    return this.dueAmount === 0;
+    return moneyIsZero(this.dueAmount);
   }
 
   /**
@@ -340,14 +385,7 @@ export class SaleInvoice extends TenantBaseModel {
        * Filters the due invoices.
        */
       dueInvoices(query) {
-        query.where(
-          raw(`
-            COALESCE(BALANCE, 0) -
-            COALESCE(PAYMENT_AMOUNT, 0) -
-            COALESCE(WRITTENOFF_AMOUNT, 0) -
-            COALESCE(CREDITED_AMOUNT, 0) > 0
-        `),
-        );
+        query.where(raw(`${INVOICE_DUE_SQL} > 0`));
       },
       /**
        * Filters the invoices between the given date range.
@@ -391,7 +429,7 @@ export class SaleInvoice extends TenantBaseModel {
        * Filters the unpaid invoices.
        */
       unpaid(query) {
-        query.where(raw('PAYMENT_AMOUNT = 0'));
+        query.where(raw('ROUND(COALESCE(PAYMENT_AMOUNT, 0), 2) = 0'));
       },
       /**
        * Filters the overdue invoices.
@@ -409,14 +447,14 @@ export class SaleInvoice extends TenantBaseModel {
        * Filters the partially invoices.
        */
       partiallyPaid(query) {
-        query.whereNot('payment_amount', 0);
-        query.whereNot(raw('`PAYMENT_AMOUNT` = `BALANCE`'));
+        query.where(raw(`${INVOICE_SETTLED_SQL} > 0`));
+        query.where(raw(`${INVOICE_DUE_SQL} > 0`));
       },
       /**
        * Filters the paid invoices.
        */
       paid(query) {
-        query.where(raw('PAYMENT_AMOUNT = BALANCE'));
+        query.where(raw(`${INVOICE_DUE_SQL} <= 0`));
       },
       /**
        * Filters the sale invoices from the given date.
@@ -429,7 +467,7 @@ export class SaleInvoice extends TenantBaseModel {
        */
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
-        query.orderByRaw(`PAYMENT_AMOUNT = BALANCE ${dir}`);
+        query.orderByRaw(`${INVOICE_DUE_SQL} <= 0 ${dir}`);
       },
 
       /**
@@ -437,7 +475,7 @@ export class SaleInvoice extends TenantBaseModel {
        */
       sortByDueAmount(query, order) {
         const dir = sanitizeSortDirection(order);
-        query.orderByRaw(`BALANCE - PAYMENT_AMOUNT ${dir}`);
+        query.orderByRaw(`${INVOICE_DUE_SQL} ${dir}`);
       },
 
       /**

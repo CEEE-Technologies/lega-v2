@@ -1,6 +1,7 @@
+import { subtractMoney } from '@bigcapital/utils';
 import { Classes } from '@blueprintjs/core';
 import { FastField, useFormikContext } from 'formik';
-import { subtract } from 'lodash';
+
 import React from 'react';
 import styled from 'styled-components';
 import { ReconcileVendorCreditEntriesTable } from './ReconcileVendorCreditEntriesTable';
@@ -76,7 +77,7 @@ function ReconcileVendorCreditTotalLines(): React.ReactElement {
   );
 
   // Calculate the total amount of credit remaining.
-  const remainingCredits = subtract(creditsRemaining, totalAmount);
+  const remainingCredits = subtractMoney(creditsRemaining, totalAmount);
 
   return (
     <ReconcileVendorCreditTotalLinesRoot>

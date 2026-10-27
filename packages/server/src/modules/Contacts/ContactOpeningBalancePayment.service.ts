@@ -1,3 +1,4 @@
+import { moneyGt, moneyLt, roundMoney } from '@bigcapital/utils';
 import { Knex } from 'knex';
 import { sumBy } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
@@ -22,7 +23,7 @@ export interface IOpeningBalancePaymentSide {
   entries?: IPaymentEntryLike[] | null;
 }
 
-const round3 = (value: number) => Math.round((value || 0) * 1000) / 1000;
+const roundAmount = (value: number) => roundMoney(value);
 
 /**
  * Sums the amount the given entries apply to the opening balance.
@@ -32,7 +33,7 @@ const round3 = (value: number) => Math.round((value || 0) * 1000) / 1000;
 export const getOpeningBalancePaidAmount = (
   entries: IPaymentEntryLike[] | null | undefined,
 ): number =>
-  round3(
+  roundAmount(
     sumBy((entries || []).filter(isOpeningBalanceEntry), (entry) =>
       Number(entry.paymentAmount || 0),
     ),
@@ -76,9 +77,9 @@ export class ContactOpeningBalancePayment {
         OPENING_BALANCE_ERRORS.OPENING_BALANCE_ENTRY_DUPLICATE,
       );
     }
-    const amount = round3(Number(entries[0].paymentAmount || 0));
+    const amount = roundAmount(Number(entries[0].paymentAmount || 0));
 
-    if (amount < 0) {
+    if (moneyLt(amount, 0)) {
       throw new ServiceError(
         OPENING_BALANCE_ERRORS.OPENING_BALANCE_PAYMENT_EXCEEDS_DUE,
         'The opening balance payment amount can not be negative.',
@@ -97,12 +98,12 @@ export class ContactOpeningBalancePayment {
       oldPayment && oldPayment.contactId === payment.contactId
         ? getOpeningBalancePaidAmount(oldPayment.entries)
         : 0;
-    const dueAmount = round3(
+    const dueAmount = roundAmount(
       Number(contact.openingBalance) -
         Number(contact.openingBalancePaymentAmount || 0) +
         oldAmount,
     );
-    if (amount > dueAmount) {
+    if (moneyGt(amount, dueAmount)) {
       throw new ServiceError(
         OPENING_BALANCE_ERRORS.OPENING_BALANCE_PAYMENT_EXCEEDS_DUE,
         null,
@@ -128,7 +129,10 @@ export class ContactOpeningBalancePayment {
     const changes = new Map<number, number>();
     const add = (contactId: number | undefined, amount: number) => {
       if (!contactId || !amount) return;
-      changes.set(contactId, round3((changes.get(contactId) || 0) + amount));
+      changes.set(
+        contactId,
+        roundAmount((changes.get(contactId) || 0) + amount),
+      );
     };
     add(
       newPayment?.contactId,

@@ -1,5 +1,6 @@
+import { moneyGt, moneyLt, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { sumBy, difference } from 'lodash';
+import { difference } from 'lodash';
 import { Knex } from 'knex';
 import { ERRORS } from '../constants';
 import { Bill } from '../../Bills/models/Bill';
@@ -178,11 +179,11 @@ export class BillPaymentValidators {
         const oldEntries = oldPaymentEntries.filter(
           (entry) => isDocumentEntry(entry) && entry.billId === bill.id,
         );
-        const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
+        const oldPaymentAmount = sumMoneyBy(oldEntries, 'paymentAmount');
 
         return [
           bill.id,
-          { ...bill, dueAmount: bill.dueAmount + oldPaymentAmount },
+          { ...bill, dueAmount: sumMoney(bill.dueAmount, oldPaymentAmount) },
         ];
       }),
     );
@@ -196,7 +197,7 @@ export class BillPaymentValidators {
       const entryBill = storedBillsMap.get(entry.billId);
       const { dueAmount } = entryBill;
 
-      if (dueAmount < entry.paymentAmount) {
+      if (moneyLt(dueAmount, entry.paymentAmount)) {
         hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
       }
     });
@@ -217,13 +218,10 @@ export class BillPaymentValidators {
     amount: number,
     entries: { paymentAmount: number }[] = [],
   ) {
-    const totalApplied = sumBy(
-      entries,
-      (entry) => Number(entry.paymentAmount) || 0,
-    );
+    const totalApplied = sumMoneyBy(entries, 'paymentAmount');
 
     // Compare in cents to ignore floating point noise.
-    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+    if (moneyGt(totalApplied, amount)) {
       throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
     }
   }

@@ -1,5 +1,6 @@
+import { moneyGt, moneyLt, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { difference, sumBy } from 'lodash';
+import { difference } from 'lodash';
 import { Knex } from 'knex';
 import { IPaymentReceivedEntryDTO } from '../types/PaymentReceived.types';
 import { ERRORS } from '../constants';
@@ -133,13 +134,10 @@ export class PaymentReceivedValidators {
     amount: number,
     entries: IPaymentReceivedEntryDTO[] = [],
   ) {
-    const totalApplied = sumBy(
-      entries,
-      (entry) => Number(entry.paymentAmount) || 0,
-    );
+    const totalApplied = sumMoneyBy(entries, 'paymentAmount');
 
     // Compare in cents to ignore floating point noise.
-    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+    if (moneyGt(totalApplied, amount)) {
       throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
     }
   }
@@ -177,11 +175,14 @@ export class PaymentReceivedValidators {
         const oldEntries = oldPaymentEntries.filter(
           (entry) => isDocumentEntry(entry) && entry.invoiceId === invoice.id,
         );
-        const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
+        const oldPaymentAmount = sumMoneyBy(oldEntries, 'paymentAmount');
 
         return [
           invoice.id,
-          { ...invoice, dueAmount: invoice.dueAmount + oldPaymentAmount },
+          {
+            ...invoice,
+            dueAmount: sumMoney(invoice.dueAmount, oldPaymentAmount),
+          },
         ];
       }),
     );
@@ -191,7 +192,7 @@ export class PaymentReceivedValidators {
       const entryInvoice = storedInvoicesMap.get(entry.invoiceId);
       const { dueAmount } = entryInvoice;
 
-      if (dueAmount < entry.paymentAmount) {
+      if (moneyLt(dueAmount, entry.paymentAmount)) {
         hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
       }
     });

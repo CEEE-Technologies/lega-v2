@@ -1,4 +1,4 @@
-import { sumBy } from 'lodash';
+import { subtractMoney, sumMoneyBy } from '@bigcapital/utils';
 import { BillPaymentEntryTransformer } from './BillPaymentEntry.transformer';
 import { Transformer } from '@/modules/Transformer/Transformer';
 import { BillPayment } from '../models/BillPayment';
@@ -86,14 +86,7 @@ export class BillPaymentTransformer extends Transformer {
   protected appliedAmount = (billPayment: BillPayment): number | null => {
     if (!billPayment.entries) return null;
 
-    return (
-      Math.round(
-        sumBy(
-          billPayment.entries,
-          (entry) => Number(entry.paymentAmount) || 0,
-        ) * 1000,
-      ) / 1000
-    );
+    return sumMoneyBy(billPayment.entries, 'paymentAmount');
   };
 
   /**
@@ -106,10 +99,7 @@ export class BillPaymentTransformer extends Transformer {
     const applied = this.appliedAmount(billPayment);
     if (applied === null) return null;
 
-    return Math.max(
-      Math.round(((Number(billPayment.amount) || 0) - applied) * 1000) / 1000,
-      0,
-    );
+    return Math.max(subtractMoney(billPayment.amount, applied), 0);
   };
 
   /**

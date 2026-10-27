@@ -1,3 +1,4 @@
+import { moneyLt, sumMoney } from '@bigcapital/utils';
 import * as moment from 'moment';
 import { omit } from 'lodash';
 import * as R from 'ramda';
@@ -99,7 +100,7 @@ export class VendorCreditDTOTransformService {
     vendorCredit: VendorCredit,
     amount: number,
   ) => {
-    if (vendorCredit.creditsRemaining < amount) {
+    if (moneyLt(vendorCredit.creditsRemaining, amount)) {
       throw new ServiceError(ERRORS.VENDOR_CREDIT_HAS_NO_REMAINING_AMOUNT);
     }
   };
@@ -114,10 +115,11 @@ export class VendorCreditDTOTransformService {
     vendorCredit: VendorCredit,
     newAmount: number,
   ) => {
-    const usedAmount =
-      vendorCredit.refundedAmount + vendorCredit.invoicedAmount;
-
-    if (newAmount < usedAmount) {
+    const usedAmount = sumMoney(
+      vendorCredit.refundedAmount,
+      vendorCredit.invoicedAmount,
+    );
+    if (moneyLt(newAmount, usedAmount)) {
       throw new ServiceError(ERRORS.VENDOR_CREDIT_AMOUNT_SMALLER_THAN_USED);
     }
   };
