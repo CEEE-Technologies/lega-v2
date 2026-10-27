@@ -186,12 +186,48 @@ describe('RefundVendorCreditCashGL', () => {
     expect(sumBy(entries, 'debit')).toBeCloseTo(sumBy(entries, 'credit'), 2);
   });
 
-  it('returns no entries when the refunded proportion cannot be computed', () => {
+  it('keeps the deposit line when the refunded proportion cannot be computed', () => {
     const refund = buildRefund({
       vendorCredit: buildVendorCredit({ totalLocal: 0 }),
     });
+    const entries = new RefundVendorCreditCashGL(refund as any)
+      .setPurchaseDiscountAccountId(2)
+      .setOtherExpensesAccountId(3)
+      .setPrepaidExpensesAccountId(4)
+      .getLedger()
+      .getEntries();
+
+    // The money still came into the bank: Dr deposit / Cr prepaid expenses.
+    const depositEntry = entries.find((entry) => entry.debit > 0);
+    const prepaidEntry = entries.find((entry) => entry.accountId === 4);
+
+    expect(entries).toHaveLength(2);
+    expect(depositEntry.debit).toBe(refund.amount);
+    expect(prepaidEntry.credit).toBe(refund.amount);
+    expect(sumBy(entries, 'debit')).toBe(sumBy(entries, 'credit'));
+  });
+});
+
+describe('RefundVendorCreditCashGL — rounding', () => {
+  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+    const refund = buildRefund({
+      amount: 100,
+      vendorCredit: buildVendorCredit({
+        totalLocal: 3,
+        entries: [501, 502, 503].map((costAccountId) => ({
+          itemId: costAccountId,
+          totalExcludingTax: 1,
+          costAccountId,
+          item: { type: 'service' },
+        })),
+      }),
+    });
     const entries = buildLedger(refund).getEntries();
 
-    expect(entries).toHaveLength(0);
+    expect(entries.find((e) => e.accountId === 501).credit).toBe(33.333);
+    expect(entries.find((e) => e.accountId === 502).credit).toBe(33.333);
+    expect(entries.find((e) => e.accountId === 503).credit).toBe(33.334);
+    expect(sumBy(entries, 'debit')).toBe(100);
+    expect(sumBy(entries, 'credit')).toBe(100);
   });
 });

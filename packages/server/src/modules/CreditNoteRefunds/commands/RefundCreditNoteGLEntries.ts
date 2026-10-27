@@ -138,6 +138,27 @@ export class RefundCreditNoteGLEntries {
       this.getRefundCreditGLEntries(refundCreditNote, ARAccountId),
     );
 
+    // Cash basis ledger entries.
+    const cashLedger = await this.getRefundCreditNoteCashLedger(
+      refundCreditNote,
+      trx,
+    );
+    return new Ledger([
+      ...accrualLedger.getEntries(),
+      ...cashLedger.getEntries(),
+    ]);
+  };
+
+  /**
+   * Retrieves the refund credit note cash basis ledger.
+   * @param {RefundCreditNote} refundCreditNote - Refund credit note.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<Ledger>}
+   */
+  public getRefundCreditNoteCashLedger = async (
+    refundCreditNote: RefundCreditNote,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger> => {
     // Find or create the discount account.
     const discountAccount =
       await this.accountRepository.findOrCreateDiscountAccount({}, trx);
@@ -149,13 +170,85 @@ export class RefundCreditNoteGLEntries {
       .setDiscountAccountId(discountAccount.id)
       .setAdjustmentAccountId(adjustmentAccount.id);
 
-    // Cash basis ledger entries.
-    const cashLedger = refundCreditNoteCashGL.getLedger();
+    // A credit note with no income to reverse takes the refund from the
+    // customer's unearned revenue.
+    if (!refundCreditNoteCashGL.isIncomeReversible()) {
+      const unearnedRevenueAccount =
+        await this.accountRepository.findOrCreateUnearnedRevenue({}, trx);
+      refundCreditNoteCashGL.setUnearnedRevenueAccountId(
+        unearnedRevenueAccount.id,
+      );
+    }
+    return refundCreditNoteCashGL.getLedger();
+  };
 
-    return new Ledger([
-      ...accrualLedger.getEntries(),
-      ...cashLedger.getEntries(),
-    ]);
+  /**
+   * Rewrites only the cash basis entries of the given refund, e.g. once the
+   * credit note is edited, leaving the accrual entries and balances alone.
+   * @param {number} refundCreditNoteId - Refund credit note id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteRefundCreditCashGLEntries = async (
+    refundCreditNoteId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    await this.ledgerStorage.deleteByReference(
+      refundCreditNoteId,
+      'RefundCreditNote',
+      trx,
+      { basis: AccountingBasis.Cash },
+    );
+    const refundCreditNote = await this.refundCreditNoteModel()
+      .query(trx)
+      .findById(refundCreditNoteId)
+      .withGraphFetched('creditNote.entries.item');
+
+    if (!refundCreditNote) return;
+
+    const cashLedger = await this.getRefundCreditNoteCashLedger(
+      refundCreditNote,
+      trx,
+    );
+    await this.ledgerStorage.commit(cashLedger, trx);
+  };
+
+  /**
+   * Retrieves the refunds of the given credit note, whose cash entries a
+   * credit note edit rewrites.
+   * @param {number} creditNoteId - Credit note id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public getCreditNoteRefunds = async (
+    creditNoteId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    const refunds = await this.refundCreditNoteModel()
+      .query(trx)
+      .where('creditNoteId', creditNoteId);
+
+    return refunds.map((refund) => ({
+      label: refund.referenceNo ? `Refund ${refund.referenceNo}` : 'A refund',
+      date: refund.date,
+    }));
+  };
+
+  /**
+   * Rewrites the cash basis entries of all the refunds of the given credit
+   * note.
+   * @param {number} creditNoteId - Credit note id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteCreditNoteRefundsCashGLEntries = async (
+    creditNoteId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    const refunds = await this.refundCreditNoteModel()
+      .query(trx)
+      .where('creditNoteId', creditNoteId);
+
+    for (const refund of refunds) {
+      await this.rewriteRefundCreditCashGLEntries(refund.id, trx);
+    }
   };
 
   /**

@@ -13,9 +13,16 @@ import { RefundSyncCreditRefundedAmount } from './commands/RefundSyncCreditRefun
 import { RefundSyncVendorCreditBalanceSubscriber } from './subscribers/RefundSyncVendorCreditBalanceSubscriber';
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
+import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
 
 @Module({
-  imports: [WarehousesModule, BranchesModule, LedgerModule, AccountsModule],
+  imports: [
+    WarehousesModule,
+    BranchesModule,
+    LedgerModule,
+    AccountsModule,
+    TransactionsLockingModule,
+  ],
   providers: [
     GetRefundVendorCreditService,
     GetRefundVendorCreditsService,
@@ -27,6 +34,7 @@ import { AccountsModule } from '../Accounts/Accounts.module';
     RefundSyncCreditRefundedAmount,
     RefundSyncVendorCreditBalanceSubscriber,
   ],
+  exports: [RefundVendorCreditGLEntries],
   controllers: [VendorCreditsRefundController],
 })
 export class VendorCreditsRefundModule {}

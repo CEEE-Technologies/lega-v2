@@ -6,7 +6,7 @@ import {
 } from '../dtos/BillPayment.dto';
 
 export interface IBillReceivePageEntry {
-  billId: number;
+  billId: number | null;
   entryType: string;
   billNo: string;
   dueAmount: number;

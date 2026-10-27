@@ -175,7 +175,7 @@ export class PaymentReceivedCostGLEntries {
       payments.flatMap((payment) =>
         (payment.entries || []).map((entry) => entry.invoiceId),
       ),
-    );
+    ).filter((invoiceId) => !!invoiceId);
     if (invoicesIds.length === 0) {
       return;
     }

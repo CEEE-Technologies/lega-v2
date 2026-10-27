@@ -8,6 +8,7 @@ import {
   IsOptional,
   ValidateNested,
 } from 'class-validator';
+import { castArray } from 'lodash';
 import { Transform, Type } from 'class-transformer';
 import { parseBoolean } from '@/utils/parse-boolean';
 import { ApiProperty } from '@nestjs/swagger';
@@ -62,6 +63,13 @@ export class GeneralLedgerQueryDto extends FinancialSheetBranchesQueryDto {
     required: false,
     type: [Number],
   })
+  // Query strings arrive as strings ("1029"); the report compares with the
+  // numeric account ids, so a string filter used to match no account.
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === ''
+      ? value
+      : castArray(value).map((id) => Number(id)),
+  )
   @IsArray()
   @IsOptional()
   accountsIds: number[];

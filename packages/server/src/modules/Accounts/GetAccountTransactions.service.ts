@@ -1,4 +1,5 @@
 import { IAccountsTransactionsFilter } from './Accounts.types';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { AccountTransactionTransformer } from './AccountTransaction.transformer';
 import { AccountTransaction } from './models/AccountTransaction.model';
 import { Account } from './models/Account.model';
@@ -36,6 +37,9 @@ export class GetAccountTransactionsService {
       .query()
       .onBuild((query) => {
         query.orderBy('date', 'DESC');
+
+        // Show each transaction once (accrual or general entries only).
+        query.modify('filterByBasis', AccountingBasis.Accrual);
 
         if (filter.accountId) {
           query.where('account_id', filter.accountId);

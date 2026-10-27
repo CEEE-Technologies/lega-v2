@@ -5,6 +5,7 @@ import { AccountNormal } from '@/interfaces/Account';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { RefundVendorCredit } from '../models/RefundVendorCredit';
+import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
 
 /**
  * Records the cash basis journal entries of the vendor credit refund.
@@ -14,12 +15,17 @@ import { RefundVendorCredit } from '../models/RefundVendorCredit';
  * The entries mirror the expense composition of the vendor credit (the
  * cost/inventory accounts, purchase discount, and other expenses) scaled by
  * the refunded proportion of the vendor credit.
+ *
+ * When the vendor credit has no expense to reverse (zero total or missing),
+ * the cash still comes into the bank, so the refund reduces the vendor's
+ * prepaid expenses instead of dropping the deposit line.
  */
 export class RefundVendorCreditCashGL {
   private readonly refundVendorCredit: RefundVendorCredit;
 
   private purchaseDiscountAccountId: number;
   private otherExpensesAccountId: number;
+  private prepaidExpensesAccountId: number;
 
   /**
    * Constructor method.
@@ -47,6 +53,25 @@ export class RefundVendorCreditCashGL {
   public setOtherExpensesAccountId(otherExpensesAccountId: number) {
     this.otherExpensesAccountId = otherExpensesAccountId;
     return this;
+  }
+
+  /**
+   * Sets the prepaid expenses account id, credited when the vendor credit
+   * has no expense to reverse.
+   * @param {number} prepaidExpensesAccountId - Prepaid expenses account id.
+   * @returns {RefundVendorCreditCashGL}
+   */
+  public setPrepaidExpensesAccountId(prepaidExpensesAccountId: number) {
+    this.prepaidExpensesAccountId = prepaidExpensesAccountId;
+    return this;
+  }
+
+  /**
+   * Determines whether the refund reverses vendor credit expenses pro-rata.
+   * @returns {boolean}
+   */
+  public isExpenseReversible(): boolean {
+    return !!this.vendorCredit && this.refundRatio > 0;
   }
 
   /**
@@ -97,7 +122,9 @@ export class RefundVendorCreditCashGL {
       this.vendorCredit?.exchangeRate,
       defaultTo(this.refundVendorCredit.exchangeRate, 1),
     );
-    return defaultTo(this.refundVendorCredit.amount, 0) * exchangeRate;
+    return roundLedgerAmount(
+      defaultTo(this.refundVendorCredit.amount, 0) * exchangeRate,
+    );
   }
 
   /**
@@ -206,21 +233,38 @@ export class RefundVendorCreditCashGL {
    * @returns {ILedgerEntry[]}
    */
   public GLEntries(): ILedgerEntry[] {
-    const vendorCredit = this.vendorCredit;
-
-    if (!vendorCredit || this.refundRatio <= 0) {
+    if (this.refundLocalAmount <= 0) {
       return [];
     }
-    const itemsEntries = (vendorCredit.entries || []).map((item, index) =>
+    if (!this.isExpenseReversible()) {
+      return [this.refundEntry, this.prepaidExpensesEntry];
+    }
+    const itemsEntries = (this.vendorCredit.entries || []).map((item, index) =>
       this.getVendorCreditItemEntry(item, index),
     );
 
-    return [
+    return roundLedgerEntries([
       this.refundEntry,
       ...this.discountEntry,
       ...this.adjustmentEntry,
       ...itemsEntries,
-    ];
+    ]);
+  }
+
+  /**
+   * Retrieves the prepaid expenses credit entry balancing the deposit when
+   * the vendor credit has no expense to reverse.
+   * @returns {ILedgerEntry}
+   */
+  private get prepaidExpensesEntry(): ILedgerEntry {
+    return {
+      ...this.cashEntriesCommonEntry,
+      credit: this.refundLocalAmount,
+      accountId: this.prepaidExpensesAccountId,
+      contactId: this.vendorCredit?.vendorId,
+      index: 2,
+      accountNormal: AccountNormal.DEBIT,
+    };
   }
 
   /**

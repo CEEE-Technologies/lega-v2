@@ -219,3 +219,19 @@ describe('PaymentReceivedCostCashGL', () => {
     expect(entries).toHaveLength(0);
   });
 });
+
+describe('PaymentReceivedCostCashGL — rounding', () => {
+  it('rounds the pro-rata cost to the ledger precision on both sides', () => {
+    const invoice = buildInvoice({ totalLocal: 3 });
+    const payment = buildPayment([buildPaymentEntry(invoice, 1)]);
+    const entries = buildGL(payment, {
+      [invoice.id]: [buildItemCost({ cost: 100 })],
+    }).GLEntries();
+
+    const costEntry = entries.find((e) => e.accountId === 600);
+    const inventoryEntry = entries.find((e) => e.accountId === 700);
+
+    expect(costEntry.debit).toBe(33.333);
+    expect(inventoryEntry.credit).toBe(33.333);
+  });
+});

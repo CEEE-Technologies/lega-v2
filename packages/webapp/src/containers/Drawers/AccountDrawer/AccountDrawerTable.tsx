@@ -1,4 +1,5 @@
 import * as FF from 'fp-ts/function';
+import moment from 'moment';
 import React from 'react';
 import intl from 'react-intl-universal';
 import { Link } from 'react-router-dom';
@@ -18,8 +19,35 @@ import {
 /**
  * account drawer table.
  */
+// Accounts posted only on the cash basis: the payment excess (customer
+// advances / vendor prepayments) has no accrual entries.
+const CASH_BASIS_ONLY_ACCOUNTS = ['unearned-revenue', 'prepaid-expenses'];
+
+/**
+ * Retrieves the general ledger link of the given account: on the cash basis
+ * for the cash basis only accounts.
+ */
+const getGeneralLedgerLink = (account?: { id?: number; slug?: string }) => {
+  if (!account?.id || !CASH_BASIS_ONLY_ACCOUNTS.includes(account.slug ?? '')) {
+    return '/financial-reports/general-ledger';
+  }
+  const params = new URLSearchParams({
+    basis: 'cash',
+    accountsIds: String(account.id),
+    fromDate: moment()
+      .subtract(10, 'years')
+      .startOf('year')
+      .format('YYYY-MM-DD'),
+    toDate: moment().format('YYYY-MM-DD'),
+  });
+  return `/financial-reports/general-ledger?${params.toString()}`;
+};
+
 function AccountDrawerTableInner({ closeDrawer }: WithDrawerActionsProps) {
-  const { accounts, drawerName } = useAccountDrawerContext();
+  const { account, accounts, drawerName } = useAccountDrawerContext();
+  const isCashBasisOnly = CASH_BASIS_ONLY_ACCOUNTS.includes(
+    (account as { slug?: string } | undefined)?.slug ?? '',
+  );
 
   // Handle view more link click.
   const handleLinkClick = () => {
@@ -34,13 +62,24 @@ function AccountDrawerTableInner({ closeDrawer }: WithDrawerActionsProps) {
         <AccountDrawerTableHeader />
         <AccountDrawerDataTable />
 
-        <If condition={(accounts?.length ?? 0) > 0}>
+        <If condition={(accounts?.length ?? 0) > 0 || isCashBasisOnly}>
           <TableFooter>
+            {isCashBasisOnly && (
+              <div style={{ marginBottom: 4, opacity: 0.8 }}>
+                This account is used on the cash basis only (unapplied
+                payments), so it has no accrual transactions.
+              </div>
+            )}
             <Link
-              to={`/financial-reports/general-ledger`}
+              to={getGeneralLedgerLink(
+                account as { id?: number; slug?: string } | undefined,
+              )}
               onClick={handleLinkClick}
             >
-              {isRTL ? '→' : '←'} {intl.get('view_more_transactions')}
+              {isRTL ? '→' : '←'}{' '}
+              {isCashBasisOnly
+                ? 'View in General Ledger (cash basis)'
+                : intl.get('view_more_transactions')}
             </Link>
           </TableFooter>
         </If>

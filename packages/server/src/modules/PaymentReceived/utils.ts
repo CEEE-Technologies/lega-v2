@@ -12,8 +12,9 @@ export const transformPaymentReceivedToPdfTemplate = (
     paymentReceivedDate: payment.formattedPaymentDate,
     customerName: payment.customer.displayName,
     lines: payment.entries.map((entry) => ({
-      invoiceNumber: entry.invoice.invoiceNo,
-      invoiceAmount: entry.invoice.totalFormatted,
+      // Opening balance lines have no invoice.
+      invoiceNumber: entry.invoice?.invoiceNo ?? 'Opening balance',
+      invoiceAmount: entry.invoice?.totalFormatted ?? '',
       paidAmount: entry.paymentAmountFormatted,
     })),
     customerAddress: contactAddressTextFormat(payment.customer),

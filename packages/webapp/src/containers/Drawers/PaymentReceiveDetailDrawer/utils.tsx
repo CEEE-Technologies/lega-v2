@@ -31,7 +31,15 @@ export const usePaymentReceiveEntriesColumns = () => {
       },
       {
         Header: intl.get('invoice_no'),
-        accessor: 'invoice.invoiceNo',
+        id: 'invoiceNo',
+        // The customer opening balance line has no invoice.
+        accessor: (row: {
+          entryType?: string;
+          invoice?: { invoiceNo?: string };
+        }) =>
+          row.entryType === 'opening_balance'
+            ? 'Opening balance'
+            : row.invoice?.invoiceNo,
         width: 150,
         className: 'invoice_number',
         disableSortBy: true,

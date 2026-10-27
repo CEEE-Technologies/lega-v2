@@ -14,6 +14,7 @@ import {
   notifyPaymentReceiveBySms,
   fetchPaymentReceiveSmsDetails,
   fetchPaymentReceivedPdf,
+  rawRequest,
   type GetPaymentsReceivedQuery,
 } from '@bigcapital/sdk-ts';
 import {
@@ -54,6 +55,9 @@ import { saveInvoke } from '@/utils';
 
 const commonInvalidateQueries = (client: ReturnType<typeof useQueryClient>) => {
   client.invalidateQueries({ queryKey: paymentReceivesKeys.all() });
+  client.invalidateQueries({
+    queryKey: paymentReceivesKeys.newEntries().slice(0, 1),
+  });
   client.invalidateQueries({
     queryKey: paymentReceivesKeys.editPage(null).slice(0, 1),
   });
@@ -204,6 +208,50 @@ export function usePaymentReceiveEditPage(
     queryKey: paymentReceivesKeys.editPage(id),
     queryFn: () => fetchPaymentReceiveEditPage(fetcher, id!),
     enabled: id != null && (props?.enabled ?? true),
+  });
+}
+
+/**
+ * An open item of the new payment page: the customer's unpaid opening
+ * balance (`entryType: 'opening_balance'`, no invoice) or a due invoice.
+ */
+export type PaymentReceiveNewPageEntry = {
+  entryType: 'invoice' | 'opening_balance';
+  invoiceId: number | null;
+  invoiceNo: string | null;
+  amount: number;
+  dueAmount: number;
+  paymentAmount: number;
+  totalPaymentAmount: number;
+  currencyCode: string;
+  date: string;
+};
+
+/**
+ * Retrieves the open items of the new payment page of the given customer:
+ * the unpaid opening balance first, then the due invoices.
+ */
+export function usePaymentReceiveNewPageEntries(
+  customerId: number | string | null | undefined,
+  props?: Omit<
+    UseQueryOptions<PaymentReceiveNewPageEntry[], Error>,
+    'queryKey' | 'queryFn'
+  >,
+) {
+  const fetcher = useApiFetcher({ enableCamelCaseTransform: true });
+  return useQuery({
+    ...props,
+    queryKey: paymentReceivesKeys.newEntries(customerId),
+    queryFn: () =>
+      rawRequest<PaymentReceiveNewPageEntry[]>(
+        fetcher,
+        'GET',
+        `/api/payments-received/new-page/entries?customerId=${encodeURIComponent(
+          String(customerId),
+        )}`,
+      ),
+    enabled:
+      customerId != null && customerId !== '' && (props?.enabled ?? true),
   });
 }
 

@@ -30,7 +30,8 @@
     "cli:tenants:list": "ts-node -r tsconfig-paths/register src/cli.ts tenants:list",
     "openapi:export": "ts-node -r tsconfig-paths/register src/cli.ts openapi:export",
     "cli:system:seed:latest": "ts-node -r tsconfig-paths/register src/cli.ts system:seed:latest",
-    "cli:tenants:seed:latest": "ts-node -r tsconfig-paths/register src/cli.ts tenants:seed:latest"
+    "cli:tenants:seed:latest": "ts-node -r tsconfig-paths/register src/cli.ts tenants:seed:latest",
+    "cli:tenants:rebuild-cash-basis": "ts-node -r tsconfig-paths/register src/cli.ts tenants:rebuild-cash-basis"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.576.0",

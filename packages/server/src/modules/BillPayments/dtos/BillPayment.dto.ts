@@ -7,17 +7,36 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsIn,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
 import { ToNumber } from '@/common/decorators/Validators';
+import {
+  PaymentEntryType,
+  PaymentEntryTypes,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 export class BillPaymentEntryDto {
+  @IsOptional()
+  @IsIn(Object.values(PaymentEntryTypes))
+  @ApiProperty({
+    description:
+      "What the line pays: a bill (default) or the vendor's opening balance",
+    enum: Object.values(PaymentEntryTypes),
+    required: false,
+    example: 'invoice',
+  })
+  entryType?: PaymentEntryType;
+
+  // Required for bill lines; opening balance lines have no bill.
+  @ValidateIf((entry) => entry.entryType !== PaymentEntryTypes.OpeningBalance)
   @ToNumber()
   @IsNumber()
   @IsNotEmpty()
   @ApiProperty({ description: 'The id of the bill', example: 1 })
-  billId: number;
+  billId?: number;
 
   @ToNumber()
   @IsNumber()

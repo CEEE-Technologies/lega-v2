@@ -14,6 +14,9 @@ export type VendorDetails = Vendor & {
   formattedBalance?: string;
   formattedOpeningBalance?: string;
   formattedOpeningBalanceAt?: string;
+  openingBalanceDueAmount?: number;
+  formattedOpeningBalanceDueAmount?: string;
+  formattedOpeningBalancePaymentAmount?: string;
 };
 
 export interface VendorDetailsDrawerContextValue {

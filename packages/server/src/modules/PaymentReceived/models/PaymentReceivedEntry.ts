@@ -1,14 +1,18 @@
 import { BaseModel } from '@/models/Model';
 import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
+import type { PaymentReceived } from './PaymentReceived';
 import { Model } from 'objection';
+import { PaymentEntryType } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 export class PaymentReceivedEntry extends BaseModel {
   paymentReceiveId: number;
-  invoiceId: number;
+  invoiceId: number | null;
+  entryType: PaymentEntryType;
   paymentAmount: number;
   index: number;
 
   invoice?: SaleInvoice;
+  payment?: PaymentReceived;
 
   /**
    * Table name

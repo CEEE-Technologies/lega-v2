@@ -1,4 +1,4 @@
-import { defaultTo } from 'lodash';
+import { defaultTo, sumBy } from 'lodash';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountNormal } from '@/interfaces/Account';
@@ -6,6 +6,11 @@ import { PaymentReceived } from '../models/PaymentReceived';
 import { PaymentReceivedEntry } from '../models/PaymentReceivedEntry';
 import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
+import {
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 /**
  * Records the cash basis journal entries of the payment received.
@@ -15,6 +20,13 @@ import { AccountingBasis } from '@/common/types/AccountingBasis';
  * The entries mirror the income composition of the invoice (the income
  * accounts, tax payable, discount, and other charges) scaled by the paid
  * proportion of the invoice.
+ *
+ * A line that pays the customer opening balance recognizes it as income on
+ * the account the opening balance was booked to (Other Income).
+ *
+ * The amount received but not applied to an invoice or the opening balance
+ * (the excess) is still cash in the bank: it is recorded as unearned revenue
+ * until it is applied.
  */
 export class PaymentReceivedCashGL {
   private readonly paymentReceived: PaymentReceived;
@@ -22,6 +34,8 @@ export class PaymentReceivedCashGL {
   private taxPayableAccountId: number;
   private discountAccountId: number;
   private otherChargesAccountId: number;
+  private unearnedRevenueAccountId: number;
+  private openingBalanceAccountId: number | null = null;
 
   /**
    * Constructor method.
@@ -62,6 +76,35 @@ export class PaymentReceivedCashGL {
   }
 
   /**
+   * Sets the unearned revenue account id, credited with the excess.
+   * @param {number} unearnedRevenueAccountId - Unearned revenue account id.
+   * @returns {PaymentReceivedCashGL}
+   */
+  setUnearnedRevenueAccountId(unearnedRevenueAccountId: number) {
+    this.unearnedRevenueAccountId = unearnedRevenueAccountId;
+    return this;
+  }
+
+  /**
+   * Sets the account the customer opening balance was booked to, credited
+   * with the opening balance lines.
+   * @param {number | null} openingBalanceAccountId
+   * @returns {PaymentReceivedCashGL}
+   */
+  setOpeningBalanceAccountId(openingBalanceAccountId: number | null) {
+    this.openingBalanceAccountId = openingBalanceAccountId ?? null;
+    return this;
+  }
+
+  /**
+   * Determines whether the payment has a line paying the opening balance.
+   * @returns {boolean}
+   */
+  public hasOpeningBalanceEntries(): boolean {
+    return (this.paymentReceived.entries || []).some(isOpeningBalanceEntry);
+  }
+
+  /**
    * Retrieves the common journal entry of the cash basis entries.
    */
   private get cashEntriesCommonEntry() {
@@ -97,8 +140,8 @@ export class PaymentReceivedCashGL {
   private getPaymentEntryLocalAmount = (
     entry: PaymentReceivedEntry,
   ): number => {
-    return (
-      entry.paymentAmount * defaultTo(this.paymentReceived.exchangeRate, 1)
+    return roundLedgerAmount(
+      entry.paymentAmount * defaultTo(this.paymentReceived.exchangeRate, 1),
     );
   };
 
@@ -244,20 +287,189 @@ export class PaymentReceivedCashGL {
   private getPaymentEntryCashEntries = (
     entry: PaymentReceivedEntry,
   ): ILedgerEntry[] => {
+    if (isOpeningBalanceEntry(entry)) {
+      return this.getOpeningBalanceEntryCashEntries(entry);
+    }
+    // A zero-total or missing invoice has no income to recognize; its
+    // amount stays in the excess so the bank line is never dropped.
+    if (!this.isIncomeRecognizable(entry)) {
+      return [];
+    }
     const invoice = entry.invoice;
     const ratio = this.getPaymentEntryRatio(entry);
 
-    if (!invoice || ratio <= 0) {
-      return [];
-    }
-
-    return [
+    return roundLedgerEntries([
       this.getPaymentEntryDepositEntry(entry),
       ...this.getPaymentEntryIncomeEntries(invoice, ratio),
       ...this.getPaymentEntryTaxEntries(invoice, ratio),
       ...this.getPaymentEntryDiscountEntry(invoice, ratio),
       ...this.getPaymentEntryAdjustmentEntry(invoice, ratio),
+    ]);
+  };
+
+  /**
+   * Determines whether the given payment entry recognizes invoice income.
+   * @param {PaymentReceivedEntry} entry - Payment received entry.
+   * @returns {boolean}
+   */
+  private isIncomeRecognizable = (entry: PaymentReceivedEntry): boolean => {
+    return (
+      isDocumentEntry(entry) &&
+      !!entry.invoice &&
+      this.getPaymentEntryRatio(entry) > 0 &&
+      this.getPaymentEntryLocalAmount(entry) > 0
+    );
+  };
+
+  /**
+   * Determines whether the given payment entry recognizes opening balance
+   * income. Without the opening balance account the amount stays in the
+   * excess, so the bank line is never dropped.
+   * @param {PaymentReceivedEntry} entry - Payment received entry.
+   * @returns {boolean}
+   */
+  private isOpeningBalanceRecognizable = (
+    entry: PaymentReceivedEntry,
+  ): boolean => {
+    return (
+      isOpeningBalanceEntry(entry) &&
+      !!this.openingBalanceAccountId &&
+      this.getPaymentEntryLocalAmount(entry) > 0
+    );
+  };
+
+  /**
+   * Retrieves the cash basis entries of an opening balance line:
+   * -----
+   * - Deposit account -> Debit -> paid amount
+   *    - Opening balance account (income) -> Credit -> paid amount
+   * -----
+   * @param {PaymentReceivedEntry} entry - Payment received entry.
+   * @returns {ILedgerEntry[]}
+   */
+  private getOpeningBalanceEntryCashEntries = (
+    entry: PaymentReceivedEntry,
+  ): ILedgerEntry[] => {
+    if (!this.isOpeningBalanceRecognizable(entry)) {
+      return [];
+    }
+    const amount = this.getPaymentEntryLocalAmount(entry);
+    const commonEntry = {
+      ...this.cashEntriesCommonEntry,
+      contactId: this.paymentReceived.customerId,
+    };
+    return [
+      {
+        ...commonEntry,
+        debit: amount,
+        accountId: this.paymentReceived.depositAccountId,
+        accountNormal: AccountNormal.DEBIT,
+        index: 1,
+      },
+      {
+        ...commonEntry,
+        credit: amount,
+        accountId: this.openingBalanceAccountId,
+        accountNormal: AccountNormal.CREDIT,
+        note: 'Opening balance',
+        index: 2,
+      },
     ];
+  };
+
+  /**
+   * Retrieves the payment amount in local currency. Falls back to the sum of
+   * the applied amounts when the payment amount is not set.
+   * @returns {number}
+   */
+  private get paymentLocalAmount(): number {
+    const amount = defaultTo(
+      this.paymentReceived.amount,
+      sumBy(this.paymentReceived.entries || [], 'paymentAmount'),
+    );
+    return roundLedgerAmount(
+      amount * defaultTo(this.paymentReceived.exchangeRate, 1),
+    );
+  }
+
+  /**
+   * Retrieves the deposit amount already posted against invoices.
+   * @returns {number}
+   */
+  public getInvoicesDepositAmount(): number {
+    return roundLedgerAmount(
+      sumBy(
+        (this.paymentReceived.entries || []).filter(this.isIncomeRecognizable),
+        this.getPaymentEntryLocalAmount,
+      ),
+    );
+  }
+
+  /**
+   * Retrieves the deposit amount posted against the opening balance.
+   * @returns {number}
+   */
+  public getOpeningBalanceDepositAmount(): number {
+    return roundLedgerAmount(
+      sumBy(
+        (this.paymentReceived.entries || []).filter(
+          this.isOpeningBalanceRecognizable,
+        ),
+        this.getPaymentEntryLocalAmount,
+      ),
+    );
+  }
+
+  /**
+   * Retrieves the payment excess in local currency: the amount received
+   * less the deposit amount already posted against invoices and the
+   * opening balance.
+   * @returns {number}
+   */
+  public getExcessAmount(): number {
+    return Math.max(
+      roundLedgerAmount(
+        this.paymentLocalAmount -
+          this.getInvoicesDepositAmount() -
+          this.getOpeningBalanceDepositAmount(),
+      ),
+      0,
+    );
+  }
+
+  /**
+   * Retrieves the excess entries:
+   * -----
+   * - Deposit account -> Debit -> excess
+   *    - Unearned revenue -> Credit -> excess
+   * -----
+   * @returns {ILedgerEntry[]}
+   */
+  private getExcessEntries = (): ILedgerEntry[] => {
+    const excess = this.getExcessAmount();
+
+    if (excess <= 0) {
+      return [];
+    }
+    const commonEntry = {
+      ...this.cashEntriesCommonEntry,
+      contactId: this.paymentReceived.customerId,
+    };
+    const depositEntry: ILedgerEntry = {
+      ...commonEntry,
+      debit: excess,
+      accountId: this.paymentReceived.depositAccountId,
+      accountNormal: AccountNormal.DEBIT,
+      index: 1,
+    };
+    const unearnedRevenueEntry: ILedgerEntry = {
+      ...commonEntry,
+      credit: excess,
+      accountId: this.unearnedRevenueAccountId,
+      accountNormal: AccountNormal.CREDIT,
+      index: 3,
+    };
+    return [depositEntry, unearnedRevenueEntry];
   };
 
   /**
@@ -265,9 +477,12 @@ export class PaymentReceivedCashGL {
    * @returns {ILedgerEntry[]}
    */
   public GLEntries(): ILedgerEntry[] {
-    return (this.paymentReceived.entries || []).flatMap(
-      this.getPaymentEntryCashEntries,
-    );
+    return [
+      ...(this.paymentReceived.entries || []).flatMap(
+        this.getPaymentEntryCashEntries,
+      ),
+      ...this.getExcessEntries(),
+    ];
   }
 
   /**

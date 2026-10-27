@@ -1,3 +1,4 @@
+import { PaymentEntryType } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import { AttachmentLinkDTO } from '@/modules/Attachments/Attachments.types';
 import { Knex } from 'knex';
 import { PaymentReceived } from '../models/PaymentReceived';
@@ -13,7 +14,8 @@ export interface IPaymentReceivedEntryDTO {
   id?: number;
   index?: number;
   paymentReceiveId?: number;
-  invoiceId: number;
+  entryType?: PaymentEntryType;
+  invoiceId?: number | null;
   paymentAmount: number;
 }
 
@@ -69,7 +71,7 @@ export type IPaymentReceivedTransformed = Omit<PaymentReceived, 'entries'> & {
 };
 
 export interface IPaymentReceivePageEntry {
-  invoiceId: number;
+  invoiceId: number | null;
   entryType: string;
   invoiceNo: string;
   dueAmount: number;
@@ -78,6 +80,7 @@ export interface IPaymentReceivePageEntry {
   paymentAmount: number;
   currencyCode: string;
   date: Date | string;
+  index?: number;
 }
 
 export interface IPaymentReceivedEditPage {

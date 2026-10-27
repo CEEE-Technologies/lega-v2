@@ -20,10 +20,13 @@ const Schema = Yup.object().shape({
       id: Yup.number().nullable(),
       dueAmount: Yup.number().nullable(),
       paymentAmount: Yup.number().nullable().max(Yup.ref('dueAmount')),
+      entryType: Yup.string().nullable(),
+      // The opening balance line has no bill.
       billId: Yup.number()
         .nullable()
-        .when(['paymentAmount'], {
-          is: (paymentAmount: unknown) => !!paymentAmount,
+        .when(['paymentAmount', 'entryType'], {
+          is: (paymentAmount: unknown, entryType: unknown) =>
+            !!paymentAmount && entryType !== 'opening_balance',
           then: Yup.number().required(),
         }),
     }),

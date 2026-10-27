@@ -35,6 +35,18 @@ export function PaymentReceiveDetailTableFooter() {
           borderStyle={TotalLineBorderStyle.DoubleDark}
           textStyle={TotalLineTextStyle.Bold}
         />
+        {paymentReceive.appliedAmountFormatted && (
+          <TotalLine
+            title={'Applied'}
+            value={paymentReceive.appliedAmountFormatted}
+          />
+        )}
+        {paymentReceive.unappliedAmountFormatted && (
+          <TotalLine
+            title={'Unapplied (credit)'}
+            value={paymentReceive.unappliedAmountFormatted}
+          />
+        )}
       </PaymentReceiveTotalLines>
     </PaymentReceiveDetailsFooterRoot>
   );

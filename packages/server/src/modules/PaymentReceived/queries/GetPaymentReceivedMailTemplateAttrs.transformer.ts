@@ -137,7 +137,7 @@ class GetPaymentReceivedMailTemplateItemAttrsTransformer extends Transformer {
    * @returns
    */
   public label(entry) {
-    return entry.invoice.invoiceNo;
+    return entry.invoice?.invoiceNo ?? 'Opening balance';
   }
 
   /**

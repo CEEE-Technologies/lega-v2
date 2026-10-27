@@ -143,12 +143,45 @@ describe('RefundCreditNoteCashGL', () => {
     expect(sumBy(entries, 'debit')).toBeCloseTo(sumBy(entries, 'credit'), 2);
   });
 
-  it('returns no entries when the refunded proportion cannot be computed', () => {
+  it('keeps the withdrawal line when the refunded proportion cannot be computed', () => {
     const refund = buildRefund({
       creditNote: buildCreditNote({ totalLocal: 0 }),
     });
+    const entries = new RefundCreditNoteCashGL(refund as any)
+      .setDiscountAccountId(2)
+      .setAdjustmentAccountId(3)
+      .setUnearnedRevenueAccountId(4)
+      .getLedger()
+      .getEntries();
+
+    // The money still left the bank: Cr withdrawal / Dr unearned revenue.
+    expect(entries).toHaveLength(2);
+    expect(entries.find((entry) => entry.accountId === 900).credit).toBe(1000);
+    expect(entries.find((entry) => entry.accountId === 4).debit).toBe(1000);
+    expect(sumBy(entries, 'debit')).toBe(sumBy(entries, 'credit'));
+  });
+});
+
+describe('RefundCreditNoteCashGL — rounding', () => {
+  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+    const refund = buildRefund({
+      amount: 100,
+      creditNote: buildCreditNote({
+        totalLocal: 3,
+        entries: [501, 502, 503].map((sellAccountId) => ({
+          itemId: sellAccountId,
+          totalExcludingTax: 1,
+          sellAccountId,
+          item: {},
+        })),
+      }),
+    });
     const entries = buildLedger(refund).getEntries();
 
-    expect(entries).toHaveLength(0);
+    expect(entries.find((e) => e.accountId === 501).debit).toBe(33.333);
+    expect(entries.find((e) => e.accountId === 502).debit).toBe(33.333);
+    expect(entries.find((e) => e.accountId === 503).debit).toBe(33.334);
+    expect(sumBy(entries, 'debit')).toBe(100);
+    expect(sumBy(entries, 'credit')).toBe(100);
   });
 });

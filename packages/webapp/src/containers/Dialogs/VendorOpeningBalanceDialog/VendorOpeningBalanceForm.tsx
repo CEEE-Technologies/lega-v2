@@ -62,11 +62,21 @@ function VendorOpeningBalanceFormInner({
 
     // Handle request response errors.
     const onError = (error: {
-      data?: { errors?: Record<string, unknown> };
+      data?: { errors?: { type?: string; message?: string }[] };
     }) => {
       const errors = error?.data?.errors;
-      if (errors) {
-        // Errors are surfaced via the form schema; nothing to do here.
+      const belowPaid = Array.isArray(errors)
+        ? errors.find((e) => e.type === 'OPENING_BALANCE_BELOW_PAID')
+        : null;
+
+      // The opening balance can't go below what payments already paid.
+      if (belowPaid) {
+        AppToaster.show({
+          message:
+            belowPaid.message ||
+            'Payments already paid part of this opening balance; it can not be set below that amount.',
+          intent: Intent.DANGER,
+        });
       }
       setSubmitting(false);
     };

@@ -3,10 +3,12 @@ import { Model } from 'objection';
 import { BaseModel } from '@/models/Model';
 import { Bill } from '@/modules/Bills/models/Bill';
 import { BillPayment } from './BillPayment';
+import { PaymentEntryType } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 export class BillPaymentEntry extends BaseModel {
   public billPaymentId: number;
-  public billId: number;
+  public billId: number | null;
+  public entryType: PaymentEntryType;
   public paymentAmount: number;
   public index: number;
 

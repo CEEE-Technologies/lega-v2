@@ -1,4 +1,5 @@
 import { isEmpty, map } from 'lodash';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { IVendorBalanceSummaryQuery } from './VendorBalanceSummary.types';
@@ -137,6 +138,8 @@ export class VendorBalanceSummaryRepository {
       .onBuild((query) => {
         query.whereIn('accountId', payableAccountsIds);
         query.modify('filterDateRange', null, asDate);
+        // Contact balances are accrual based.
+        query.modify('filterByBasis', AccountingBasis.Accrual);
         query.groupBy('contactId');
         query.sum('credit as credit');
         query.sum('debit as debit');

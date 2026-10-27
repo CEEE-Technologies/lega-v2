@@ -1,6 +1,6 @@
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
-import { pick, first, sumBy } from 'lodash';
+import { pick, first } from 'lodash';
 import moment from 'moment';
 import React from 'react';
 import intl from 'react-intl-universal';
@@ -15,6 +15,7 @@ import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import {
   defaultFastFieldShouldUpdate,
   safeSumBy,
+  subtractAmounts,
   transformToForm,
   orderingLinesIndexes,
   formattedAmount,
@@ -53,8 +54,18 @@ export type PaymentMadeFormValues = {
 export type PaymentMadeRequestEntry = {
   index?: string | number;
   paymentAmount: string | number;
-  billId: string | number;
+  billId?: string | number;
+  entryType?: string;
 };
+
+// The entry type of the line that pays the vendor opening balance.
+export const OPENING_BALANCE_ENTRY_TYPE = 'opening_balance';
+
+/**
+ * Determines whether the given entry is the vendor opening balance line.
+ */
+export const isOpeningBalanceEntry = (entry: { entryType?: string }) =>
+  entry?.entryType === OPENING_BALANCE_ENTRY_TYPE;
 
 export type PaymentMadeRequestBody = {
   vendorId: string | number;
@@ -89,6 +100,7 @@ export type PaymentMadeEditEntry = {
  */
 type BillRow = {
   id?: string | number;
+  entryType?: string;
   billId?: string | number;
   dueAmount?: string | number;
   date?: string;
@@ -105,12 +117,16 @@ export const ERRORS = {
 
 // Default payment made entry values.
 export const defaultPaymentMadeEntry: PaymentMadeEntry = {
+  entryType: 'invoice',
   billId: '',
+  billNo: '',
+  date: '',
   paymentAmount: '',
   currencyCode: '',
   id: null,
   dueAmount: null,
   amount: '',
+  totalPaymentAmount: '',
 };
 
 // Default initial values of payment made.
@@ -205,12 +221,21 @@ export const accountsFieldShouldUpdate = (
 export const transformFormToRequest = (
   form: PaymentMadeFormValues,
 ): PaymentMadeRequestBody => {
-  // Filters entries that have no `billId` or `paymentAmount`.
+  // Filters entries that have no `billId` (bar the opening balance line) or
+  // no `paymentAmount`.
   const entries = form.entries
-    .filter((item) => item.billId && item.paymentAmount)
-    .map((entry) => ({
-      ...pick(entry, ['paymentAmount', 'billId']),
-    })) as PaymentMadeRequestEntry[];
+    .filter(
+      (item) =>
+        (item.billId || isOpeningBalanceEntry(item)) && item.paymentAmount,
+    )
+    .map((entry) =>
+      isOpeningBalanceEntry(entry)
+        ? {
+            ...pick(entry, ['paymentAmount']),
+            entryType: OPENING_BALANCE_ENTRY_TYPE,
+          }
+        : { ...pick(entry, ['paymentAmount', 'billId']), entryType: 'invoice' },
+    ) as PaymentMadeRequestEntry[];
 
   const attachments = transformAttachmentsToRequest(form);
 
@@ -240,6 +265,32 @@ export const useSetPrimaryBranchToForm = () => {
 /**
  * Transformes the response errors types.
  */
+export const PAYMENT_MADE_ENTRIES_EXCEED_AMOUNT_MESSAGE =
+  'The amounts applied to bills are more than the amount paid. Lower the bill payment amounts or raise the amount paid.';
+
+/**
+ * The over-applied message shown before saving, with both amounts.
+ */
+export const getPaymentMadeOverAppliedMessage = (
+  appliedAmount: string,
+  paymentAmount: string,
+) =>
+  `The amount applied to bills (${appliedAmount}) is more than the payment amount (${paymentAmount}). Lower the bill payment amounts or raise the payment amount.`;
+
+export const PAYMENT_MADE_ERROR_MESSAGES: Record<string, string> = {
+  BILL_ENTRIES_IDS_NOT_FOUND:
+    'One of the selected bills was not found for this vendor.',
+  BILLS_NOT_OPENED_YET:
+    'One of the selected bills is still a draft. Open the bill before paying it.',
+  INVALID_BILL_PAYMENT_AMOUNT:
+    'The amount for a bill is more than what is still due on it.',
+  OPENING_BALANCE_NOT_FOUND: 'This vendor has no opening balance to pay.',
+  OPENING_BALANCE_PAYMENT_EXCEEDS_DUE:
+    'The amount for the opening balance is more than what is still due on it. Lower it to the opening balance due.',
+  OPENING_BALANCE_ENTRY_DUPLICATE:
+    'The opening balance can only appear once in a payment.',
+};
+
 export const transformErrors = (
   errors: PaymentMadeErrorResponse[],
   {
@@ -260,6 +311,17 @@ export const transformErrors = (
       intent: Intent.DANGER,
     });
   }
+  if (getError(PAYMENT_MADE_ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT)) {
+    AppToaster.show({
+      message: PAYMENT_MADE_ENTRIES_EXCEED_AMOUNT_MESSAGE,
+      intent: Intent.DANGER,
+    });
+  }
+  Object.entries(PAYMENT_MADE_ERROR_MESSAGES).forEach(([type, message]) => {
+    if (getError(type)) {
+      AppToaster.show({ message, intent: Intent.DANGER });
+    }
+  });
 };
 
 /**
@@ -304,14 +366,16 @@ export const usePaymentMadeAppliedAmount = (): number => {
     values: { entries },
   } = useFormikContext<PaymentMadeFormValues>();
 
-  return React.useMemo(() => sumBy(entries, 'paymentAmount'), [entries]);
+  return React.useMemo(() => safeSumBy(entries, 'paymentAmount'), [entries]);
 };
 
+// Paid more than applied to bills (the rest is an excess payment). An
+// over-applied payment has no excess.
 export const usePaymentMadeExcessAmount = (): number => {
   const appliedAmount = usePaymentMadeAppliedAmount();
   const totalAmount = usePaymentmadeTotalAmount();
 
-  return Math.abs(Number(totalAmount) - appliedAmount);
+  return Math.max(subtractAmounts(Number(totalAmount), appliedAmount), 0);
 };
 
 /**
@@ -328,13 +392,17 @@ export const usePaymentMadeIsForeignCustomer = (): boolean => {
   return isForeignCustomer;
 };
 
+/**
+ * Retrieves the payment amount less the amount applied to bills: positive
+ * for an excess payment, negative for an over-applied one.
+ */
 export const getPaymentExcessAmountFromValues = (
   values: PaymentMadeFormValues,
 ): number => {
-  const appliedAmount = sumBy(values.entries, 'paymentAmount');
+  const appliedAmount = safeSumBy(values.entries, 'paymentAmount');
   const totalAmount = Number(values.amount);
 
-  return Math.abs(totalAmount - appliedAmount);
+  return subtractAmounts(totalAmount, appliedAmount);
 };
 
 export const amountPaymentEntries = (

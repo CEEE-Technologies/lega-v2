@@ -10,6 +10,9 @@ export class CustomerTransfromer extends ContactTransfromer {
       'formattedBalance',
       'formattedOpeningBalance',
       'formattedOpeningBalanceAt',
+      'openingBalanceDueAmount',
+      'formattedOpeningBalancePaymentAmount',
+      'formattedOpeningBalanceDueAmount',
       'customerType',
       'formattedCustomerType',
     ];

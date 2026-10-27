@@ -4,6 +4,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PaymentReceivedGLEntries } from '../PaymentReceived/commands/PaymentReceivedGLEntries';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
 import { PaymentReceivedEntry } from '../PaymentReceived/models/PaymentReceivedEntry';
+import { ILinkedTransaction } from '../TransactionsLocking/guards/LinkedTransactionsLockingGuard';
 
 @Injectable()
 export class InvoicePaymentsGLEntriesRewrite {
@@ -46,6 +47,30 @@ export class InvoicePaymentsGLEntriesRewrite {
   };
 
   /**
+   * Retrieves the payments applied to the given invoice, whose entries an
+   * invoice edit rewrites.
+   * @param {number} invoiceId
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<ILinkedTransaction[]>}
+   */
+  public getInvoiceLinkedPayments = async (
+    invoiceId: number,
+    trx?: Knex.Transaction,
+  ): Promise<ILinkedTransaction[]> => {
+    const entries = await this.paymentReceivedEntryModel()
+      .query(trx)
+      .where('invoiceId', invoiceId)
+      .withGraphFetched('payment');
+
+    return entries
+      .filter((entry) => entry.payment)
+      .map((entry) => ({
+        label: entry.payment.paymentReceiveNo || `Payment #${entry.payment.id}`,
+        date: entry.payment.paymentDate,
+      }));
+  };
+
+  /**
    * Rewrites the payments GL entries that associated to the given invoice.
    * @param {number} invoiceId
    * @param {Knex.Transaction} trx
@@ -56,7 +81,7 @@ export class InvoicePaymentsGLEntriesRewrite {
     trx?: Knex.Transaction,
   ) => {
     const invoicePaymentEntries = await this.paymentReceivedEntryModel()
-      .query()
+      .query(trx)
       .where('invoiceId', invoiceId);
 
     const paymentsIds = invoicePaymentEntries.map((e) => e.paymentReceiveId);

@@ -10,6 +10,7 @@ import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { Customer } from '../models/Customer';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { validateOpeningBalanceNotBelowPaid } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class EditOpeningBalanceCustomer {
@@ -43,6 +44,18 @@ export class EditOpeningBalanceCustomer {
 
     // Mutates the customer opening balance under unit-of-work.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Locks the customer row so a payment saved at the same moment can't
+      // pay more than the new opening balance.
+      const lockedCustomer = await this.customerModel()
+        .query(trx)
+        .findById(customerId)
+        .forUpdate();
+
+      // The new opening balance can't be below what payments already paid.
+      validateOpeningBalanceNotBelowPaid(
+        openingBalanceEditDTO.openingBalance,
+        lockedCustomer.openingBalancePaymentAmount,
+      );
       // Triggers `onCustomerOpeningBalanceChanging` event.
       await this.eventPublisher.emitAsync(
         events.customers.onOpeningBalanceChanging,
@@ -54,7 +67,7 @@ export class EditOpeningBalanceCustomer {
       );
       // Mutates the customer on the storage.
       const customer = await this.customerModel()
-        .query()
+        .query(trx)
         .patchAndFetchById(customerId, {
           ...openingBalanceEditDTO,
         });

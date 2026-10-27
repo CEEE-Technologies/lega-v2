@@ -4,6 +4,8 @@ import { GetContactService } from './queries/GetContact.service';
 import { ContactsController } from './Contacts.controller';
 import { ActivateContactService } from './commands/ActivateContact.service';
 import { InactivateContactService } from './commands/InactivateContact.service';
+import { ContactOpeningBalanceAccount } from './ContactOpeningBalanceAccount.service';
+import { ContactOpeningBalancePayment } from './ContactOpeningBalancePayment.service';
 
 @Module({
   providers: [
@@ -11,7 +13,10 @@ import { InactivateContactService } from './commands/InactivateContact.service';
     GetContactService,
     ActivateContactService,
     InactivateContactService,
+    ContactOpeningBalanceAccount,
+    ContactOpeningBalancePayment,
   ],
+  exports: [ContactOpeningBalanceAccount, ContactOpeningBalancePayment],
   controllers: [ContactsController],
 })
 export class ContactsModule {}

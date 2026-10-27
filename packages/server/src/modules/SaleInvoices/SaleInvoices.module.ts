@@ -68,6 +68,7 @@ import { SaleInvoicesImportable } from './commands/SaleInvoicesImportable';
 import { PaymentLinksModule } from '../PaymentLinks/PaymentLinks.module';
 import { BulkDeleteSaleInvoicesService } from './BulkDeleteSaleInvoices.service';
 import { ValidateBulkDeleteSaleInvoicesService } from './ValidateBulkDeleteSaleInvoices.service';
+import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { ValidateBulkDeleteSaleInvoicesService } from './ValidateBulkDeleteSaleI
     WarehousesModule,
     TaxRatesModule,
     PaymentsReceivedModule,
+    TransactionsLockingModule,
     LedgerModule,
     AccountsModule,
     MailModule,

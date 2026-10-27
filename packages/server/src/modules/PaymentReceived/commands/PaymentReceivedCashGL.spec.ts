@@ -243,3 +243,252 @@ describe('PaymentReceivedCashGL', () => {
     expect(findEntry(entries, 100).debit).toBe(825);
   });
 });
+
+describe('PaymentReceivedCashGL — unapplied amount (excess)', () => {
+  const UNEARNED_REVENUE = 700;
+  const OTHER_INCOME = 800;
+  const BANK = 100;
+
+  const buildExcessGL = (payment: PaymentReceived) =>
+    buildGL(payment).setUnearnedRevenueAccountId(UNEARNED_REVENUE);
+
+  const sum = (entries: any[], key: 'debit' | 'credit') =>
+    Math.round(entries.reduce((total, e) => total + e[key], 0) * 1000) / 1000;
+
+  const sumAccount = (
+    entries: any[],
+    accountId: number,
+    key: 'debit' | 'credit',
+  ) =>
+    sum(
+      entries.filter((e) => e.accountId === accountId),
+      key,
+    );
+
+  // PAY-0002: 290,000 received, 200,000 + 20,000 applied, 70,000 unapplied.
+  const buildPay0002 = () => {
+    const invoiceA = buildInvoice(
+      [buildItemEntry({ totalExcludingTax: 200000 })],
+      { id: 1 },
+    );
+    const invoiceB = buildInvoice(
+      [buildItemEntry({ totalExcludingTax: 20000 })],
+      { id: 2 },
+    );
+
+    return {
+      ...buildPayment(),
+      amount: 290000,
+      entries: [
+        buildPaymentEntry(invoiceA, 200000),
+        buildPaymentEntry(invoiceB, 20000),
+      ],
+    } as unknown as PaymentReceived;
+  };
+
+  it('posts the excess to unearned revenue when there is no opening balance', () => {
+    const gl = buildExcessGL(buildPay0002());
+    const entries = gl.GLEntries();
+
+    expect(gl.getExcessAmount()).toBe(70000);
+    expect(sumAccount(entries, BANK, 'debit')).toBe(290000);
+    expect(sumAccount(entries, 500, 'credit')).toBe(220000);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(70000);
+    expect(entries.filter((e) => e.accountId === OTHER_INCOME)).toHaveLength(0);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+
+  // Plan example: opening balance 300, invoice 100, payment 550.
+  const buildOpeningBalancePayment = (openingBalancePaid = 300) => {
+    const invoice = buildInvoice([buildItemEntry({ totalExcludingTax: 100 })], {
+      id: 1,
+    });
+    return {
+      ...buildPayment(),
+      amount: 550,
+      entries: [
+        {
+          entryType: 'opening_balance',
+          invoiceId: null,
+          paymentAmount: openingBalancePaid,
+          invoice: null,
+        },
+        { ...buildPaymentEntry(invoice, 100), entryType: 'invoice' },
+      ],
+    } as unknown as PaymentReceived;
+  };
+
+  it('credits the opening balance account with the opening balance line, only the true excess is unearned', () => {
+    const gl = buildExcessGL(
+      buildOpeningBalancePayment(),
+    ).setOpeningBalanceAccountId(OTHER_INCOME);
+    const entries = gl.GLEntries();
+
+    expect(gl.hasOpeningBalanceEntries()).toBe(true);
+    expect(gl.getExcessAmount()).toBe(150);
+    expect(sumAccount(entries, BANK, 'debit')).toBe(550);
+    expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(300);
+    expect(sumAccount(entries, 500, 'credit')).toBe(100);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(150);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+
+  it('tags the opening balance lines with the customer', () => {
+    const entries = buildExcessGL(buildOpeningBalancePayment())
+      .setOpeningBalanceAccountId(OTHER_INCOME)
+      .GLEntries();
+    const obLine = entries.find((e) => e.accountId === OTHER_INCOME);
+
+    expect(obLine.contactId).toBe(5);
+    expect(obLine.basis).toBe(AccountingBasis.Cash);
+  });
+
+  it('posts everything not applied to unearned revenue when the opening balance line is 0', () => {
+    const entries = buildExcessGL(buildOpeningBalancePayment(0))
+      .setOpeningBalanceAccountId(OTHER_INCOME)
+      .GLEntries();
+
+    expect(entries.filter((e) => e.accountId === OTHER_INCOME)).toHaveLength(0);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(450);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+
+  it('keeps the bank line (as unearned) when the opening balance account is unknown', () => {
+    const entries = buildExcessGL(buildOpeningBalancePayment()).GLEntries();
+
+    expect(sumAccount(entries, BANK, 'debit')).toBe(550);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(450);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+
+  it('records a payment of the opening balance only (no invoice)', () => {
+    const payment = {
+      ...buildPayment(),
+      amount: 100.555,
+      entries: [
+        {
+          entryType: 'opening_balance',
+          invoiceId: null,
+          paymentAmount: 100.555,
+          invoice: null,
+        },
+      ],
+    } as unknown as PaymentReceived;
+    const gl = buildExcessGL(payment).setOpeningBalanceAccountId(OTHER_INCOME);
+    const entries = gl.GLEntries();
+
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(entries).toHaveLength(2);
+    expect(sumAccount(entries, BANK, 'debit')).toBe(100.555);
+    expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(100.555);
+  });
+
+  it('keeps the bank line when the invoice total is zero', () => {
+    const invoice = buildInvoice([buildItemEntry({ totalExcludingTax: 0 })], {
+      totalLocal: 0,
+    });
+    const payment = {
+      ...buildPayment(),
+      amount: 500,
+      entries: [buildPaymentEntry(invoice, 500)],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment).GLEntries();
+
+    expect(sumAccount(entries, BANK, 'debit')).toBe(500);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(500);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+
+  it('keeps the bank line when the invoice is missing', () => {
+    const payment = {
+      ...buildPayment(),
+      amount: 500,
+      entries: [{ invoiceId: 99, paymentAmount: 500, invoice: null }],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment).GLEntries();
+
+    expect(sumAccount(entries, BANK, 'debit')).toBe(500);
+    expect(sumAccount(entries, UNEARNED_REVENUE, 'credit')).toBe(500);
+  });
+
+  it('posts no excess lines when the whole amount is applied', () => {
+    const invoice = buildInvoice([buildItemEntry()]);
+    const payment = {
+      ...buildPayment(),
+      amount: 1000,
+      entries: [buildPaymentEntry(invoice, 1000)],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment).GLEntries();
+
+    expect(
+      entries.filter((e) => e.accountId === UNEARNED_REVENUE),
+    ).toHaveLength(0);
+    expect(sumAccount(entries, BANK, 'debit')).toBe(1000);
+  });
+
+  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+    const invoice = buildInvoice(
+      [
+        buildItemEntry({ sellAccountId: 501, totalExcludingTax: 1 }),
+        buildItemEntry({ sellAccountId: 502, totalExcludingTax: 1 }),
+        buildItemEntry({ sellAccountId: 503, totalExcludingTax: 1 }),
+      ],
+      { totalLocal: 3 },
+    );
+    const payment = {
+      ...buildPayment(),
+      amount: 100,
+      entries: [buildPaymentEntry(invoice, 100)],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment).GLEntries();
+
+    expect(findEntry(entries, 501).credit).toBe(33.333);
+    expect(findEntry(entries, 502).credit).toBe(33.333);
+    expect(findEntry(entries, 503).credit).toBe(33.334);
+    expect(sum(entries, 'debit')).toBe(100);
+    expect(sum(entries, 'credit')).toBe(100);
+  });
+
+  it('balances every set (multi-invoice, tax, discount, excess, opening balance)', () => {
+    const invoiceA = buildInvoice(
+      [
+        buildItemEntry({ totalExcludingTax: 1000, taxAmount: 170 }),
+        buildItemEntry({
+          sellAccountId: 501,
+          totalExcludingTax: 333.33,
+          taxAmount: 56.67,
+        }),
+      ],
+      { id: 1, totalLocal: 1460, discountAmountLocal: 100 },
+    );
+    const invoiceB = buildInvoice(
+      [buildItemEntry({ totalExcludingTax: 777.77 })],
+      { id: 2 },
+    );
+    const payment = {
+      ...buildPayment(),
+      amount: 2000,
+      entries: [
+        buildPaymentEntry(invoiceA, 777.77),
+        buildPaymentEntry(invoiceB, 333.33),
+        {
+          entryType: 'opening_balance',
+          invoiceId: null,
+          paymentAmount: 300,
+          invoice: null,
+        },
+      ],
+    } as unknown as PaymentReceived;
+    const entries = buildExcessGL(payment)
+      .setOpeningBalanceAccountId(OTHER_INCOME)
+      .GLEntries();
+
+    entries.forEach((e) => {
+      expect(Math.round(e.debit * 1000) / 1000).toBe(e.debit);
+      expect(Math.round(e.credit * 1000) / 1000).toBe(e.credit);
+    });
+    expect(sumAccount(entries, BANK, 'debit')).toBe(2000);
+    expect(sumAccount(entries, OTHER_INCOME, 'credit')).toBe(300);
+    expect(sum(entries, 'debit')).toBe(sum(entries, 'credit'));
+  });
+});

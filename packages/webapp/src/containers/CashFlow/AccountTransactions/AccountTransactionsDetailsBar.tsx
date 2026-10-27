@@ -93,6 +93,22 @@ function AccountBankBalanceItem() {
   );
 }
 
+/**
+ * Says the register lists the accrual basis transactions (each transaction
+ * once); cash basis only entries are in the cash basis reports.
+ */
+function AccountBasisNote() {
+  return (
+    <AccountBalanceItemWrap
+      title={
+        'This register lists each transaction once, as recorded on the accrual basis. Cash basis entries (for example unearned revenue or prepaid expenses) show in the cash basis reports.'
+      }
+    >
+      <span style={{ opacity: 0.75 }}>Accrual basis</span>
+    </AccountBalanceItemWrap>
+  );
+}
+
 function AccountTransactionsDetailsBarSkeleton() {
   return (
     <React.Fragment>
@@ -112,6 +128,7 @@ function AccountTransactionsDetailsContent() {
   return (
     <React.Fragment>
       <AccountSwitchItem />
+      <AccountBasisNote />
 
       {/** Hide some details once the aside opens to preserve space on details bar. */}
       {hideAside && <AccountBalanceItem />}

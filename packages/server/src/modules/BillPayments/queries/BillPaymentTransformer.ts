@@ -1,3 +1,4 @@
+import { sumBy } from 'lodash';
 import { BillPaymentEntryTransformer } from './BillPaymentEntry.transformer';
 import { Transformer } from '@/modules/Transformer/Transformer';
 import { BillPayment } from '../models/BillPayment';
@@ -15,6 +16,10 @@ export class BillPaymentTransformer extends Transformer {
       'formattedAmount',
       'formattedTotal',
       'formattedSubtotal',
+      'appliedAmount',
+      'appliedAmountFormatted',
+      'unappliedAmount',
+      'unappliedAmountFormatted',
       'entries',
       'attachments',
     ];
@@ -68,6 +73,73 @@ export class BillPaymentTransformer extends Transformer {
    */
   protected formattedSubtotal = (billPayment: BillPayment): string => {
     return this.formatNumber(billPayment.amount, {
+      currencyCode: billPayment.currencyCode,
+    });
+  };
+
+  /**
+   * Retrieves the amount applied to documents and the opening balance, or
+   * null when the entries are not loaded.
+   * @param {BillPayment} billPayment
+   * @returns {number | null}
+   */
+  protected appliedAmount = (billPayment: BillPayment): number | null => {
+    if (!billPayment.entries) return null;
+
+    return (
+      Math.round(
+        sumBy(
+          billPayment.entries,
+          (entry) => Number(entry.paymentAmount) || 0,
+        ) * 1000,
+      ) / 1000
+    );
+  };
+
+  /**
+   * Retrieves the amount not applied yet (the payment credit), or null when
+   * the entries are not loaded.
+   * @param {BillPayment} billPayment
+   * @returns {number | null}
+   */
+  protected unappliedAmount = (billPayment: BillPayment): number | null => {
+    const applied = this.appliedAmount(billPayment);
+    if (applied === null) return null;
+
+    return Math.max(
+      Math.round(((Number(billPayment.amount) || 0) - applied) * 1000) / 1000,
+      0,
+    );
+  };
+
+  /**
+   * Retrieves the formatted applied amount.
+   * @param {BillPayment} billPayment
+   * @returns {string | null}
+   */
+  protected appliedAmountFormatted = (
+    billPayment: BillPayment,
+  ): string | null => {
+    const applied = this.appliedAmount(billPayment);
+    if (applied === null) return null;
+
+    return this.formatNumber(applied, {
+      currencyCode: billPayment.currencyCode,
+    });
+  };
+
+  /**
+   * Retrieves the formatted unapplied amount.
+   * @param {BillPayment} billPayment
+   * @returns {string | null}
+   */
+  protected unappliedAmountFormatted = (
+    billPayment: BillPayment,
+  ): string | null => {
+    const unapplied = this.unappliedAmount(billPayment);
+    if (unapplied === null) return null;
+
+    return this.formatNumber(unapplied, {
       currencyCode: billPayment.currencyCode,
     });
   };

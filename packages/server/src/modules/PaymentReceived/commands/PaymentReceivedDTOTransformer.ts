@@ -15,6 +15,7 @@ import { assocItemEntriesDefaultIndex } from '@/utils/associate-item-entries-ind
 import { Customer } from '@/modules/Customers/models/Customer';
 import { formatDateFields } from '@/utils/format-date-fields';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { normalizePaymentEntryType } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class PaymentReceiveDTOTransformer {
@@ -64,7 +65,11 @@ export class PaymentReceiveDTOTransformer {
     const entries = R.compose(
       // Associate the default index to each item entry line.
       assocItemEntriesDefaultIndex,
-    )(paymentReceiveDTO.entries);
+    )(
+      paymentReceiveDTO.entries.map((entry) =>
+        normalizePaymentEntryType(entry, 'invoiceId'),
+      ),
+    );
 
     const initialDTO = {
       ...formatDateFields(omit(paymentReceiveDTO, ['entries', 'attachments']), [

@@ -6,6 +6,7 @@ import Objection, { ModelObject } from 'objection';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { BillPaymentEntryDto } from '../dtos/BillPayment.dto';
 import { BillPaymentEntry } from '../models/BillPaymentEntry';
+import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class BillPaymentBillSync {
@@ -27,9 +28,12 @@ export class BillPaymentBillSync {
   ): Promise<void> {
     const opers: Objection.QueryBuilder<Bill, Bill[]>[] = [];
 
+    // Opening balance lines have no bill; they sync to the vendor.
     const diffEntries = entriesAmountDiff(
-      paymentMadeEntries,
-      oldPaymentMadeEntries,
+      (paymentMadeEntries || []).filter(isDocumentEntry),
+      oldPaymentMadeEntries
+        ? oldPaymentMadeEntries.filter(isDocumentEntry)
+        : oldPaymentMadeEntries,
       'paymentAmount',
       'billId',
     );

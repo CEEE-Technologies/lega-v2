@@ -10,6 +10,9 @@ export class VendorTransfromer extends ContactTransfromer {
       'formattedBalance',
       'formattedOpeningBalance',
       'formattedOpeningBalanceAt',
+      'openingBalanceDueAmount',
+      'formattedOpeningBalancePaymentAmount',
+      'formattedOpeningBalanceDueAmount',
     ];
   };
 }

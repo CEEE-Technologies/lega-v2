@@ -28,6 +28,7 @@ export class BillPaymentBillSyncSubscriber {
     const entries = billPayment.entries || [];
     await this.billPaymentBillSync.saveChangeBillsPaymentAmount(
       entries.map((entry) => ({
+        entryType: entry.entryType,
         billId: entry.billId,
         paymentAmount: entry.paymentAmount,
       })),
@@ -50,6 +51,7 @@ export class BillPaymentBillSyncSubscriber {
 
     await this.billPaymentBillSync.saveChangeBillsPaymentAmount(
       entries.map((entry) => ({
+        entryType: entry.entryType,
         billId: entry.billId,
         paymentAmount: entry.paymentAmount,
       })),
@@ -70,6 +72,7 @@ export class BillPaymentBillSyncSubscriber {
 
     await this.billPaymentBillSync.saveChangeBillsPaymentAmount(
       oldEntries.map((entry) => ({
+        entryType: entry.entryType,
         billId: entry.billId,
         paymentAmount: 0,
       })),

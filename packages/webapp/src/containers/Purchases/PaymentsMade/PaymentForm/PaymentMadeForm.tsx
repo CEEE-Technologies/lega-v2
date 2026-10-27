@@ -24,6 +24,7 @@ import {
   transformErrors,
   transformFormToRequest,
   getPaymentExcessAmountFromValues,
+  getPaymentMadeOverAppliedMessage,
   type PaymentMadeFormValues,
   type PaymentMadeErrorResponse,
   type PaymentMadeEditEntry,
@@ -36,7 +37,7 @@ import { AppToaster, Box } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
-import { orderingLinesIndexes } from '@/utils';
+import { orderingLinesIndexes, safeSumBy, formattedAmount } from '@/utils';
 
 type WithDialogActionsProps = {
   openDialog: (name: string, payload?: Record<string, unknown>) => void;
@@ -62,6 +63,7 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
     createPaymentMadeMutate,
     editPaymentMadeMutate,
     isExcessConfirmed,
+    setIsExcessConfirmed,
     billPaymentSettings,
   } = usePaymentMadeFormContext();
 
@@ -109,6 +111,22 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
     }
     const excessAmount = getPaymentExcessAmountFromValues(values);
 
+    // Applied to bills more than was paid: can't be saved, and it's not an
+    // excess either.
+    if (excessAmount < 0) {
+      AppToaster.show({
+        message: getPaymentMadeOverAppliedMessage(
+          formattedAmount(
+            safeSumBy(values.entries, 'paymentAmount'),
+            values.currencyCode,
+          ),
+          formattedAmount(Number(values.amount), values.currencyCode),
+        ),
+        intent: Intent.DANGER,
+      });
+      setSubmitting(false);
+      return Promise.resolve(false);
+    }
     // Show the confirmation popup if the excess amount bigger than zero and
     // has not been confirmed yet.
     if (excessAmount > 0 && !isExcessConfirmed) {
@@ -120,8 +138,10 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
     // Transformes the form values to request body.
     const form = transformFormToRequest(values);
 
-    // Triggers once the save request success.
+    // Triggers once the save request success. Resolves to whether the payment
+    // was saved, so the excess dialog only closes on success.
     const onSaved = () => {
+      setIsExcessConfirmed(false);
       AppToaster.show({
         message: intl.get(
           isNewMode
@@ -134,6 +154,7 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
 
       submitPayload.redirect && history.push('/payments-made');
       submitPayload.resetForm && resetForm();
+      return true;
     };
 
     const onError = ({
@@ -145,6 +166,8 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
         transformErrors(errors, { setFieldError });
       }
       setSubmitting(false);
+      setIsExcessConfirmed(false);
+      return false;
     };
     if (!isNewMode) {
       return editPaymentMadeMutate([

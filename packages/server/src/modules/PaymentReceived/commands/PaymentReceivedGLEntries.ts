@@ -11,6 +11,8 @@ import { Inject } from '@nestjs/common';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { Account } from '@/modules/Accounts/models/Account.model';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { ContactOpeningBalanceAccount } from '@/modules/Contacts/ContactOpeningBalanceAccount.service';
 
 @Injectable()
 export class PaymentReceivedGLEntries {
@@ -19,6 +21,7 @@ export class PaymentReceivedGLEntries {
     private readonly accountRepository: AccountRepository,
     private readonly tenancyContext: TenancyContext,
     private readonly paymentReceivedCostGLEntries: PaymentReceivedCostGLEntries,
+    private readonly openingBalanceAccount: ContactOpeningBalanceAccount,
 
     @Inject(PaymentReceived.name)
     private readonly paymentReceivedModel: TenantModelProxy<
@@ -91,6 +94,38 @@ export class PaymentReceivedGLEntries {
   };
 
   /**
+   * Rewrites only the cash basis entries (income and cost) of the given
+   * payment, leaving the accrual entries and the stored balances untouched.
+   * Used when something the cash set depends on changes (the invoice or the
+   * customer opening balance).
+   * @param {number} paymentReceiveId - Payment received id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewritePaymentCashGLEntries = async (
+    paymentReceiveId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    await this.ledgerStorage.deleteByReference(
+      paymentReceiveId,
+      'PaymentReceive',
+      trx,
+      { basis: AccountingBasis.Cash },
+    );
+    const paymentReceive = await this.paymentReceivedModel()
+      .query(trx)
+      .findById(paymentReceiveId)
+      .withGraphFetched('entries.invoice.entries');
+
+    if (!paymentReceive) return;
+
+    const ledger = await this.getPaymentReceiveCashBasisLedger(
+      paymentReceive,
+      trx,
+    );
+    await this.ledgerStorage.commit(ledger, trx);
+  };
+
+  /**
    * Retrieves the payment receive accrual basis ledger.
    * @param {PaymentReceived} paymentReceive - Payment received.
    * @param {string} baseCurrencyCode - Base currency code.
@@ -149,7 +184,48 @@ export class PaymentReceivedGLEntries {
       .setDiscountAccountId(discountAccount.id)
       .setOtherChargesAccountId(otherChargesAccount.id);
 
+    // Opening balance lines post to the account the opening balance used.
+    if (paymentReceivedCashGL.hasOpeningBalanceEntries()) {
+      const openingBalanceAccountId =
+        await this.openingBalanceAccount.getCustomerAccountId(
+          paymentReceive.customerId,
+          trx,
+        );
+      paymentReceivedCashGL.setOpeningBalanceAccountId(openingBalanceAccountId);
+    }
+    // The unapplied amount is unearned revenue.
+    if (paymentReceivedCashGL.getExcessAmount() > 0) {
+      const unearnedRevenueAccount =
+        await this.accountRepository.findOrCreateUnearnedRevenue({}, trx);
+
+      paymentReceivedCashGL.setUnearnedRevenueAccountId(
+        unearnedRevenueAccount.id,
+      );
+    }
     return paymentReceivedCashGL.getLedger();
+  };
+
+  /**
+   * Retrieves the whole cash basis ledger of the payment: the income
+   * entries and the cost (COGS) entries.
+   * @param {PaymentReceived} paymentReceive - Payment received.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<Ledger>}
+   */
+  public getPaymentReceiveCashBasisLedger = async (
+    paymentReceive: PaymentReceived,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger> => {
+    const cashLedger = await this.getPaymentReceiveCashLedger(
+      paymentReceive,
+      trx,
+    );
+    const costLedger =
+      await this.paymentReceivedCostGLEntries.getPaymentCostLedger(
+        paymentReceive,
+        trx,
+      );
+    return new Ledger([...cashLedger.getEntries(), ...costLedger.getEntries()]);
   };
 
   /**
@@ -173,21 +249,14 @@ export class PaymentReceivedGLEntries {
       baseCurrencyCode,
       trx,
     );
-    // Cash basis ledger entries.
-    const cashLedger = await this.getPaymentReceiveCashLedger(
+    // Cash basis income and cost (COGS) ledger entries.
+    const cashBasisLedger = await this.getPaymentReceiveCashBasisLedger(
       paymentReceive,
       trx,
     );
-    // Cash basis cost (COGS) ledger entries.
-    const costLedger =
-      await this.paymentReceivedCostGLEntries.getPaymentCostLedger(
-        paymentReceive,
-        trx,
-      );
     return new Ledger([
       ...accrualLedger.getEntries(),
-      ...cashLedger.getEntries(),
-      ...costLedger.getEntries(),
+      ...cashBasisLedger.getEntries(),
     ]);
   };
 }

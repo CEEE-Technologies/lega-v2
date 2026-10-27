@@ -14,6 +14,9 @@ export type CustomerDetails = Customer & {
   formattedBalance?: string;
   formattedOpeningBalance?: string;
   formattedOpeningBalanceAt?: string;
+  openingBalanceDueAmount?: number;
+  formattedOpeningBalanceDueAmount?: string;
+  formattedOpeningBalancePaymentAmount?: string;
   formattedCustomerType?: string;
 };
 

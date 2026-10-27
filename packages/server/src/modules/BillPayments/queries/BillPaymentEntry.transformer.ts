@@ -14,6 +14,9 @@ export class BillPaymentEntryTransformer extends Transformer {
    * Retreives the bill.
    */
   protected bill = (entry) => {
+    // Opening balance lines have no bill.
+    if (!entry.bill) return null;
+
     return this.item(entry.bill, new BillTransformer());
   };
 

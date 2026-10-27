@@ -1,0 +1,65 @@
+## Issue 6a: credit note edited after a refund
+create credit note: 201
+refund 500: 201
+Refund GL before editing the credit note:
++---------+---------------------------+---------+---------+
+| BASIS   | NAME                      | DEBIT   | CREDIT  |
++---------+---------------------------+---------+---------+
+| accrual | Accounts Receivable (A/R) | 500.000 |   0.000 |
+| accrual | Bank Account              |   0.000 | 500.000 |
+| cash    | Bank Account              |   0.000 | 500.000 |
+| cash    | Sales of Service Income   | 500.000 |   0.000 |
++---------+---------------------------+---------+---------+
+
+edit credit note (800 Sales of Service + 200 Other Income): 200
+Refund GL after editing the credit note:
++---------+---------------------------+---------+---------+
+| BASIS   | NAME                      | DEBIT   | CREDIT  |
++---------+---------------------------+---------+---------+
+| accrual | Accounts Receivable (A/R) | 500.000 |   0.000 |
+| accrual | Bank Account              |   0.000 | 500.000 |
+| cash    | Bank Account              |   0.000 | 500.000 |
+| cash    | Sales of Service Income   | 400.000 |   0.000 |
+| cash    | Other Income              | 100.000 |   0.000 |
++---------+---------------------------+---------+---------+
+
+## Issue 6b: vendor credit edited after a refund
+create vendor credit: 201
+refund 500: 201
+Refund GL before editing the vendor credit:
++---------+------------------------+---------+---------+
+| BASIS   | NAME                   | DEBIT   | CREDIT  |
++---------+------------------------+---------+---------+
+| accrual | Accounts Payable (A/P) |   0.000 | 500.000 |
+| accrual | Bank Account           | 500.000 |   0.000 |
+| cash    | Bank Account           | 500.000 |   0.000 |
+| cash    | Cost of Goods Sold     |   0.000 | 500.000 |
++---------+------------------------+---------+---------+
+
+edit vendor credit (800 COGS + 200 Office expenses): 200
+Refund GL after editing the vendor credit:
++---------+------------------------+---------+---------+
+| BASIS   | NAME                   | DEBIT   | CREDIT  |
++---------+------------------------+---------+---------+
+| accrual | Accounts Payable (A/P) |   0.000 | 500.000 |
+| accrual | Bank Account           | 500.000 |   0.000 |
+| cash    | Bank Account           | 500.000 |   0.000 |
+| cash    | Cost of Goods Sold     |   0.000 | 400.000 |
+| cash    | Office expenses        |   0.000 | 100.000 |
++---------+------------------------+---------+---------+
+
+## Issue 2: bill payment with an unapplied amount, and an over-applied one
+create bill 1000: 201
+pay 500 but apply 1000 -> HTTP 400: {"errors": [{"statusCode": 400, "type": "PAYMENT_ENTRIES_EXCEED_AMOUNT", "message": null}]}
+pay 1300, apply 1000 -> HTTP 201
+Bill payment GL:
++---------+------------------------+----------+----------+
+| BASIS   | NAME                   | DEBIT    | CREDIT   |
++---------+------------------------+----------+----------+
+| accrual | Bank Account           |    0.000 | 1300.000 |
+| accrual | Accounts Payable (A/P) | 1300.000 |    0.000 |
+| cash    | Bank Account           |    0.000 | 1000.000 |
+| cash    | Office expenses        | 1000.000 |    0.000 |
+| cash    | Bank Account           |    0.000 |  300.000 |
+| cash    | Prepaid Expenses       |  300.000 |    0.000 |
++---------+------------------------+----------+----------+

@@ -8,6 +8,7 @@ import { AccountTransaction } from '../Accounts/models/AccountTransaction.model'
 import { Ledger } from './Ledger';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
 import { LedgerClickHouseSink } from '../Analytics/services/LedgerClickHouseSink.service';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 
 @Injectable()
 export class LedgerStorageService {
@@ -98,16 +99,24 @@ export class LedgerStorageService {
    * @param {number | number[]} referenceId - The reference ID.
    * @param {string | string[]} referenceType - The reference type.
    * @param {Knex.Transaction} trx - The knex transaction.
+   * @param {{ basis?: AccountingBasis }} options - Deletes only the entries
+   *  tagged with the given basis when set (e.g. to rewrite the cash set alone).
    */
   public deleteByReference = async (
     referenceId: number | number[],
     referenceType: string | string[],
     trx?: Knex.Transaction,
+    options?: { basis?: AccountingBasis },
   ) => {
     // Retrieves the transactions of the given reference.
     const transactions = await this.accountTransactionModel()
       .query(trx)
       .modify('filterByReference', referenceId, referenceType)
+      .onBuild((query) => {
+        if (options?.basis) {
+          query.where('basis', options.basis);
+        }
+      })
       .withGraphFetched('account');
 
     // Creates a new ledger from transaction and reverse the entries.

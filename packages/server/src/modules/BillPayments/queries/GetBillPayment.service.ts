@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { TransformerInjectable } from '../../Transformer/TransformerInjectable.service';
 import { BillPayment } from '../models/BillPayment';
 import { BillPaymentTransformer } from './BillPaymentTransformer';
@@ -25,6 +26,10 @@ export class GetBillPayment {
       .withGraphFetched('vendor')
       .withGraphFetched('paymentAccount')
       .withGraphFetched('transactions')
+      // Each transaction once: the accrual (or general) entries only.
+      .modifyGraph('transactions', (builder) => {
+        builder.modify('filterByBasis', AccountingBasis.Accrual);
+      })
       .withGraphFetched('branch')
       .withGraphFetched('attachments')
       .findById(billPyamentId)

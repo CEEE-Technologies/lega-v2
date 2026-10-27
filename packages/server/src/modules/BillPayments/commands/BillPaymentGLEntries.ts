@@ -9,6 +9,8 @@ import { BillPayment } from '../models/BillPayment';
 import { AccountRepository } from '@/modules/Accounts/repositories/Account.repository';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { ContactOpeningBalanceAccount } from '@/modules/Contacts/ContactOpeningBalanceAccount.service';
 
 @Injectable()
 export class BillPaymentGLEntries {
@@ -16,6 +18,7 @@ export class BillPaymentGLEntries {
     private readonly ledgerStorage: LedgerStorageService,
     private readonly accountRepository: AccountRepository,
     private readonly tenancyContext: TenancyContext,
+    private readonly openingBalanceAccount: ContactOpeningBalanceAccount,
 
     @Inject(BillPayment.name)
     private readonly billPaymentModel: TenantModelProxy<typeof BillPayment>,
@@ -70,6 +73,36 @@ export class BillPaymentGLEntries {
   };
 
   /**
+   * Rewrites only the cash basis entries of the given bill payment, leaving
+   * the accrual entries and the stored balances untouched. Used when
+   * something the cash set depends on changes (the bill or the vendor
+   * opening balance).
+   * @param {number} billPaymentId - Bill payment id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewritePaymentCashGLEntries = async (
+    billPaymentId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    await this.ledgerStorage.deleteByReference(
+      billPaymentId,
+      'BillPayment',
+      trx,
+      { basis: AccountingBasis.Cash },
+    );
+    const payment = await this.billPaymentModel()
+      .query(trx)
+      .findById(billPaymentId)
+      .withGraphFetched('entries.bill.entries.item');
+
+    if (!payment) return;
+
+    const ledger = await this.getBillPaymentCashLedger(payment, trx);
+
+    await this.ledgerStorage.commit(ledger, trx);
+  };
+
+  /**
    * Reverts the bill payment GL entries.
    * @param {number} tenantId
    * @param {number} billPaymentId
@@ -120,6 +153,25 @@ export class BillPaymentGLEntries {
     // Accrual basis ledger entries.
     const accrualLedger = billPaymentAccrualGL.getBillPaymentLedger();
 
+    // Cash basis ledger entries.
+    const cashLedger = await this.getBillPaymentCashLedger(billPayment, trx);
+
+    return new Ledger([
+      ...accrualLedger.getEntries(),
+      ...cashLedger.getEntries(),
+    ]);
+  };
+
+  /**
+   * Retrieves the bill payment cash basis ledger.
+   * @param {BillPayment} billPayment - Bill payment.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<Ledger>}
+   */
+  public getBillPaymentCashLedger = async (
+    billPayment: BillPayment,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger> => {
     // Find or create tax payable account.
     const taxPayableAccount =
       await this.accountRepository.findOrCreateTaxPayable({}, trx);
@@ -135,12 +187,22 @@ export class BillPaymentGLEntries {
       .setPurchaseDiscountAccountId(purchaseDiscountAccount.id)
       .setOtherExpensesAccountId(otherExpensesAccount.id);
 
-    // Cash basis ledger entries.
-    const cashLedger = billPaymentCashGL.getLedger();
+    // Opening balance lines post to the account the opening balance used.
+    if (billPaymentCashGL.hasOpeningBalanceEntries()) {
+      const openingBalanceAccountId =
+        await this.openingBalanceAccount.getVendorAccountId(
+          billPayment.vendorId,
+          trx,
+        );
+      billPaymentCashGL.setOpeningBalanceAccountId(openingBalanceAccountId);
+    }
+    // The unapplied amount is a prepaid expense.
+    if (billPaymentCashGL.getExcessAmount() > 0) {
+      const prepaidExpensesAccount =
+        await this.accountRepository.findOrCreatePrepardExpenses({}, trx);
 
-    return new Ledger([
-      ...accrualLedger.getEntries(),
-      ...cashLedger.getEntries(),
-    ]);
+      billPaymentCashGL.setPrepaidExpensesAccountId(prepaidExpensesAccount.id);
+    }
+    return billPaymentCashGL.getLedger();
   };
 }

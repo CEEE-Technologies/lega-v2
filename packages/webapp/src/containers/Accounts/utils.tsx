@@ -130,7 +130,18 @@ export const useAccountsTableColumns =
           },
           {
             id: 'balance',
-            Header: intl.get('balance'),
+            // Stored balances are on the accrual basis; accounts used only
+            // on the cash basis (e.g. Unearned Revenue) show no balance here.
+            Header: () => (
+              <span
+                title={
+                  'Balances are on the accrual basis. Accounts used only on the cash basis (such as Unearned Revenue and Prepaid Expenses) show their balance in the cash basis reports.'
+                }
+              >
+                {intl.get('balance')}{' '}
+                <span style={{ opacity: 0.6, fontWeight: 400 }}>(accrual)</span>
+              </span>
+            ),
             accessor: 'amount',
             Cell: BalanceCell,
             width: 150,

@@ -2,25 +2,16 @@ import { useFormikContext } from 'formik';
 import React, { createContext, useContext, useEffect } from 'react';
 import { usePaymentReceiveFormContext } from './PaymentReceiveFormProvider';
 import {
-  transformInvoicesNewPageEntries,
+  transformNewPageEntriesToForm,
   type PaymentReceiveFormValues,
 } from './utils';
-import type { UseQueryOptions } from '@tanstack/react-query';
-import { useDueInvoices } from '@/hooks/query';
-
-type DueInvoice = {
-  id: string | number;
-  dueAmount: string | number;
-  invoiceDate: string;
-  balance: string | number;
-  currencyCode: string;
-  invoiceNo: string;
-  branchId: string | number;
-  paymentAmount?: string | number;
-};
+import {
+  usePaymentReceiveNewPageEntries,
+  type PaymentReceiveNewPageEntry,
+} from '@/hooks/query';
 
 interface PaymentReceiveInnerContextValue {
-  dueInvoices: DueInvoice[] | undefined;
+  dueInvoices: PaymentReceiveNewPageEntry[] | undefined;
   isDueInvoicesLoading: boolean;
   isDueInvoicesFetching: boolean;
 }
@@ -44,25 +35,20 @@ function PaymentReceiveInnerProvider({
     setFieldValue,
   } = useFormikContext<PaymentReceiveFormValues>();
 
-  // `useDueInvoices` types its options as a full UseQueryOptions (which requires queryKey/queryFn),
-  // but it supplies those internally — so we pass only the partial options.
-  const dueInvoicesQuery = {
-    enabled: !!customerId && isNewMode,
-  } as UseQueryOptions<unknown, Error>;
-
+  // The customer's open items: the unpaid opening balance first, then the
+  // due invoices.
   const {
     data: dueInvoices,
     isLoading: isDueInvoicesLoading,
     isFetching: isDueInvoicesFetching,
-  } = useDueInvoices(customerId as number | undefined, dueInvoicesQuery);
+  } = usePaymentReceiveNewPageEntries(customerId, {
+    enabled: !!customerId && isNewMode,
+  });
 
   useEffect(() => {
     if (!isDueInvoicesFetching && isNewMode) {
       if (dueInvoices) {
-        const transformed = transformInvoicesNewPageEntries(
-          dueInvoices as DueInvoice[],
-        );
-        setFieldValue('entries', transformed);
+        setFieldValue('entries', transformNewPageEntriesToForm(dueInvoices));
       } else if (!customerId) {
         setFieldValue('entries', []);
       }
@@ -76,7 +62,7 @@ function PaymentReceiveInnerProvider({
   ]);
 
   const provider: PaymentReceiveInnerContextValue = {
-    dueInvoices: dueInvoices as DueInvoice[] | undefined,
+    dueInvoices,
     isDueInvoicesLoading,
     isDueInvoicesFetching,
   };

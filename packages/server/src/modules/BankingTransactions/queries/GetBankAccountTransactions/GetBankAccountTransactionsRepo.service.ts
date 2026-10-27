@@ -1,4 +1,5 @@
 import { Inject, Injectable, Scope } from '@nestjs/common';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ICashflowAccountTransactionsQuery } from '../../types/BankingTransactions.types';
 import {
   groupMatchedBankTransactions,
@@ -65,6 +66,9 @@ export class GetBankAccountTransactionsRepository {
     const { results, pagination } = await this.accountTransactionModel()
       .query()
       .where('account_id', this.query.accountId)
+      // The register shows each transaction once: the accrual (or general)
+      // entries; the cash basis set is a report-only view of the same cash.
+      .modify('filterByBasis', AccountingBasis.Accrual)
       .orderBy([
         { column: 'date', order: 'desc' },
         { column: 'created_at', order: 'desc' },
@@ -87,6 +91,9 @@ export class GetBankAccountTransactionsRepository {
     const openingBalancesSubquery = this.accountTransactionModel()
       .query()
       .where('account_id', this.query.accountId)
+      // The register shows each transaction once: the accrual (or general)
+      // entries; the cash basis set is a report-only view of the same cash.
+      .modify('filterByBasis', AccountingBasis.Accrual)
       .orderBy([
         { column: 'date', order: 'desc' },
         { column: 'created_at', order: 'desc' },

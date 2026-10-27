@@ -212,6 +212,14 @@ export class PaymentReceivesApplication {
   }
 
   /**
+   * Retrieves the open items of the new payment page of the given customer.
+   * @param {number} customerId - Customer id.
+   */
+  public getPaymentReceivedNewPageEntries(customerId: number) {
+    return this.paymentsReceivedPagesService.getNewPageEntries(customerId);
+  }
+
+  /**
    * Retrieve the payment received edit page.
    * @param {number} paymentReceiveId - Payment receive id.
    */

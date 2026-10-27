@@ -10,6 +10,7 @@ export class Contact extends BaseModel {
 
   openingBalance: number;
   openingBalanceAt: Date;
+  openingBalancePaymentAmount: number;
 
   salutation?: string;
   firstName?: string;

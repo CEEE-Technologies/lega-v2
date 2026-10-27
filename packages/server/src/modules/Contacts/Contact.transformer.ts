@@ -28,6 +28,46 @@ export class ContactTransfromer extends Transformer {
   };
 
   /**
+   * Retrieves the unpaid part of the opening balance.
+   * @param {Contact} contact
+   * @returns {number}
+   */
+  protected openingBalanceDueAmount = (contact: Contact): number => {
+    return Math.max(
+      Math.round(
+        (Number(contact.openingBalance || 0) -
+          Number(contact.openingBalancePaymentAmount || 0)) *
+          1000,
+      ) / 1000,
+      0,
+    );
+  };
+
+  /**
+   * Retrieves the formatted paid part of the opening balance.
+   * @param {Contact} contact
+   * @returns {string}
+   */
+  protected formattedOpeningBalancePaymentAmount = (
+    contact: Contact,
+  ): string => {
+    return this.formatNumber(contact.openingBalancePaymentAmount || 0, {
+      currencyCode: contact.currencyCode,
+    });
+  };
+
+  /**
+   * Retrieves the formatted unpaid part of the opening balance.
+   * @param {Contact} contact
+   * @returns {string}
+   */
+  protected formattedOpeningBalanceDueAmount = (contact: Contact): string => {
+    return this.formatNumber(this.openingBalanceDueAmount(contact), {
+      currencyCode: contact.currencyCode,
+    });
+  };
+
+  /**
    * Retriecve fromatted date.
    * @param {IExpense} expense
    * @returns {string}

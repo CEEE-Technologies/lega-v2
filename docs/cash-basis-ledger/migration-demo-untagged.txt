@@ -1,0 +1,29 @@
+# Simulated legacy data on the disposable e2e test org (bigcapital_tenant_96rherk2nfmvo4aet1)
+## 1. Correctly tagged (current state)
++-------------------+----------------------+---------------+
+| income_cash_basis | income_accrual_basis | untagged_rows |
++-------------------+----------------------+---------------+
+|         11505.000 |           648039.091 |             3 |
++-------------------+----------------------+---------------+
+## 2. After untagging the invoice and payment accrual entries (= data written before the basis column)
+Cash-basis income now includes unpaid invoice income (double counted):
++-------------------+----------------------+---------------+
+| income_cash_basis | income_accrual_basis | untagged_rows |
++-------------------+----------------------+---------------+
+|        660944.091 |           648039.091 |            45 |
++-------------------+----------------------+---------------+
+## 3. Run migration 20261025120000_backfill_documents_basis
+Tenant bigcapital_tenant_96rherk2nfmvo4aet1 > Batch 2 run: 1 migrations
+-------------------
++-------------------+----------------------+---------------+
+| income_cash_basis | income_accrual_basis | untagged_rows |
++-------------------+----------------------+---------------+
+|         11505.000 |           648039.091 |             3 |
++-------------------+----------------------+---------------+
+## 4. Rebuild + check
+[96rherk2nfmvo4aet1] Rebuilding the cash basis entries...
+[96rherk2nfmvo4aet1] Rebuilt: PaymentReceive 16, BillPayment 13, RefundCreditNote 3, RefundVendorCredit 2. Orphan cash sets removed: 0.
+[96rherk2nfmvo4aet1] Cash basis check:
+  Bank/cash accounts: cash and accrual totals match.
+  Entry sets: all balanced.
+1 organizations rebuilt: no differences.

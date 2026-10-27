@@ -15,6 +15,7 @@ import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { Inject, Injectable } from '@nestjs/common';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreatePaymentReceivedDto } from '../dtos/PaymentReceived.dto';
+import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
 
 @Injectable()
 export class CreatePaymentReceivedService {
@@ -24,6 +25,7 @@ export class CreatePaymentReceivedService {
     private uow: UnitOfWork,
     private transformer: PaymentReceiveDTOTransformer,
     private tenancyContext: TenancyContext,
+    private openingBalancePayment: ContactOpeningBalancePayment,
 
     @Inject(PaymentReceived.name)
     private paymentReceived: TenantModelProxy<typeof PaymentReceived>,
@@ -125,6 +127,15 @@ export class CreatePaymentReceivedService {
     await this.validators.validateInvoicesPaymentsAmount(
       paymentReceiveDTO.entries,
       [],
+      trx,
+    );
+    // Validate the opening balance line against the locked customer row.
+    await this.openingBalancePayment.validateOpeningBalanceEntries(
+      {
+        contactId: paymentReceiveDTO.customerId,
+        entries: paymentReceiveObj.entries,
+      },
+      null,
       trx,
     );
     return { paymentReceiveObj };
