@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -26,14 +26,14 @@ export class ManualJournalEntryDto {
   @ApiPropertyOptional({ description: 'Credit amount' })
   @ToNumber()
   @IsOptional()
-  @IsNumber()
+  @IsMoney()
   @Min(0)
   credit?: number;
 
   @ApiPropertyOptional({ description: 'Debit amount' })
   @ToNumber()
   @IsOptional()
-  @IsNumber()
+  @IsMoney()
   @Min(0)
   debit?: number;
 

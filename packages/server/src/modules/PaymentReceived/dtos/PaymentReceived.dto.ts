@@ -12,7 +12,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
 import {
   PaymentEntryType,
@@ -54,7 +54,7 @@ export class PaymentReceivedEntryDto {
   invoiceId?: number;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsNotEmpty()
   paymentAmount: number;
 }
@@ -75,7 +75,7 @@ export class CommandPaymentReceivedDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({
     description: 'The amount of the payment received',
     example: 100,

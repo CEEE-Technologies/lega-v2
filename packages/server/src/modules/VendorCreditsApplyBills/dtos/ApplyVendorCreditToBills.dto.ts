@@ -1,3 +1,4 @@
+import { IsMoney } from '@/common/decorators/Validators';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -5,7 +6,6 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   ValidateNested,
 } from 'class-validator';
 
@@ -16,7 +16,7 @@ export class ApplyVendorCreditToBillEntryDto {
   billId: number;
 
   @IsNotEmpty()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({ description: 'Amount to apply', example: 100.5 })
   amount: number;
 }

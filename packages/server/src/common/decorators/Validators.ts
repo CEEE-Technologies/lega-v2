@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ValidateIf, ValidationOptions } from 'class-validator';
+import { IsNumber, ValidateIf, ValidationOptions } from 'class-validator';
 
 /**
  * Decorator that converts the property value to a number.
@@ -29,4 +29,21 @@ export function IsOptional(validationOptions?: ValidationOptions) {
   return ValidateIf((_obj, value) => {
     return value !== null && value !== undefined && value !== '';
   }, validationOptions);
+}
+
+/**
+ * Validates a money amount: a number with at most 2 decimals (whole cents).
+ * An API call sending 100.005 gets a clear error instead of a hidden
+ * fraction of a cent.
+ * @param {ValidationOptions} validationOptions
+ * @returns PropertyDecorator
+ */
+export function IsMoney(validationOptions?: ValidationOptions) {
+  return IsNumber(
+    { maxDecimalPlaces: 2, allowNaN: false, allowInfinity: false },
+    {
+      message: '$property must be a money amount with at most 2 decimals',
+      ...validationOptions,
+    },
+  );
 }

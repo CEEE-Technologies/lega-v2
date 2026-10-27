@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import {
   IsBoolean,
   IsDateString,
@@ -62,7 +62,7 @@ export class CreateBankTransactionDto {
   })
   @IsNotEmpty()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   amount: number;
 
   @ApiProperty({

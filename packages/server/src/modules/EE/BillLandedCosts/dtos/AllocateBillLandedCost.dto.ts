@@ -5,10 +5,9 @@ import {
   IsArray,
   ValidateNested,
   IsString,
-  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { LandedCostTransactionType } from '../types/BillLandedCosts.types';
 
 export class AllocateBillLandedCostItemDto {
@@ -16,7 +15,7 @@ export class AllocateBillLandedCostItemDto {
   @ToNumber()
   entryId: number;
 
-  @IsNumber()
+  @IsMoney()
   @ToNumber()
   cost: number;
 }

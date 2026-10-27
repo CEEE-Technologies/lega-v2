@@ -2,7 +2,11 @@ import * as bluebird from 'bluebird';
 import { isUndefined, pickBy, set } from 'lodash';
 import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
-import { ImportMappingAttr, ResourceMetaFieldsMap } from './interfaces';
+import {
+  ImportMappingAttr,
+  ImportRoundedMoneyWarning,
+  ResourceMetaFieldsMap,
+} from './interfaces';
 import {
   valueParser,
   parseKey,
@@ -29,6 +33,7 @@ export class ImportFileDataTransformer {
     importableFields: ResourceMetaFieldsMap,
     data: Record<string, unknown>[],
     trx?: Knex.Transaction,
+    warnings?: ImportRoundedMoneyWarning[],
   ): Promise<Record<string, any>[]> {
     // Sanitize the sheet data.
     const sanitizedData = sanitizeSheetData(data);
@@ -43,6 +48,7 @@ export class ImportFileDataTransformer {
       importableFields,
       mappedDTOs,
       trx,
+      warnings,
     );
     const aggregateValues = this.aggregateParsedValues(
       importFile.resource,
@@ -106,15 +112,31 @@ export class ImportFileDataTransformer {
     fields: ResourceMetaFieldsMap,
     valueDTOs: Record<string, any>[],
     trx?: Knex.Transaction,
+    warnings?: ImportRoundedMoneyWarning[],
   ): Promise<Record<string, any>[]> {
     // Create a model resolver function that uses ResourceService
     const modelResolver = (modelName: string) => {
       return this.resource.getResourceModel(modelName)();
     };
-    const _valueParser = valueParser(fields, modelResolver, trx);
     const _keyParser = parseKey(fields);
 
-    const parseAsync = async (valueDTO) => {
+    const parseAsync = async (valueDTO, index: number) => {
+      // Money values with more than 2 decimals are rounded to cents and
+      // listed as warnings (row numbers count the header row).
+      const _valueParser = valueParser(
+        fields,
+        modelResolver,
+        trx,
+        (key, value, roundedValue) => {
+          warnings?.push({
+            rowNumber: index + 2,
+            field: key,
+            value,
+            roundedValue,
+            message: `Row ${index + 2}: ${key} ${value} was rounded to ${roundedValue} (money keeps 2 decimals).`,
+          });
+        },
+      );
       // Clean up the undefined keys that not exist in resource fields.
       const _valueDTO = pickBy(
         valueDTO,
