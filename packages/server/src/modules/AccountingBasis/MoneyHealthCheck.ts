@@ -274,7 +274,9 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
       normal === ACCOUNT_NORMAL.CREDIT ? -debitMinusCredit : debitMinusCredit;
     const stored = Number(account.amount || 0);
 
-    if (Math.abs(stored - fromLedger) > NOISE) {
+    // The account amount column keeps 5 decimals (a foreign currency
+    // balance is local / rate, so it has more).
+    if (Math.abs(stored - fromLedger) > 0.000005 + NOISE) {
       differences.push({
         kind: 'account',
         id: account.id,
