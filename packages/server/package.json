@@ -184,7 +184,8 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/$1"
+      "^@/(.*)$": "<rootDir>/$1",
+      "^@bigcapital/utils$": "<rootDir>/../../../shared/bigcapital-utils/src/index.ts"
     }
   }
 }

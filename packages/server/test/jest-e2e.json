@@ -9,7 +9,8 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^@/(.*)$": "<rootDir>/../src/$1"
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@bigcapital/utils$": "<rootDir>/../../../shared/bigcapital-utils/src/index.ts"
   },
   "maxWorkers": 1,
   "maxConcurrency": 1

@@ -9,6 +9,7 @@ import _ from 'lodash';
 import { isEqual, castArray, isEmpty, includes, pickBy } from 'lodash';
 import moment from 'moment';
 import { createSelectorCreator, defaultMemoize } from 'reselect';
+import { subtractMoney } from '@bigcapital/utils';
 import { deepMapKeys } from './map-key-deep';
 import type { IResourceField } from '@/components/AdvancedFilter/interfaces';
 export * from './deep';
@@ -654,14 +655,10 @@ export function safeSumBy(entries, getter) {
 /**
  * Subtracts one money amount from another in whole cents, so float error
  * (1.10 + 2.20 = 3.3000000000000003) can't make equal amounts look different.
- * Matches the server, which compares amounts rounded to cents.
+ * Same helper as the server (`@bigcapital/utils`).
  */
 export function subtractAmounts(amount: number, other: number): number {
-  return (
-    (Math.round(toSafeNumber(amount) * 100) -
-      Math.round(toSafeNumber(other) * 100)) /
-    100
-  );
+  return subtractMoney(amount, other);
 }
 
 export const fullAmountPaymentEntries = (entries) => {
