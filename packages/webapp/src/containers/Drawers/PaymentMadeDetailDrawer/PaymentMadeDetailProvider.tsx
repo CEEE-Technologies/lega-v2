@@ -31,6 +31,10 @@ export interface BillPaymentDetail
   vendor: BillPayment['vendor'] & { displayName?: string };
   paymentAccount: BillPayment['paymentAccount'] & { name?: string };
   branch?: { name?: string };
+  appliedAmount?: number | null;
+  appliedAmountFormatted?: string | null;
+  unappliedAmount?: number | null;
+  unappliedAmountFormatted?: string | null;
   entries: BillPaymentDetailEntry[];
 }
 

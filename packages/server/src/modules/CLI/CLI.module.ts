@@ -15,6 +15,7 @@ import { TenantsSeedLatestCommand } from './commands/TenantsSeedLatest.command';
 import { OpenApiExportCommand } from './commands/OpenApiExport.command';
 import { AnalyticsBackfillCommand } from './commands/AnalyticsBackfill.command';
 import { AnalyticsCoreModule } from '../Analytics/AnalyticsCore.module';
+import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBasis.command';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AnalyticsCoreModule } from '../Analytics/AnalyticsCore.module';
     TenantsSeedLatestCommand,
     OpenApiExportCommand,
     AnalyticsBackfillCommand,
+    TenantsRebuildCashBasisCommand,
   ],
 })
 export class CLIModule {}

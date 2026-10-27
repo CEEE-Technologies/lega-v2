@@ -17,6 +17,10 @@ import { BillPaymentGLEntriesSubscriber } from './subscribers/BillPaymentGLEntri
 import { BillPaymentBillSyncSubscriber } from './subscribers/BillPaymentBillSyncSubscriber';
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
+import { ContactsModule } from '../Contacts/Contacts.module';
+import { BillPaymentsGLEntriesRewrite } from './commands/BillPaymentsGLRewrite';
+import { BillPaymentGLRewriteSubscriber } from './subscribers/BillPaymentGLRewriteSubscriber';
+import { BillPaymentOpeningBalanceSubscriber } from './subscribers/BillPaymentOpeningBalanceSubscriber';
 import { BillPaymentsExportable } from './queries/BillPaymentsExportable';
 import { BillPaymentsImportable } from './commands/BillPaymentsImportable';
 import { GetBillPaymentsService } from './queries/GetBillPayments.service';
@@ -24,9 +28,17 @@ import { DynamicListModule } from '../DynamicListing/DynamicList.module';
 import { BillPaymentsPages } from './commands/BillPaymentsPages.service';
 import { BulkDeleteBillPaymentsService } from './BulkDeleteBillPayments.service';
 import { ValidateBulkDeleteBillPaymentsService } from './ValidateBulkDeleteBillPayments.service';
+import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
 
 @Module({
-  imports: [TenancyModule, LedgerModule, AccountsModule, DynamicListModule],
+  imports: [
+    TenancyModule,
+    LedgerModule,
+    AccountsModule,
+    ContactsModule,
+    TransactionsLockingModule,
+    DynamicListModule,
+  ],
   providers: [
     BillPaymentsApplication,
     CreateBillPaymentService,
@@ -48,9 +60,13 @@ import { ValidateBulkDeleteBillPaymentsService } from './ValidateBulkDeleteBillP
     BillPaymentsImportable,
     GetBillPaymentsService,
     BillPaymentsPages,
+    BillPaymentsGLEntriesRewrite,
+    BillPaymentGLRewriteSubscriber,
+    BillPaymentOpeningBalanceSubscriber,
   ],
   exports: [
     BillPaymentValidators,
+    BillPaymentGLEntries,
     CreateBillPaymentService,
     BillPaymentsExportable,
     BillPaymentsImportable,

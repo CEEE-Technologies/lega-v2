@@ -14,6 +14,7 @@ import { Customer } from '@/modules/Customers/models/Customer';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditPaymentReceivedDto } from '../dtos/PaymentReceived.dto';
+import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
 
 @Injectable()
 export class EditPaymentReceivedService {
@@ -23,6 +24,7 @@ export class EditPaymentReceivedService {
     private readonly eventPublisher: EventEmitter2,
     private readonly uow: UnitOfWork,
     private readonly tenancyContext: TenancyContext,
+    private readonly openingBalancePayment: ContactOpeningBalancePayment,
 
     @Inject(PaymentReceived.name)
     private readonly paymentReceiveModel: TenantModelProxy<
@@ -171,6 +173,18 @@ export class EditPaymentReceivedService {
     await this.validators.validateInvoicesPaymentsAmount(
       paymentReceiveDTO.entries,
       oldPaymentReceive.entries,
+      trx,
+    );
+    // Validate the opening balance line against the locked customer row.
+    await this.openingBalancePayment.validateOpeningBalanceEntries(
+      {
+        contactId: paymentReceiveDTO.customerId,
+        entries: paymentReceiveObj.entries,
+      },
+      {
+        contactId: oldPaymentReceive.customerId,
+        entries: oldPaymentReceive.entries,
+      },
       trx,
     );
     return { oldPaymentReceive, paymentReceiveObj };

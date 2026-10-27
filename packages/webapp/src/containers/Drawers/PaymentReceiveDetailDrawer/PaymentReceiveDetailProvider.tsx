@@ -29,6 +29,10 @@ export interface PaymentReceiveDetail
   extends Omit<PaymentReceived, 'entries' | 'customer'> {
   customer: PaymentReceived['customer'] & { displayName?: string };
   subtotalFormatted?: string;
+  appliedAmount?: number | null;
+  appliedAmountFormatted?: string | null;
+  unappliedAmount?: number | null;
+  unappliedAmountFormatted?: string | null;
   entries: PaymentReceiveDetailEntry[];
 }
 

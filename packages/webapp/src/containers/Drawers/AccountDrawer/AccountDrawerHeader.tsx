@@ -45,6 +45,16 @@ export function AccountDrawerHeader() {
         <DetailItem name={'currency'} label={intl.get('currency')}>
           {account?.currencyCode}
         </DetailItem>
+
+        <DetailItem name={'basis'} label={'Basis'}>
+          <span
+            title={
+              'The closing balance and the transactions below are on the accrual basis. Cash basis entries show in the General Ledger on the cash basis.'
+            }
+          >
+            Accrual basis
+          </span>
+        </DetailItem>
       </DetailsMenu>
 
       <DetailsMenu direction={'horizantal'}>

@@ -12,9 +12,15 @@ import { RefundCreditNoteGLEntries } from './commands/RefundCreditNoteGLEntries'
 import { RefundCreditNoteGLEntriesSubscriber } from '../CreditNotes/subscribers/RefundCreditNoteGLEntriesSubscriber';
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
+import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
 
 @Module({
-  imports: [forwardRef(() => CreditNotesModule), LedgerModule, AccountsModule],
+  imports: [
+    forwardRef(() => CreditNotesModule),
+    LedgerModule,
+    AccountsModule,
+    TransactionsLockingModule,
+  ],
   providers: [
     CreateRefundCreditNoteService,
     DeleteRefundCreditNoteService,
@@ -26,7 +32,7 @@ import { AccountsModule } from '../Accounts/Accounts.module';
     RefundCreditNoteGLEntries,
     RefundCreditNoteGLEntriesSubscriber,
   ],
-  exports: [RefundSyncCreditNoteBalanceService],
+  exports: [RefundSyncCreditNoteBalanceService, RefundCreditNoteGLEntries],
   controllers: [CreditNoteRefundsController],
 })
 export class CreditNoteRefundsModule {}

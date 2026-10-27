@@ -4,6 +4,12 @@ import {
   IRefundVendorCreditCreatedPayload,
   IRefundVendorCreditDeletedPayload,
 } from '../types/VendorCreditRefund.types';
+import {
+  IVendorCreditEditedPayload,
+  IVendorCreditEditingPayload,
+} from '@/modules/VendorCredit/types/VendorCredit.types';
+import { LinkedTransactionsLockingGuard } from '@/modules/TransactionsLocking/guards/LinkedTransactionsLockingGuard';
+import { TransactionsLockingGroup } from '@/modules/TransactionsLocking/types/TransactionsLocking.types';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
@@ -11,7 +17,30 @@ import { OnEvent } from '@nestjs/event-emitter';
 export class RefundVendorCreditGLEntriesSubscriber {
   constructor(
     private readonly refundVendorCreditGLEntries: RefundVendorCreditGLEntries,
+    private readonly linkedTransactionsLockingGuard: LinkedTransactionsLockingGuard,
   ) {}
+
+  /**
+   * Blocks the vendor credit edit before anything is saved when it would
+   * rewrite a refund dated inside a locked period.
+   * @param {IVendorCreditEditingPayload} payload -
+   */
+  @OnEvent(events.vendorCredit.onEditing, { suppressErrors: false })
+  async validateLinkedRefundsNotLocked({
+    oldVendorCredit,
+    trx,
+  }: IVendorCreditEditingPayload) {
+    const refunds =
+      await this.refundVendorCreditGLEntries.getVendorCreditRefunds(
+        oldVendorCredit.id,
+        trx,
+      );
+    await this.linkedTransactionsLockingGuard.validateLinkedTransactionsNotLocked(
+      refunds,
+      TransactionsLockingGroup.Purchases,
+      'this vendor credit',
+    );
+  }
 
   /**
    * Writes refund vendor credit GL entries once the transaction created.
@@ -41,6 +70,23 @@ export class RefundVendorCreditGLEntriesSubscriber {
   }: IRefundVendorCreditDeletedPayload) {
     await this.refundVendorCreditGLEntries.revertRefundVendorCreditGLEntries(
       refundCreditId,
+      trx,
+    );
+  }
+
+  /**
+   * Rewrites the refunds cash basis entries once the vendor credit is edited,
+   * so they follow the edited vendor credit composition.
+   * @param {IVendorCreditEditedPayload} payload -
+   */
+  @OnEvent(events.vendorCredit.onEdited)
+  async rewriteRefundsCashGLEntriesOnceVendorCreditEdited({
+    vendorCredit,
+    oldVendorCredit,
+    trx,
+  }: IVendorCreditEditedPayload) {
+    await this.refundVendorCreditGLEntries.rewriteVendorCreditRefundsCashGLEntries(
+      vendorCredit?.id ?? oldVendorCredit.id,
       trx,
     );
   }

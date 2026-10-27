@@ -14,6 +14,8 @@ export const paymentReceivesKeys = {
   detail: (id: number | null | undefined) => [PAYMENT_RECEIVE, id] as const,
   editPage: (id: number | null | undefined) =>
     [PAYMENT_RECEIVE_EDIT_PAGE, id] as const,
+  newEntries: (customerId?: number | string | null) =>
+    [PAYMENT_RECEIVE_NEW_ENTRIES, customerId] as const,
   smsDetail: (id: number | null | undefined) =>
     [PAYMENT_RECEIVE_SMS_DETAIL, id] as const,
   html: (id: number | null | undefined) =>

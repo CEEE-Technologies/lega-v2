@@ -651,6 +651,19 @@ export function safeSumBy(entries, getter) {
     .value();
 }
 
+/**
+ * Subtracts one money amount from another in whole cents, so float error
+ * (1.10 + 2.20 = 3.3000000000000003) can't make equal amounts look different.
+ * Matches the server, which compares amounts rounded to cents.
+ */
+export function subtractAmounts(amount: number, other: number): number {
+  return (
+    (Math.round(toSafeNumber(amount) * 100) -
+      Math.round(toSafeNumber(other) * 100)) /
+    100
+  );
+}
+
 export const fullAmountPaymentEntries = (entries) => {
   return entries.map((item) => ({
     ...item,

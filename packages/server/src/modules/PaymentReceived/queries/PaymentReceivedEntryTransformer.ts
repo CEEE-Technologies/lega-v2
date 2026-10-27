@@ -23,6 +23,9 @@ export class PaymentReceivedEntryTransfromer extends Transformer {
    * Retreives the transformed invoice.
    */
   protected invoice(entry) {
+    // Opening balance lines have no invoice.
+    if (!entry.invoice) return null;
+
     return this.item(entry.invoice, new SaleInvoiceTransformer());
   }
 }

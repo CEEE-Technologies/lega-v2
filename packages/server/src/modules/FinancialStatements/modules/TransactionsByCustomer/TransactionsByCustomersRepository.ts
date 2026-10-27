@@ -1,4 +1,5 @@
 import { ModelObject } from 'objection';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import * as moment from 'moment';
 import { assoc } from '@/common/fp';
 import { ACCOUNT_TYPE } from '@/constants/accounts';
@@ -228,6 +229,7 @@ export class TransactionsByCustomersRepository extends TransactionsByContactRepo
 
     const openingTransactions = await this.accountTransactionModel()
       .query()
+      .modify('filterByBasis', AccountingBasis.Accrual)
       .modify(
         'contactsOpeningBalance',
         openingDate,
@@ -255,6 +257,9 @@ export class TransactionsByCustomersRepository extends TransactionsByContactRepo
       .onBuild((query) => {
         // Filter by date.
         query.modify('filterDateRange', fromDate, toDate);
+
+        // Contact balances are accrual based.
+        query.modify('filterByBasis', AccountingBasis.Accrual);
 
         // Filter by customers.
         query.whereNot('contactId', null);

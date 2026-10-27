@@ -30,6 +30,22 @@ export function PaymentReceiveDetailHeader() {
           <DetailItem label={intl.get('amount')}>
             <h3 className="big-number">{paymentReceive.formattedAmount}</h3>
           </DetailItem>
+          {/* Where the money went: applied to documents or the opening
+              balance, and the rest kept as the contact's credit. */}
+          {paymentReceive.appliedAmountFormatted && (
+            <DetailItem label={'Applied'}>
+              <h3 className="big-number">
+                {paymentReceive.appliedAmountFormatted}
+              </h3>
+            </DetailItem>
+          )}
+          {paymentReceive.unappliedAmountFormatted && (
+            <DetailItem label={'Unapplied (credit)'}>
+              <h3 className="big-number">
+                {paymentReceive.unappliedAmountFormatted}
+              </h3>
+            </DetailItem>
+          )}
         </DetailsMenu>
       </CommercialDocTopHeader>
 

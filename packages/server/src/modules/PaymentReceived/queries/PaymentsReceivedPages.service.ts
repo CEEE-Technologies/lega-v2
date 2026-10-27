@@ -6,6 +6,12 @@ import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
 import { PaymentReceived } from '../models/PaymentReceived';
 import { ServiceError } from '@/modules/Items/ServiceError';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { Customer } from '@/modules/Customers/models/Customer';
+import {
+  PaymentEntryTypes,
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 /**
  * Payment receives edit/new pages service.
@@ -18,6 +24,9 @@ export class PaymentsReceivedPagesService {
 
     @Inject(PaymentReceived.name)
     private readonly paymentReceived: TenantModelProxy<typeof PaymentReceived>,
+
+    @Inject(Customer.name)
+    private readonly customerModel: TenantModelProxy<typeof Customer>,
   ) {}
 
   /**
@@ -27,7 +36,7 @@ export class PaymentsReceivedPagesService {
    */
   private invoiceToPageEntry(invoice: SaleInvoice): IPaymentReceivePageEntry {
     return {
-      entryType: 'invoice',
+      entryType: PaymentEntryTypes.Invoice,
       invoiceId: invoice.id,
       invoiceNo: invoice.invoiceNo,
       amount: invoice.balance,
@@ -40,20 +49,68 @@ export class PaymentsReceivedPagesService {
   }
 
   /**
-   * Retrieve payment receive new page receivable entries.
-   * @param {number} vendorId - Vendor id.
+   * Retrieves the opening balance row of the given customer: an open item
+   * dated on the opening balance date, due the unpaid part.
+   * @param {Customer} customer - Customer.
+   * @param {number} thisPaymentAmount - What the edited payment pays of it.
+   * @return {IPaymentReceivePageEntry}
+   */
+  private openingBalanceToPageEntry(
+    customer: Customer,
+    thisPaymentAmount: number = 0,
+  ): IPaymentReceivePageEntry {
+    return {
+      entryType: PaymentEntryTypes.OpeningBalance,
+      invoiceId: null,
+      invoiceNo: null,
+      amount: customer.openingBalance,
+      dueAmount: customer.openingBalanceDueAmount + thisPaymentAmount,
+      paymentAmount: thisPaymentAmount,
+      totalPaymentAmount: customer.openingBalancePaymentAmount,
+      currencyCode: customer.currencyCode,
+      date: customer.openingBalanceAt,
+    };
+  }
+
+  /**
+   * Retrieves the opening balance row when the customer has an unpaid
+   * opening balance, or the edited payment pays part of it.
+   */
+  private async getOpeningBalancePageEntries(
+    customerId: number,
+    thisPaymentAmount: number = 0,
+  ): Promise<IPaymentReceivePageEntry[]> {
+    const customer = await this.customerModel().query().findById(customerId);
+
+    if (!customer || !(customer.openingBalance > 0)) return [];
+
+    const entry = this.openingBalanceToPageEntry(customer, thisPaymentAmount);
+
+    return entry.dueAmount > 0 || thisPaymentAmount > 0 ? [entry] : [];
+  }
+
+  /**
+   * Retrieve payment receive new page receivable entries: the unpaid
+   * opening balance first (the oldest item), then the due invoices.
+   * @param {number} customerId - Customer id.
    * @return {IPaymentReceivePageEntry[]}
    */
   public async getNewPageEntries(customerId: number) {
+    const openingBalanceEntries =
+      await this.getOpeningBalancePageEntries(customerId);
+
     // Retrieve due invoices.
-    const entries = await this.saleInvoice()
+    const invoices = await this.saleInvoice()
       .query()
       .modify('delivered')
       .modify('dueInvoices')
       .where('customer_id', customerId)
       .orderBy('invoice_date', 'ASC');
 
-    return entries.map(this.invoiceToPageEntry);
+    return [
+      ...openingBalanceEntries,
+      ...invoices.map((invoice) => this.invoiceToPageEntry(invoice)),
+    ];
   }
 
   /**
@@ -75,7 +132,21 @@ export class PaymentsReceivedPagesService {
     if (!paymentReceive) {
       throw new ServiceError(ERRORS.PAYMENT_RECEIVE_NOT_EXISTS);
     }
-    const paymentEntries = paymentReceive.entries.map((entry) => ({
+    const invoiceEntries = paymentReceive.entries.filter(
+      (entry) => isDocumentEntry(entry) && entry.invoice,
+    );
+    const openingBalanceEntry = paymentReceive.entries.find(
+      isOpeningBalanceEntry,
+    );
+    // The opening balance row comes first, with this payment's amount.
+    const openingBalanceEntries = (
+      await this.getOpeningBalancePageEntries(
+        paymentReceive.customerId,
+        openingBalanceEntry?.paymentAmount || 0,
+      )
+    ).map((entry) => ({ ...entry, index: openingBalanceEntry?.index }));
+
+    const paymentEntries = invoiceEntries.map((entry) => ({
       ...this.invoiceToPageEntry(entry.invoice),
       dueAmount: entry.invoice.dueAmount + entry.paymentAmount,
       paymentAmount: entry.paymentAmount,
@@ -89,14 +160,18 @@ export class PaymentsReceivedPagesService {
       .where('customer_id', paymentReceive.customerId)
       .whereNotIn(
         'id',
-        paymentReceive.entries.map((entry) => entry.invoiceId),
+        invoiceEntries.map((entry) => entry.invoiceId),
       )
       .orderBy('invoice_date', 'ASC');
 
-    const restReceivableEntries = restReceivableInvoices.map(
-      this.invoiceToPageEntry,
+    const restReceivableEntries = restReceivableInvoices.map((invoice) =>
+      this.invoiceToPageEntry(invoice),
     );
-    const entries = [...paymentEntries, ...restReceivableEntries];
+    const entries = [
+      ...openingBalanceEntries,
+      ...paymentEntries,
+      ...restReceivableEntries,
+    ];
 
     return {
       data: omit(paymentReceive, ['entries']),

@@ -11,11 +11,15 @@ import {
   transformAttachmentsToRequest,
 } from '@/containers/Attachments/utils';
 import { convertBrandingTemplatesToOptions } from '@/containers/BrandingTemplates/BrandingTemplatesSelectFields';
-import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
+import {
+  useCurrentOrganizationBaseCurrency,
+  type PaymentReceiveNewPageEntry,
+} from '@/hooks/query';
 import {
   defaultFastFieldShouldUpdate,
   transformToForm,
   safeSumBy,
+  subtractAmounts,
   orderingLinesIndexes,
   formattedAmount,
 } from '@/utils';
@@ -54,8 +58,18 @@ export type PaymentReceiveFormValues = {
 export type PaymentReceiveRequestEntry = {
   index: string | number;
   paymentAmount: string | number;
-  invoiceId: string | number;
+  invoiceId?: string | number;
+  entryType?: string;
 };
+
+// The entry type of the line that pays the customer opening balance.
+export const OPENING_BALANCE_ENTRY_TYPE = 'opening_balance';
+
+/**
+ * Determines whether the given entry is the customer opening balance line.
+ */
+export const isOpeningBalanceEntry = (entry: { entryType?: string }) =>
+  entry?.entryType === OPENING_BALANCE_ENTRY_TYPE;
 
 export type PaymentReceiveRequestBody = {
   customerId: string | number;
@@ -82,6 +96,7 @@ type PaymentReceiveEditPage = NonNullable<
 export const defaultPaymentReceiveEntry: PaymentReceiveEntry = {
   index: '',
   paymentAmount: '',
+  entryType: 'invoice',
   invoiceId: '',
   invoiceNo: '',
   dueAmount: '',
@@ -112,6 +127,7 @@ export const defaultRequestPaymentEntry: PaymentReceiveRequestEntry = {
   index: '',
   paymentAmount: '',
   invoiceId: '',
+  entryType: '',
 };
 
 export const defaultRequestPayment: PaymentReceiveRequestBody = {
@@ -123,17 +139,6 @@ export const defaultRequestPayment: PaymentReceiveRequestBody = {
   statement: '',
   entries: [],
   attachments: [],
-};
-
-type InvoiceRow = {
-  id: string | number;
-  dueAmount: string | number;
-  invoiceDate: string;
-  balance: string | number;
-  currencyCode: string;
-  invoiceNo: string;
-  branchId: string | number;
-  paymentAmount?: string | number;
 };
 
 export type PaymentReceiveEditEntry = {
@@ -159,32 +164,24 @@ export const transformToEditForm = (
   }) as PaymentReceiveFormValues;
 
 /**
- * Transformes the given invoices to the new page receivable entries.
+ * Transformes the new page open items (the opening balance first, then the
+ * due invoices) to the form entries.
  */
-export const transformInvoicesNewPageEntries = (
-  invoices: InvoiceRow[],
+export const transformNewPageEntriesToForm = (
+  pageEntries: PaymentReceiveNewPageEntry[],
 ): PaymentReceiveEntry[] =>
-  [
-    ...invoices.map((invoice, index) => ({
-      index: index + 1,
-      invoiceId: invoice.id,
-      entryType: 'invoice',
-      dueAmount: invoice.dueAmount,
-      date: invoice.invoiceDate,
-      amount: invoice.balance,
-      currencyCode: invoice.currencyCode,
-      paymentAmount: '',
-      invoiceNo: invoice.invoiceNo,
-      branchId: invoice.branchId,
-      totalPaymentAmount: invoice.paymentAmount,
-    })),
-  ] as PaymentReceiveEntry[];
-
-export const transformEntriesToEditForm = (
-  receivableEntries: InvoiceRow[],
-): PaymentReceiveEntry[] => [
-  ...transformInvoicesNewPageEntries([...(receivableEntries || [])]),
-];
+  pageEntries.map((entry, index) => ({
+    index: index + 1,
+    entryType: entry.entryType || 'invoice',
+    invoiceId: entry.invoiceId ?? '',
+    invoiceNo: entry.invoiceNo ?? '',
+    dueAmount: entry.dueAmount,
+    date: entry.date,
+    amount: entry.amount,
+    currencyCode: entry.currencyCode,
+    paymentAmount: '',
+    totalPaymentAmount: entry.totalPaymentAmount,
+  }));
 
 export const clearAllPaymentEntries = (
   entries: PaymentReceiveEntry[],
@@ -265,10 +262,22 @@ export const transformFormToRequest = (
   form: PaymentReceiveFormValues,
 ): PaymentReceiveRequestBody => {
   const entries = form.entries
-    .filter((entry) => entry.invoiceId && entry.paymentAmount)
-    .map((entry) => ({
-      ...pick(entry, Object.keys(defaultRequestPaymentEntry)),
-    })) as PaymentReceiveRequestEntry[];
+    .filter(
+      (entry) =>
+        (entry.invoiceId || isOpeningBalanceEntry(entry)) &&
+        entry.paymentAmount,
+    )
+    .map((entry) =>
+      isOpeningBalanceEntry(entry)
+        ? {
+            ...pick(entry, ['index', 'paymentAmount']),
+            entryType: OPENING_BALANCE_ENTRY_TYPE,
+          }
+        : {
+            ...pick(entry, ['index', 'paymentAmount', 'invoiceId']),
+            entryType: 'invoice',
+          },
+    ) as PaymentReceiveRequestEntry[];
 
   const attachments = transformAttachmentsToRequest(form);
 
@@ -304,6 +313,22 @@ export const useSetPrimaryBranchToForm = () => {
 export const PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE =
   'The amounts applied to invoices are more than the amount received. Lower the invoice payment amounts or raise the amount received.';
 
+export const NO_INVOICE_SELECTED_MESSAGE =
+  'Select at least one invoice to apply this payment to.';
+
+export const PAYMENT_RECEIVE_ERROR_MESSAGES: Record<string, string> = {
+  INVOICES_IDS_NOT_FOUND: NO_INVOICE_SELECTED_MESSAGE,
+  INVOICES_NOT_DELIVERED_YET:
+    'One of the selected invoices is still a draft. Deliver the invoice before receiving a payment for it.',
+  OPENING_BALANCE_NOT_FOUND: 'This customer has no opening balance to pay.',
+  OPENING_BALANCE_PAYMENT_EXCEEDS_DUE:
+    'The amount for the opening balance is more than what is still due on it. Lower it to the opening balance due.',
+  OPENING_BALANCE_ENTRY_DUPLICATE:
+    'The opening balance can only appear once in a payment.',
+  INVALID_PAYMENT_AMOUNT:
+    'The amount for an invoice is more than what is still due on it.',
+};
+
 export const transformErrors = (
   errors: PaymentReceiveErrorResponse[],
   {
@@ -328,6 +353,11 @@ export const transformErrors = (
       intent: Intent.DANGER,
     });
   }
+  Object.entries(PAYMENT_RECEIVE_ERROR_MESSAGES).forEach(([type, message]) => {
+    if (getError(type)) {
+      AppToaster.show({ message, intent: Intent.DANGER });
+    }
+  });
   if (getError('PAYMENT_ACCOUNT_CURRENCY_INVALID')) {
     AppToaster.show({
       message: intl.get(
@@ -388,7 +418,7 @@ export const usePaymentReceivedTotalExceededAmount = (): number => {
   const totalAmount = usePaymentReceivedTotalAmount();
   const totalApplied = usePaymentReceivedTotalAppliedAmount();
 
-  return Math.max(Number(totalAmount) - totalApplied, 0);
+  return Math.max(subtractAmounts(Number(totalAmount), totalApplied), 0);
 };
 
 // Applied to invoices more than was received, which can't be saved.
@@ -396,7 +426,7 @@ export const usePaymentReceivedOverAppliedAmount = (): number => {
   const totalAmount = usePaymentReceivedTotalAmount();
   const totalApplied = usePaymentReceivedTotalAppliedAmount();
 
-  return Math.max(totalApplied - Number(totalAmount), 0);
+  return Math.max(subtractAmounts(totalApplied, Number(totalAmount)), 0);
 };
 
 /**
@@ -438,7 +468,7 @@ export const getExceededAmountFromValues = (
   const totalApplied = safeSumBy(values.entries, 'paymentAmount');
   const totalAmount = Number(values.amount);
 
-  return totalAmount - totalApplied;
+  return subtractAmounts(totalAmount, totalApplied);
 };
 
 export const usePaymentReceivedFormBrandingTemplatesOptions = () => {

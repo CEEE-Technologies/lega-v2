@@ -1,0 +1,31 @@
+      ✓ recognizes the income on the accrual basis report (13 ms)
+      ✓ does not recognize the income on the cash basis report (13 ms)
+      ✓ posts the receivable on the accrual basis trial balance (10 ms)
+      ✓ has no receivable on the cash basis trial balance (12 ms)
+      ✓ does not double count the income on the accrual basis report (12 ms)
+      ✓ recognizes the income once on the cash basis report (9 ms)
+      ✓ settles the receivable on the accrual basis trial balance (9 ms)
+      ✓ keeps no receivable on the cash basis trial balance (12 ms)
+        ✓ recognizes the purchase expense on the accrual basis report (10 ms)
+        ✓ does not recognize the purchase expense on the cash basis report (10 ms)
+        ✓ posts the payable on the accrual basis trial balance (13 ms)
+        ✓ has no payable on the cash basis trial balance (10 ms)
+        ✓ does not double count the purchase expense on the accrual basis report (11 ms)
+        ✓ recognizes the purchase expense on the cash basis report (8 ms)
+        ✓ settles the payable on the accrual basis trial balance (8 ms)
+        ✓ keeps no payable on the cash basis trial balance (9 ms)
+        ✓ posts the cash outflow once on both bases (19 ms)
+      ✓ deposits the same amount in the bank on both bases
+      ✓ records the unapplied amount as unearned revenue on the cash basis
+      ✓ settles the unpaid opening balance first, the rest is unearned revenue (6 ms)
+      ✓ allocates nothing more once the opening balance is settled (6 ms)
+      ✓ gives the opening balance to the later payment once the earlier one is deleted (51 ms)
+      ✓ rewrites the payment's cash income lines (125 ms)
+      ✓ rewrites the payment's cash expense lines when the paid bill is edited (123 ms)
+      ✓ records the unapplied amount as prepaid expenses on the cash basis (58 ms)
+      ✓ rejects a payment that applies more than the amount paid (35 ms)
+      ✓ shows one row per payment (69 ms)
+Test Suites: 1 passed, 1 total
+Tests:       27 passed, 27 total
+
+[exited with code 0]

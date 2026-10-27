@@ -10,6 +10,7 @@ import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { Vendor } from '../models/Vendor';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { validateOpeningBalanceNotBelowPaid } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class EditOpeningBalanceVendorService {
@@ -44,6 +45,18 @@ export class EditOpeningBalanceVendorService {
 
     // Mutates the customer opening balance under unit-of-work.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Locks the vendor row so a payment saved at the same moment can't
+      // pay more than the new opening balance.
+      const lockedVendor = await this.vendorModel()
+        .query(trx)
+        .findById(vendorId)
+        .forUpdate();
+
+      // The new opening balance can't be below what payments already paid.
+      validateOpeningBalanceNotBelowPaid(
+        openingBalanceEditDTO.openingBalance,
+        lockedVendor.openingBalancePaymentAmount,
+      );
       // Triggers `onVendorOpeingBalanceChanging` event.
       await this.eventPublisher.emitAsync(
         events.vendors.onOpeningBalanceChanging,
@@ -56,7 +69,7 @@ export class EditOpeningBalanceVendorService {
 
       // Mutates the vendor on the storage.
       const vendor = await this.vendorModel()
-        .query()
+        .query(trx)
         .patchAndFetchById(vendorId, {
           ...openingBalanceEditDTO,
         });

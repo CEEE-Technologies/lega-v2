@@ -58,6 +58,19 @@ export function VendorDetailsHeader() {
           label={intl.get('vendor.drawer.label.opening_balance')}
           children={vendor?.formattedOpeningBalance}
         />
+        {/* The paid/unpaid part of the opening balance (an open item paid
+            from the payment forms). */}
+        {Number(vendor?.openingBalance) > 0 && (
+          <DetailItem
+            label={'Opening balance due'}
+            name={'opening-balance-due'}
+          >
+            {vendor?.formattedOpeningBalanceDueAmount}{' '}
+            <span style={{ opacity: 0.7 }}>
+              (paid {vendor?.formattedOpeningBalancePaymentAmount})
+            </span>
+          </DetailItem>
+        )}
         <DetailItem
           label={intl.get('vendor.drawer.label.opening_balance_at')}
           children={vendor?.formattedOpeningBalanceAt}

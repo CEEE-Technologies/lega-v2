@@ -4,6 +4,7 @@ import { FinancialTransactionLocking } from './guards/FinancialTransactionLockin
 import { PurchasesTransactionLockingGuard } from './guards/PurchasesTransactionLockingGuard';
 import { SalesTransactionLockingGuard } from './guards/SalesTransactionLockingGuard';
 import { TransactionsLockingGuard } from './guards/TransactionsLockingGuard';
+import { LinkedTransactionsLockingGuard } from './guards/LinkedTransactionsLockingGuard';
 import { TransactionsLockingRepository } from './TransactionsLockingRepository';
 import { FinancialTransactionLockingGuardSubscriber } from './subscribers/FinancialsTransactionLockingGuardSubscriber';
 import { PurchasesTransactionLockingGuardSubscriber } from './subscribers/PurchasesTransactionLockingGuardSubscriber';
@@ -25,7 +26,9 @@ import { SettingsModule } from '../Settings/Settings.module';
     PurchasesTransactionLockingGuardSubscriber,
     SalesTransactionLockingGuardSubscriber,
     QueryTransactionsLocking,
+    LinkedTransactionsLockingGuard,
   ],
+  exports: [LinkedTransactionsLockingGuard],
   controllers: [TransactionsLockingController],
 })
 export class TransactionsLockingModule {}

@@ -63,6 +63,19 @@ export function CustomerDetailsHeader() {
           label={intl.get('customer.drawer.label.opening_balance')}
           children={customer?.formattedOpeningBalance}
         />
+        {/* The paid/unpaid part of the opening balance (an open item paid
+            from the payment forms). */}
+        {Number(customer?.openingBalance) > 0 && (
+          <DetailItem
+            label={'Opening balance due'}
+            name={'opening-balance-due'}
+          >
+            {customer?.formattedOpeningBalanceDueAmount}{' '}
+            <span style={{ opacity: 0.7 }}>
+              (paid {customer?.formattedOpeningBalancePaymentAmount})
+            </span>
+          </DetailItem>
+        )}
         <DetailItem
           label={intl.get('customer.drawer.label.opening_balance_at')}
           children={customer?.formattedOpeningBalanceAt}

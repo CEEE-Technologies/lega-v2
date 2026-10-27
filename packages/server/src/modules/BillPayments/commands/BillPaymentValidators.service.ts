@@ -13,6 +13,7 @@ import {
   BillPaymentEntryDto,
   EditBillPaymentDto,
 } from '../dtos/BillPayment.dto';
+import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class BillPaymentValidators {
@@ -108,11 +109,16 @@ export class BillPaymentValidators {
    * @param {Knex.Transaction} trx - Locks the bill rows when given (FOR UPDATE).
    */
   public async validateBillsExistance(
-    billPaymentEntries: { billId: number }[],
+    billPaymentEntries: { billId?: number | null; entryType?: string }[],
     vendorId: number,
     trx?: Knex.Transaction,
   ) {
-    const entriesBillsIds = billPaymentEntries.map((e: any) => e.billId);
+    // Opening balance lines are validated against the vendor instead.
+    const entriesBillsIds = billPaymentEntries
+      .filter(isDocumentEntry)
+      .map((e: any) => e.billId);
+
+    if (entriesBillsIds.length === 0) return [];
 
     const storedBillsQuery = this.billModel()
       .query(trx)
@@ -153,9 +159,11 @@ export class BillPaymentValidators {
     oldPaymentEntries: BillPaymentEntry[] = [],
     trx?: Knex.Transaction,
   ) {
-    const billsIds = billPaymentEntries.map(
+    const billEntries = billPaymentEntries.filter(isDocumentEntry);
+    const billsIds = billEntries.map(
       (entry: BillPaymentEntryDto) => entry.billId,
     );
+    if (billsIds.length === 0) return;
 
     const storedBillsQuery = this.billModel()
       .query(trx)
@@ -168,7 +176,7 @@ export class BillPaymentValidators {
     const storedBillsMap = new Map(
       storedBills.map((bill) => {
         const oldEntries = oldPaymentEntries.filter(
-          (entry) => entry.billId === bill.id,
+          (entry) => isDocumentEntry(entry) && entry.billId === bill.id,
         );
         const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
 
@@ -184,7 +192,7 @@ export class BillPaymentValidators {
     }
     const hasWrongPaymentAmount: invalidPaymentAmountError[] = [];
 
-    billPaymentEntries.forEach((entry: BillPaymentEntryDto, index: number) => {
+    billEntries.forEach((entry: BillPaymentEntryDto, index: number) => {
       const entryBill = storedBillsMap.get(entry.billId);
       const { dueAmount } = entryBill;
 
@@ -194,6 +202,29 @@ export class BillPaymentValidators {
     });
     if (hasWrongPaymentAmount.length > 0) {
       throw new ServiceError(ERRORS.INVALID_BILL_PAYMENT_AMOUNT);
+    }
+  }
+
+  /**
+   * Validates the amounts applied to bills don't add up to more than the
+   * amount paid; otherwise bills get marked paid with money that never left
+   * the bank and the accrual and cash ledgers disagree.
+   * @param {number} amount - Amount paid.
+   * @param {{ paymentAmount: number }[]} entries - Lines applied to bills.
+   * @throws {ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT)}
+   */
+  public validateEntriesWithinAmount(
+    amount: number,
+    entries: { paymentAmount: number }[] = [],
+  ) {
+    const totalApplied = sumBy(
+      entries,
+      (entry) => Number(entry.paymentAmount) || 0,
+    );
+
+    // Compare in cents to ignore floating point noise.
+    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+      throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
     }
   }
 

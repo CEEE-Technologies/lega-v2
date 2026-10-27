@@ -90,6 +90,24 @@ export class PaymentReceivesController {
     );
   }
 
+  @Get('new-page/entries')
+  @RequirePermission(PaymentReceiveAction.View, AbilitySubject.PaymentReceive)
+  @ApiOperation({
+    summary:
+      "Retrieves the open items of the new payment page once a customer is selected: the customer's unpaid opening balance first, then the due invoices.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The receivable entries of the new payment page.',
+  })
+  public getPaymentReceiveNewPageEntries(
+    @Query('customerId', ParseIntPipe) customerId: number,
+  ) {
+    return this.paymentReceivesApplication.getPaymentReceivedNewPageEntries(
+      customerId,
+    );
+  }
+
   @Get(':id/edit-page')
   @ApiResponse({
     status: 200,

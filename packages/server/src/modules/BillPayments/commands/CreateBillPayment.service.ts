@@ -14,6 +14,7 @@ import { BillPayment } from '../models/BillPayment';
 import { Vendor } from '../../Vendors/models/Vendor';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreateBillPaymentDto } from '../dtos/BillPayment.dto';
+import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
 
 @Injectable()
 export class CreateBillPaymentService {
@@ -32,6 +33,7 @@ export class CreateBillPaymentService {
     private validators: BillPaymentValidators,
     private commandTransformerDTO: CommandBillPaymentDTOTransformer,
     private tenancyContext: TenancyContext,
+    private openingBalancePayment: ContactOpeningBalancePayment,
 
     @Inject(Vendor.name)
     private readonly vendorModel: TenantModelProxy<typeof Vendor>,
@@ -127,6 +129,11 @@ export class CreateBillPaymentService {
       billPaymentDTO,
       vendor,
     );
+    // Validates the amounts applied to bills are within the amount paid.
+    this.validators.validateEntriesWithinAmount(
+      billPaymentObj.amount,
+      billPaymentObj.entries,
+    );
     // Validate the payment account existance and type.
     const paymentAccount = await this.validators.getPaymentAccountOrThrowError(
       billPaymentObj.paymentAccountId,
@@ -152,6 +159,12 @@ export class CreateBillPaymentService {
     await this.validators.validateBillsDueAmount(
       billPaymentObj.entries,
       [],
+      trx,
+    );
+    // Validate the opening balance line against the locked vendor row.
+    await this.openingBalancePayment.validateOpeningBalanceEntries(
+      { contactId: billPaymentDTO.vendorId, entries: billPaymentObj.entries },
+      null,
       trx,
     );
     return { billPaymentObj };

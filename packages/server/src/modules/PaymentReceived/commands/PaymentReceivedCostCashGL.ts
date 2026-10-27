@@ -6,6 +6,7 @@ import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { PaymentReceived } from '../models/PaymentReceived';
 import { PaymentReceivedEntry } from '../models/PaymentReceivedEntry';
 import { increment } from '@/utils/increment';
+import { roundLedgerAmount } from '@/utils/ledger-rounding';
 
 /**
  * Aggregated cost of a single invoice item retrieved from the inventory
@@ -134,7 +135,8 @@ export class PaymentReceivedCostCashGL {
     const getIndexIncrement = increment(0);
 
     return itemCosts.flatMap((itemCost) => {
-      const cost = itemCost.cost * ratio;
+      // Both sides share the same rounded amount, so the pair balances.
+      const cost = roundLedgerAmount(itemCost.cost * ratio);
 
       // XXX Debit - Cost account.
       const costEntry = {

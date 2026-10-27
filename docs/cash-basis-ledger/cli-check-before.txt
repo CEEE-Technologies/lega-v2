@@ -1,0 +1,5 @@
+[96rherk78imvmvdogt] Cash basis check:
+  Bank/cash accounts where the cash and accrual totals differ:
+    #1000 Bank Account: cash 4791000, accrual 4861000 (diff -70000)
+  Entry sets: all balanced.
+Error: 1 of 1 organizations have problems.

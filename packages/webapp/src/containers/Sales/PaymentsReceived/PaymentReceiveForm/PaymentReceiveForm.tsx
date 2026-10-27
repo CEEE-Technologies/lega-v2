@@ -28,6 +28,7 @@ import {
   resetFormState,
   getExceededAmountFromValues,
   PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE,
+  NO_INVOICE_SELECTED_MESSAGE,
   type PaymentReceiveFormValues,
   type PaymentReceiveErrorResponse,
   type PaymentReceiveEditEntry,
@@ -65,6 +66,7 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
     editPaymentReceiveMutate,
     createPaymentReceiveMutate,
     isExcessConfirmed,
+    setIsExcessConfirmed,
     paymentReceivedState,
     paymentReceiveSettings,
   } = usePaymentReceiveFormContext();
@@ -133,6 +135,15 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
       setSubmitting(false);
       return;
     }
+    // A customer payment must pay an invoice or the opening balance.
+    if (!values.entries.some((entry) => Number(entry.paymentAmount) > 0)) {
+      AppToaster.show({
+        message: NO_INVOICE_SELECTED_MESSAGE,
+        intent: Intent.DANGER,
+      });
+      setSubmitting(false);
+      return Promise.resolve(false);
+    }
     if (exceededAmount > 0 && !isExcessConfirmed) {
       setSubmitting(false);
       openDialog('payment-received-excessed-payment');
@@ -140,8 +151,11 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
     }
     const form = transformFormToRequest(values);
 
+    // Resolves to whether the payment was saved, so the excess dialog only
+    // closes on success.
     const onSaved = () => {
       setSubmitting(false);
+      setIsExcessConfirmed(false);
       AppToaster.show({
         message: intl.get(
           paymentReceiveId
@@ -157,6 +171,7 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
       if (submitPayload.resetForm) {
         resetFormState({ resetForm, initialValues, values });
       }
+      return true;
     };
     const onError = ({
       data: { errors },
@@ -167,6 +182,8 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
         transformErrors(errors, { setFieldError });
       }
       setSubmitting(false);
+      setIsExcessConfirmed(false);
+      return false;
     };
 
     if (paymentReceiveId) {

@@ -33,6 +33,18 @@ export function PaymentMadeDetailTableFooter() {
           borderStyle={TotalLineBorderStyle.DoubleDark}
           textStyle={TotalLineTextStyle.Bold}
         />
+        {paymentMade.appliedAmountFormatted && (
+          <TotalLine
+            title={'Applied'}
+            value={paymentMade.appliedAmountFormatted}
+          />
+        )}
+        {paymentMade.unappliedAmountFormatted && (
+          <TotalLine
+            title={'Unapplied (credit)'}
+            value={paymentMade.unappliedAmountFormatted}
+          />
+        )}
       </PaymentMadeTotalLines>
     </PaymentMadeFooterRoot>
   );

@@ -5,6 +5,7 @@ import { AccountNormal } from '@/interfaces/Account';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { RefundCreditNote } from '../models/RefundCreditNote';
+import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
 
 /**
  * Records the cash basis journal entries of the credit note refund.
@@ -14,12 +15,17 @@ import { RefundCreditNote } from '../models/RefundCreditNote';
  * The entries mirror the income composition of the credit note (the income
  * accounts, discount, and other charges) scaled by the refunded proportion
  * of the credit note.
+ *
+ * When the credit note has no income to reverse (zero total or missing), the
+ * cash still leaves the bank, so the refund is taken from the customer's
+ * unearned revenue instead of dropping the withdrawal line.
  */
 export class RefundCreditNoteCashGL {
   private readonly refundCreditNote: RefundCreditNote;
 
   private discountAccountId: number;
   private adjustmentAccountId: number;
+  private unearnedRevenueAccountId: number;
 
   /**
    * Constructor method.
@@ -47,6 +53,25 @@ export class RefundCreditNoteCashGL {
   setAdjustmentAccountId(adjustmentAccountId: number) {
     this.adjustmentAccountId = adjustmentAccountId;
     return this;
+  }
+
+  /**
+   * Sets the unearned revenue account id, debited when the credit note has
+   * no income to reverse.
+   * @param {number} unearnedRevenueAccountId - Unearned revenue account id.
+   * @returns {RefundCreditNoteCashGL}
+   */
+  setUnearnedRevenueAccountId(unearnedRevenueAccountId: number) {
+    this.unearnedRevenueAccountId = unearnedRevenueAccountId;
+    return this;
+  }
+
+  /**
+   * Determines whether the refund reverses credit note income pro-rata.
+   * @returns {boolean}
+   */
+  public isIncomeReversible(): boolean {
+    return !!this.refundCreditNote.creditNote && this.refundRatio > 0;
   }
 
   /**
@@ -102,7 +127,7 @@ export class RefundCreditNoteCashGL {
   private get refundEntry(): ILedgerEntry {
     return {
       ...this.cashEntriesCommonEntry,
-      credit: this.refundCreditNote.amount,
+      credit: roundLedgerAmount(this.refundCreditNote.amount),
       accountId: this.refundCreditNote.fromAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -184,21 +209,39 @@ export class RefundCreditNoteCashGL {
    * @returns {ILedgerEntry[]}
    */
   public GLEntries(): ILedgerEntry[] {
-    const creditNote = this.refundCreditNote.creditNote;
-
-    if (!creditNote || this.refundRatio <= 0) {
+    if (roundLedgerAmount(this.refundCreditNote.amount) <= 0) {
       return [];
     }
+    if (!this.isIncomeReversible()) {
+      return [this.refundEntry, this.unearnedRevenueEntry];
+    }
+    const creditNote = this.refundCreditNote.creditNote;
     const itemsEntries = (creditNote.entries || []).map((item, index) =>
       this.getCreditNoteItemEntry(item, index),
     );
 
-    return [
+    return roundLedgerEntries([
       this.refundEntry,
       ...this.discountEntry,
       ...this.adjustmentEntry,
       ...itemsEntries,
-    ];
+    ]);
+  }
+
+  /**
+   * Retrieves the unearned revenue debit entry balancing the withdrawal when
+   * the credit note has no income to reverse.
+   * @returns {ILedgerEntry}
+   */
+  private get unearnedRevenueEntry(): ILedgerEntry {
+    return {
+      ...this.cashEntriesCommonEntry,
+      debit: roundLedgerAmount(this.refundCreditNote.amount),
+      accountId: this.unearnedRevenueAccountId,
+      contactId: this.refundCreditNote.creditNote?.customerId,
+      index: 2,
+      accountNormal: AccountNormal.CREDIT,
+    };
   }
 
   /**

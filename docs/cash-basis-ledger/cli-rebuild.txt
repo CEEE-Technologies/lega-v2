@@ -1,0 +1,6 @@
+[96rherk78imvmvdogt] Rebuilding the cash basis entries...
+[96rherk78imvmvdogt] Rebuilt: PaymentReceive 30, BillPayment 0, RefundCreditNote 0, RefundVendorCredit 0. Orphan cash sets removed: 0.
+[96rherk78imvmvdogt] Cash basis check:
+  Bank/cash accounts: cash and accrual totals match.
+  Entry sets: all balanced.
+1 organizations rebuilt: no differences.

@@ -32,7 +32,9 @@ import type {
 
 const commonInvalidateQueries = (client: ReturnType<typeof useQueryClient>) => {
   client.invalidateQueries({ queryKey: paymentMadesKeys.all() });
-  client.invalidateQueries({ queryKey: paymentMadesKeys.newEntries() });
+  client.invalidateQueries({
+    queryKey: paymentMadesKeys.newEntries().slice(0, 1),
+  });
   client.invalidateQueries({
     queryKey: paymentMadesKeys.editPage(null).slice(0, 1),
   });

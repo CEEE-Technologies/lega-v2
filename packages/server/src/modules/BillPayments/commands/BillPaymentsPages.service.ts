@@ -6,12 +6,19 @@ import { BillPayment } from '../models/BillPayment';
 import { IBillReceivePageEntry } from '../types/BillPayments.types';
 import { ServiceError } from '../../Items/ServiceError';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { Vendor } from '@/modules/Vendors/models/Vendor';
+import {
+  PaymentEntryTypes,
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class BillPaymentsPages {
   /**
    * @param {TenantModelProxy<typeof Bill>} billModel - Bill model.
    * @param {TenantModelProxy<typeof BillPayment>} billPaymentModel - Bill payment model.
+   * @param {TenantModelProxy<typeof Vendor>} vendorModel - Vendor model.
    */
   constructor(
     @Inject(Bill.name)
@@ -19,6 +26,9 @@ export class BillPaymentsPages {
 
     @Inject(BillPayment.name)
     private readonly billPaymentModel: TenantModelProxy<typeof BillPayment>,
+
+    @Inject(Vendor.name)
+    private readonly vendorModel: TenantModelProxy<typeof Vendor>,
   ) {}
 
   /**
@@ -40,7 +50,17 @@ export class BillPaymentsPages {
     if (!billPayment) {
       throw new ServiceError(ERRORS.PAYMENT_MADE_NOT_FOUND);
     }
-    const paymentEntries = billPayment.entries.map((entry) => ({
+    const billEntries = billPayment.entries.filter(
+      (entry) => isDocumentEntry(entry) && entry.bill,
+    );
+    const openingBalanceEntry = billPayment.entries.find(isOpeningBalanceEntry);
+
+    // The opening balance row comes first, with this payment's amount.
+    const openingBalanceEntries = await this.getOpeningBalancePageEntries(
+      billPayment.vendorId,
+      openingBalanceEntry?.paymentAmount || 0,
+    );
+    const paymentEntries = billEntries.map((entry) => ({
       ...this.mapBillToPageEntry(entry.bill),
       dueAmount: entry.bill.dueAmount + entry.paymentAmount,
       paymentAmount: entry.paymentAmount,
@@ -53,13 +73,19 @@ export class BillPaymentsPages {
       .where('vendor_id', billPayment.vendorId)
       .whereNotIn(
         'id',
-        billPayment.entries.map((e) => e.billId),
+        billEntries.map((e) => e.billId),
       )
       .orderBy('bill_date', 'ASC');
 
     // Mapping the payable bills to entries.
-    const restPayableEntries = resPayableBills.map(this.mapBillToPageEntry);
-    const entries = [...paymentEntries, ...restPayableEntries];
+    const restPayableEntries = resPayableBills.map((bill) =>
+      this.mapBillToPageEntry(bill),
+    );
+    const entries = [
+      ...openingBalanceEntries,
+      ...paymentEntries,
+      ...restPayableEntries,
+    ];
 
     return {
       billPayment: omit(billPayment, ['entries']),
@@ -68,13 +94,16 @@ export class BillPaymentsPages {
   }
 
   /**
-   * Retrieve the payable entries of the new page once vendor be selected.
-   * @param {number} tenantId
+   * Retrieve the payable entries of the new page once vendor be selected:
+   * the unpaid opening balance first (the oldest item), then the due bills.
    * @param {number} vendorId
    */
   public async getNewPageEntries(
     vendorId: number,
   ): Promise<IBillReceivePageEntry[]> {
+    const openingBalanceEntries =
+      await this.getOpeningBalancePageEntries(vendorId);
+
     // Retrieve all payable bills that associated to the payment made transaction.
     const payableBills = await this.billModel()
       .query()
@@ -83,7 +112,38 @@ export class BillPaymentsPages {
       .where('vendor_id', vendorId)
       .orderBy('bill_date', 'ASC');
 
-    return payableBills.map(this.mapBillToPageEntry);
+    return [
+      ...openingBalanceEntries,
+      ...payableBills.map((bill) => this.mapBillToPageEntry(bill)),
+    ];
+  }
+
+  /**
+   * Retrieves the opening balance row when the vendor has an unpaid opening
+   * balance, or the edited payment pays part of it.
+   * @param {number} vendorId
+   * @param {number} thisPaymentAmount - What the edited payment pays of it.
+   */
+  private async getOpeningBalancePageEntries(
+    vendorId: number,
+    thisPaymentAmount: number = 0,
+  ): Promise<IBillReceivePageEntry[]> {
+    const vendor = await this.vendorModel().query().findById(vendorId);
+
+    if (!vendor || !(vendor.openingBalance > 0)) return [];
+
+    const entry: IBillReceivePageEntry = {
+      entryType: PaymentEntryTypes.OpeningBalance,
+      billId: null,
+      billNo: null,
+      amount: vendor.openingBalance,
+      dueAmount: vendor.openingBalanceDueAmount + thisPaymentAmount,
+      totalPaymentAmount: vendor.openingBalancePaymentAmount,
+      paymentAmount: thisPaymentAmount,
+      currencyCode: vendor.currencyCode,
+      date: vendor.openingBalanceAt,
+    };
+    return entry.dueAmount > 0 || thisPaymentAmount > 0 ? [entry] : [];
   }
 
   /**
@@ -93,7 +153,7 @@ export class BillPaymentsPages {
    */
   private mapBillToPageEntry(bill: Bill): IBillReceivePageEntry {
     return {
-      entryType: 'invoice',
+      entryType: PaymentEntryTypes.Invoice,
       billId: bill.id,
       billNo: bill.billNumber,
       amount: bill.amount,

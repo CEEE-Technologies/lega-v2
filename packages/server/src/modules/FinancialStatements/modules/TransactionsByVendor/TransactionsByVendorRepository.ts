@@ -1,4 +1,5 @@
 import * as moment from 'moment';
+import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { assoc } from '@/common/fp';
 import { isEmpty, map } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
@@ -233,6 +234,7 @@ export class TransactionsByVendorRepository extends TransactionsByContactReposit
 
     const openingTransactions = await this.accountTransactionModel()
       .query()
+      .modify('filterByBasis', AccountingBasis.Accrual)
       .modify(
         'contactsOpeningBalance',
         openingDate,
@@ -260,6 +262,9 @@ export class TransactionsByVendorRepository extends TransactionsByContactReposit
       .onBuild((query) => {
         // Filter by date.
         query.modify('filterDateRange', fromDate, toDate);
+
+        // Contact balances are accrual based.
+        query.modify('filterByBasis', AccountingBasis.Accrual);
 
         // Filter by customers.
         query.whereNot('contactId', null);

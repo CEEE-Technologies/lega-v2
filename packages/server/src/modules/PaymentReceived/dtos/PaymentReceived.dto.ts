@@ -8,10 +8,16 @@ import {
   IsArray,
   IsNotEmpty,
   IsInt,
+  IsIn,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { ToNumber } from '@/common/decorators/Validators';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
+import {
+  PaymentEntryType,
+  PaymentEntryTypes,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 export class PaymentReceivedEntryDto {
   @ToNumber()
@@ -29,10 +35,23 @@ export class PaymentReceivedEntryDto {
   @IsInt()
   paymentReceiveId?: number;
 
+  @IsOptional()
+  @IsIn(Object.values(PaymentEntryTypes))
+  @ApiProperty({
+    description:
+      "What the line pays: an invoice (default) or the customer's opening balance",
+    enum: Object.values(PaymentEntryTypes),
+    required: false,
+    example: 'invoice',
+  })
+  entryType?: PaymentEntryType;
+
+  // Required for invoice lines; opening balance lines have no invoice.
+  @ValidateIf((entry) => entry.entryType !== PaymentEntryTypes.OpeningBalance)
   @ToNumber()
   @IsInt()
   @IsNotEmpty()
-  invoiceId: number;
+  invoiceId?: number;
 
   @ToNumber()
   @IsNumber()

@@ -46,7 +46,7 @@ const createInvoiceDateCell = (onViewInvoiceDetail?: OnViewInvoiceDetail) => {
     const formattedDate = moment(value).format('YYYY MMM DD');
 
     if (!original?.invoiceId) {
-      return <span>{formattedDate}</span>;
+      return <span>{value ? formattedDate : '-'}</span>;
     }
     return (
       <a
@@ -66,6 +66,10 @@ const createInvoiceDateCell = (onViewInvoiceDetail?: OnViewInvoiceDetail) => {
  * Invoice number table cell accessor.
  */
 function InvNumberCellAccessor(row: PaymentReceiveEntry): string {
+  // The customer opening balance is an open item without an invoice.
+  if (row?.entryType === 'opening_balance') {
+    return 'Opening balance';
+  }
   return row?.invoiceNo ? `#${row?.invoiceNo || ''}` : '-';
 }
 
@@ -84,7 +88,11 @@ const createInvoiceNumberCell = (onViewInvoiceDetail?: OnViewInvoiceDetail) => {
     value,
   }: InvoiceNumberCellProps) {
     if (!original?.invoiceId) {
-      return <span>{value}</span>;
+      return original?.entryType === 'opening_balance' ? (
+        <strong>{value}</strong>
+      ) : (
+        <span>{value}</span>
+      );
     }
     return (
       <a
@@ -121,7 +129,7 @@ export const usePaymentReceiveEntriesColumns = (
   return React.useMemo(
     () => [
       {
-        Header: 'Invoice date',
+        Header: 'Date',
         id: 'invoiceDate',
         // Page entries carry the invoice date as `date`.
         accessor: 'date',

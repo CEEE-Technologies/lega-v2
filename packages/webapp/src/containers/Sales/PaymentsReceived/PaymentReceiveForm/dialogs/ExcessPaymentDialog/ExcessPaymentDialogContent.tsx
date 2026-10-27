@@ -32,10 +32,22 @@ export function ExcessPaymentDialogContentRoot({
     setSubmitting(true);
     setIsExcessConfirmed(true);
 
-    submitForm().then(() => {
-      closeDialog(dialogName);
-      setSubmitting(false);
-    });
+    // Closes only once the payment is saved; on an error the message shows
+    // and the dialog stays open.
+    submitForm()
+      .then((saved: unknown) => {
+        setSubmitting(false);
+
+        if (saved === true) {
+          closeDialog(dialogName);
+        } else {
+          setIsExcessConfirmed(false);
+        }
+      })
+      .catch(() => {
+        setSubmitting(false);
+        setIsExcessConfirmed(false);
+      });
   };
   const handleClose = () => {
     closeDialog(dialogName);

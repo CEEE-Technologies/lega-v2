@@ -11,6 +11,10 @@ import { ServiceError } from '@/modules/Items/ServiceError';
 import { ACCOUNT_TYPE } from '@/constants/accounts';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditPaymentReceivedDto } from '../dtos/PaymentReceived.dto';
+import {
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class PaymentReceivedValidators {
@@ -66,21 +70,27 @@ export class PaymentReceivedValidators {
   }
 
   /**
-   * Validates the invoices IDs existance.
+   * Validates the invoices IDs existance. A payment must pay at least one
+   * invoice or the customer opening balance.
    * @param {number} customerId -
    * @param {IPaymentReceivedEntryDTO[]} paymentReceiveEntries -
    * @param {Knex.Transaction} trx - Locks the invoice rows when given (FOR UPDATE).
    */
   public async validateInvoicesIDsExistance(
     customerId: number,
-    paymentReceiveEntries: { invoiceId: number }[],
+    paymentReceiveEntries: { invoiceId?: number | null; entryType?: string }[],
     trx?: Knex.Transaction,
   ): Promise<SaleInvoice[]> {
     const invoicesIds = paymentReceiveEntries
-      .map((e: { invoiceId: number }) => e.invoiceId)
+      .filter(isDocumentEntry)
+      .map((e) => e.invoiceId)
       .filter((id): id is number => id !== undefined && id !== null);
 
     if (invoicesIds.length === 0) {
+      // Paying only the opening balance needs no invoice.
+      if (paymentReceiveEntries.some(isOpeningBalanceEntry)) {
+        return [];
+      }
       throw new ServiceError(ERRORS.INVOICES_IDS_NOT_FOUND);
     }
 
@@ -145,9 +155,13 @@ export class PaymentReceivedValidators {
     oldPaymentEntries: PaymentReceivedEntry[] = [],
     trx?: Knex.Transaction,
   ) {
-    const invoicesIds = paymentReceiveEntries.map(
+    // Opening balance lines are validated against the customer instead.
+    const invoiceEntries = paymentReceiveEntries.filter(isDocumentEntry);
+    const invoicesIds = invoiceEntries.map(
       (e: IPaymentReceivedEntryDTO) => e.invoiceId,
     );
+    if (invoicesIds.length === 0) return;
+
     const storedInvoicesQuery = this.saleInvoiceModel()
       .query(trx)
       .whereIn('id', invoicesIds);
@@ -161,7 +175,7 @@ export class PaymentReceivedValidators {
       storedInvoices.map((invoice: SaleInvoice) => {
         // Only this invoice's line on the old payment frees up its due amount.
         const oldEntries = oldPaymentEntries.filter(
-          (entry) => entry.invoiceId === invoice.id,
+          (entry) => isDocumentEntry(entry) && entry.invoiceId === invoice.id,
         );
         const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
 
@@ -173,16 +187,14 @@ export class PaymentReceivedValidators {
     );
     const hasWrongPaymentAmount: any[] = [];
 
-    paymentReceiveEntries.forEach(
-      (entry: IPaymentReceivedEntryDTO, index: number) => {
-        const entryInvoice = storedInvoicesMap.get(entry.invoiceId);
-        const { dueAmount } = entryInvoice;
+    invoiceEntries.forEach((entry: IPaymentReceivedEntryDTO, index: number) => {
+      const entryInvoice = storedInvoicesMap.get(entry.invoiceId);
+      const { dueAmount } = entryInvoice;
 
-        if (dueAmount < entry.paymentAmount) {
-          hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
-        }
-      },
-    );
+      if (dueAmount < entry.paymentAmount) {
+        hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
+      }
+    });
     if (hasWrongPaymentAmount.length > 0) {
       throw new ServiceError(ERRORS.INVALID_PAYMENT_AMOUNT);
     }

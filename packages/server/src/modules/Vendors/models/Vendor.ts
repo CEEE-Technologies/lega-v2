@@ -37,6 +37,7 @@ export class Vendor extends TenantBaseModel {
   openingBalanceExchangeRate: number;
   openingBalanceAt: Date | string;
   openingBalanceBranchId?: number;
+  openingBalancePaymentAmount: number;
 
   salutation: string;
   firstName: string;
@@ -96,7 +97,12 @@ export class Vendor extends TenantBaseModel {
    * Defined virtual attributes.
    */
   static get virtualAttributes() {
-    return ['closingBalance', 'contactNormal', 'localOpeningBalance'];
+    return [
+      'closingBalance',
+      'contactNormal',
+      'localOpeningBalance',
+      'openingBalanceDueAmount',
+    ];
   }
 
   /**
@@ -114,6 +120,20 @@ export class Vendor extends TenantBaseModel {
     return this.openingBalance
       ? this.openingBalance * this.openingBalanceExchangeRate
       : 0;
+  }
+
+  /**
+   * Retrieves the unpaid part of the opening balance (contact currency).
+   * @returns {number}
+   */
+  get openingBalanceDueAmount() {
+    return Math.max(
+      Math.round(
+        ((this.openingBalance || 0) - (this.openingBalancePaymentAmount || 0)) *
+          1000,
+      ) / 1000,
+      0,
+    );
   }
 
   /**

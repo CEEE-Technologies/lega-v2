@@ -141,6 +141,28 @@ export class RefundVendorCreditGLEntries {
       this.getRefundVendorCreditGLEntries(refundVendorCredit, APAccountId),
     );
 
+    // Cash basis ledger entries.
+    const cashLedger = await this.getRefundVendorCreditCashLedger(
+      refundVendorCredit,
+      trx,
+    );
+
+    return new Ledger([
+      ...accrualLedger.getEntries(),
+      ...cashLedger.getEntries(),
+    ]);
+  };
+
+  /**
+   * Retrieves the refund vendor credit cash basis ledger.
+   * @param {RefundVendorCredit} refundVendorCredit - Refund vendor credit.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<Ledger>}
+   */
+  public getRefundVendorCreditCashLedger = async (
+    refundVendorCredit: RefundVendorCredit,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger> => {
     // Find or create the purchase discount account.
     const purchaseDiscountAccount =
       await this.accountRepository.findOrCreatePurchaseDiscountAccount({}, trx);
@@ -154,13 +176,85 @@ export class RefundVendorCreditGLEntries {
       .setPurchaseDiscountAccountId(purchaseDiscountAccount.id)
       .setOtherExpensesAccountId(otherExpensesAccount.id);
 
-    // Cash basis ledger entries.
-    const cashLedger = refundVendorCreditCashGL.getLedger();
+    // A vendor credit with no expense to reverse returns the refund to the
+    // vendor's prepaid expenses.
+    if (!refundVendorCreditCashGL.isExpenseReversible()) {
+      const prepaidExpensesAccount =
+        await this.accountRepository.findOrCreatePrepardExpenses({}, trx);
+      refundVendorCreditCashGL.setPrepaidExpensesAccountId(
+        prepaidExpensesAccount.id,
+      );
+    }
+    return refundVendorCreditCashGL.getLedger();
+  };
 
-    return new Ledger([
-      ...accrualLedger.getEntries(),
-      ...cashLedger.getEntries(),
-    ]);
+  /**
+   * Rewrites only the cash basis entries of the given refund, e.g. once the
+   * vendor credit is edited, leaving the accrual entries and balances alone.
+   * @param {number} refundVendorCreditId - Refund vendor credit id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteRefundVendorCreditCashGLEntries = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    await this.ledgerStorage.deleteByReference(
+      refundVendorCreditId,
+      'RefundVendorCredit',
+      trx,
+      { basis: AccountingBasis.Cash },
+    );
+    const refundVendorCredit = await this.refundVendorCreditModel()
+      .query(trx)
+      .findById(refundVendorCreditId)
+      .withGraphFetched('vendorCredit.entries.item');
+
+    if (!refundVendorCredit) return;
+
+    const cashLedger = await this.getRefundVendorCreditCashLedger(
+      refundVendorCredit,
+      trx,
+    );
+    await this.ledgerStorage.commit(cashLedger, trx);
+  };
+
+  /**
+   * Retrieves the refunds of the given vendor credit, whose cash entries a
+   * vendor credit edit rewrites.
+   * @param {number} vendorCreditId - Vendor credit id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public getVendorCreditRefunds = async (
+    vendorCreditId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    const refunds = await this.refundVendorCreditModel()
+      .query(trx)
+      .where('vendorCreditId', vendorCreditId);
+
+    return refunds.map((refund) => ({
+      label: refund.referenceNo ? `Refund ${refund.referenceNo}` : 'A refund',
+      date: refund.date,
+    }));
+  };
+
+  /**
+   * Rewrites the cash basis entries of all the refunds of the given vendor
+   * credit.
+   * @param {number} vendorCreditId - Vendor credit id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteVendorCreditRefundsCashGLEntries = async (
+    vendorCreditId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    const refunds = await this.refundVendorCreditModel()
+      .query(trx)
+      .where('vendorCreditId', vendorCreditId);
+
+    for (const refund of refunds) {
+      await this.rewriteRefundVendorCreditCashGLEntries(refund.id, trx);
+    }
   };
 
   /**

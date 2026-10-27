@@ -180,6 +180,6 @@ export class GetPaymentReceivedEntryMailState extends PaymentReceivedEntryTransf
    * @returns {string}
    */
   public invoiceNumber = (entry) => {
-    return entry.invoice.invoiceNo;
+    return entry.invoice?.invoiceNo ?? 'Opening balance';
   };
 }

@@ -6,6 +6,7 @@ import { assocItemEntriesDefaultIndex } from '@/utils/associate-item-entries-ind
 import { BranchTransactionDTOTransformer } from '@/modules/Branches/integrations/BranchTransactionDTOTransform';
 import { Vendor } from '@/modules/Vendors/models/Vendor';
 import { BillPayment } from '../models/BillPayment';
+import { normalizePaymentEntryType } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import {
   CreateBillPaymentDto,
   EditBillPaymentDto,
@@ -36,7 +37,11 @@ export class CommandBillPaymentDTOTransformer {
     const entries = R.compose(
       // Associate the default index to payment entries.
       assocItemEntriesDefaultIndex,
-    )(billPaymentDTO.entries);
+    )(
+      (billPaymentDTO.entries || []).map((entry) =>
+        normalizePaymentEntryType(entry, 'billId'),
+      ),
+    );
 
     const initialDTO = {
       ...formatDateFields(omit(billPaymentDTO, ['attachments']), [

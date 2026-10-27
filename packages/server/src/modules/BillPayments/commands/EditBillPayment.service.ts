@@ -14,6 +14,7 @@ import { events } from '@/common/events/events';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditBillPaymentDto } from '../dtos/BillPayment.dto';
+import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
 
 @Injectable()
 export class EditBillPayment {
@@ -23,6 +24,7 @@ export class EditBillPayment {
     private readonly uow: UnitOfWork,
     private readonly transformer: CommandBillPaymentDTOTransformer,
     private readonly tenancyContext: TenancyContext,
+    private readonly openingBalancePayment: ContactOpeningBalancePayment,
 
     @Inject(BillPayment.name)
     private readonly billPaymentModel: TenantModelProxy<typeof BillPayment>,
@@ -139,6 +141,11 @@ export class EditBillPayment {
     );
     // Validate vendor not modified.
     this.validators.validateVendorNotModified(billPaymentDTO, oldBillPayment);
+    // Validates the amounts applied to bills are within the amount paid.
+    this.validators.validateEntriesWithinAmount(
+      billPaymentObj.amount,
+      billPaymentObj.entries,
+    );
 
     // Validate the payment account existance and type.
     const paymentAccount = await this.validators.getPaymentAccountOrThrowError(
@@ -173,6 +180,12 @@ export class EditBillPayment {
     await this.validators.validateBillsDueAmount(
       billPaymentObj.entries,
       oldBillPayment.entries,
+      trx,
+    );
+    // Validate the opening balance line against the locked vendor row.
+    await this.openingBalancePayment.validateOpeningBalanceEntries(
+      { contactId: billPaymentDTO.vendorId, entries: billPaymentObj.entries },
+      { contactId: oldBillPayment.vendorId, entries: oldBillPayment.entries },
       trx,
     );
     return { oldBillPayment, billPaymentObj };

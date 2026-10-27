@@ -90,7 +90,11 @@ export class BillPaymentAccrualGL {
     return sumBy(this.billPayment.entries, (entry) => {
       const paymentLocalAmount =
         entry.paymentAmount * this.billPayment.exchangeRate;
-      const invoicePayment = entry.paymentAmount * entry.bill.exchangeRate;
+      // Opening balance lines have no bill: no exchange difference
+      // (foreign currency opening balances are not handled here).
+      const billExchangeRate =
+        entry.bill?.exchangeRate ?? this.billPayment.exchangeRate;
+      const invoicePayment = entry.paymentAmount * billExchangeRate;
 
       return invoicePayment - paymentLocalAmount;
     });

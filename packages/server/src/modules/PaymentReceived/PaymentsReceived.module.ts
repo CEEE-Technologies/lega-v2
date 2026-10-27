@@ -34,6 +34,8 @@ import { PaymentReceivedSyncInvoicesSubscriber } from './subscribers/PaymentRece
 import { PaymentReceivedInvoiceSync } from './commands/PaymentReceivedInvoiceSync.service';
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
+import { ContactsModule } from '../Contacts/Contacts.module';
+import { PaymentReceivedOpeningBalanceSubscriber } from './subscribers/PaymentReceivedOpeningBalanceSubscriber';
 import { SendPaymentReceiveMailNotification } from './commands/PaymentReceivedMailNotification';
 import { GetPaymentsReceivedService } from './queries/GetPaymentsReceived.service';
 import { MailNotificationModule } from '../MailNotification/MailNotification.module';
@@ -77,6 +79,7 @@ const models = [RegisterTenancyModel(InventoryCostLotTracker)];
     PaymentReceivedAutoIncrementSubscriber,
     PaymentReceivedSmsNotificationSubscriber,
     PaymentReceivedGLEntriesSubscriber,
+    PaymentReceivedOpeningBalanceSubscriber,
     PaymentReceivedCostGLEntriesSubscriber,
     PaymentReceivedSyncInvoicesSubscriber,
     GetPaymentsReceivedService,
@@ -109,6 +112,7 @@ const models = [RegisterTenancyModel(InventoryCostLotTracker)];
     AutoIncrementOrdersModule,
     LedgerModule,
     AccountsModule,
+    ContactsModule,
     MailNotificationModule,
     DynamicListModule,
     MailModule,

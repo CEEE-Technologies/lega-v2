@@ -106,6 +106,7 @@ import { TenantModelsInitializeModule } from '../Tenancy/TenantModelsInitialize.
 import { SocketModule } from '../Socket/Socket.module';
 import { EEModule } from '../EE/EE.module';
 import { AnalyticsModule } from '../Analytics/Analytics.module';
+import { AccountingBasisModule } from '../AccountingBasis/AccountingBasis.module';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AppThrottleModule } from './AppThrottle.module';
 
@@ -263,6 +264,7 @@ import { AppThrottleModule } from './AppThrottle.module';
     EEModule,
     AnalyticsModule,
     ExchangeRatesModule,
+    AccountingBasisModule,
   ],
   controllers: [AppController],
   providers: [

@@ -58,7 +58,11 @@ export class PaymentReceivedAccrualGL {
     return sumBy(this.paymentReceived.entries, (entry) => {
       const paymentLocalAmount =
         entry.paymentAmount * this.paymentReceived.exchangeRate;
-      const invoicePayment = entry.paymentAmount * entry.invoice.exchangeRate;
+      // Opening balance lines have no invoice: no exchange difference
+      // (foreign currency opening balances are not handled here).
+      const invoiceExchangeRate =
+        entry.invoice?.exchangeRate ?? this.paymentReceived.exchangeRate;
+      const invoicePayment = entry.paymentAmount * invoiceExchangeRate;
 
       return paymentLocalAmount - invoicePayment;
     });

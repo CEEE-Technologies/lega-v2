@@ -4,6 +4,7 @@ import { SaleInvoice } from '../../SaleInvoices/models/SaleInvoice';
 import { IPaymentReceivedEntryDTO } from '../types/PaymentReceived.types';
 import { entriesAmountDiff } from '@/utils/entries-amount-diff';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class PaymentReceivedInvoiceSync {
@@ -25,9 +26,12 @@ export class PaymentReceivedInvoiceSync {
   ): Promise<void> {
     const opers: Promise<void>[] = [];
 
+    // Opening balance lines have no invoice; they sync to the customer.
     const diffEntries = entriesAmountDiff(
-      newPaymentReceiveEntries,
-      oldPaymentReceiveEntries,
+      (newPaymentReceiveEntries || []).filter(isDocumentEntry),
+      oldPaymentReceiveEntries
+        ? oldPaymentReceiveEntries.filter(isDocumentEntry)
+        : oldPaymentReceiveEntries,
       'paymentAmount',
       'invoiceId',
     );

@@ -14,6 +14,7 @@ import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 type Row = {
   billId?: string | number;
   billNo?: string;
+  entryType?: string;
   currencyCode?: string;
 };
 
@@ -32,6 +33,10 @@ const createBillClickHandler =
   };
 
 function BillNumberAccessor(row: Row): string {
+  // The vendor opening balance is an open item without a bill.
+  if (row?.entryType === 'opening_balance') {
+    return 'Opening balance';
+  }
   return row?.billNo ? row?.billNo : '-';
 }
 
@@ -52,7 +57,7 @@ const createBillDateCell = (onViewBillDetail?: OnViewBillDetail) => {
     const formattedDate = moment(value).format('YYYY MMM DD');
 
     if (!original?.billId) {
-      return <span>{formattedDate}</span>;
+      return <span>{value ? formattedDate : '-'}</span>;
     }
     return (
       <a
@@ -83,7 +88,11 @@ const createBillNumberCell = (onViewBillDetail?: OnViewBillDetail) => {
     value,
   }: BillNumberCellProps) {
     if (!original?.billId) {
-      return <span>{value}</span>;
+      return original?.entryType === 'opening_balance' ? (
+        <strong>{value}</strong>
+      ) : (
+        <span>{value}</span>
+      );
     }
     return (
       <a
@@ -121,7 +130,7 @@ export function usePaymentMadeEntriesTableColumns(
   return React.useMemo(
     () => [
       {
-        Header: 'Bill date',
+        Header: 'Date',
         id: 'billDate',
         // Page entries carry the bill date as `date`.
         accessor: 'date',

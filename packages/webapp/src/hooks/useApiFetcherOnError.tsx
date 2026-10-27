@@ -1,6 +1,8 @@
+import { Intent } from '@blueprintjs/core';
 import { useCallback } from 'react';
 import { useAuthActions, useSetGlobalErrors } from './state';
 import type { ApiError } from 'openapi-typescript-fetch';
+import { AppToaster } from '@/components/AppToaster';
 
 /**
  * Returns a stable callback that translates SDK fetcher rejections into
@@ -38,6 +40,21 @@ export function useApiFetcherOnError() {
         if (lockedError) {
           setGlobalErrors({
             transactionsLocked: { ...lockedError.payload },
+          });
+        }
+        // A payment or refund linked to the edited document is in a locked
+        // period; the server message names it.
+        const linkedLockedError = data.errors.find(
+          (e: { type?: string }) =>
+            e.type === 'LINKED_TRANSACTIONS_DATE_LOCKED',
+        );
+        if (linkedLockedError) {
+          AppToaster.show({
+            message:
+              linkedLockedError.message ||
+              'A linked payment or refund is in a locked period.',
+            intent: Intent.DANGER,
+            timeout: 10000,
           });
         }
         if (
