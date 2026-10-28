@@ -15,6 +15,7 @@ import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ContactOpeningBalanceAccount } from '@/modules/Contacts/ContactOpeningBalanceAccount.service';
 import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import {
+  getDocumentsAccrualLines,
   getDocumentsPaidBefore,
   getLaterPayments,
   rewritePaymentsInOrder,
@@ -156,9 +157,16 @@ export class PaymentReceivedGLEntries {
       'exchange-grain-loss',
     )) as Account;
 
+    // What the earlier payments paid on each invoice: the A/R relief at
+    // the invoice rate is a running total from there.
+    const paidBefore = await this.getPaymentInvoicesPaidBefore(
+      paymentReceive,
+      trx,
+    );
     const paymentReceivedAccrualGL = new PaymentReceivedAccrualGL(
       paymentReceive,
     )
+      .setPaidBefore(paidBefore)
       .setARAccountId(receivableAccount.id)
       .setExchangeGainOrLossAccountId(exGainLossAccount.id)
       .setBaseCurrencyCode(baseCurrencyCode);
@@ -187,7 +195,23 @@ export class PaymentReceivedGLEntries {
     const otherChargesAccount =
       await this.accountRepository.findOrCreateOtherChargesAccount({}, trx);
 
+    // Exchange gain/loss account: the currency rounding cent of a foreign
+    // currency payment.
+    const exGainLossAccount = (await this.accountRepository.findBySlug(
+      'exchange-grain-loss',
+    )) as Account;
     const paymentReceivedCashGL = new PaymentReceivedCashGL(paymentReceive)
+      .setExchangeGainOrLossAccountId(exGainLossAccount?.id ?? null)
+      .setAccrualLines(
+        await getDocumentsAccrualLines(
+          trx ?? this.paymentReceivedModel().knex(),
+          'SaleInvoice',
+          (paymentReceive.entries || [])
+            .filter(isDocumentEntry)
+            .map((entry) => entry.invoiceId),
+          1,
+        ),
+      )
       .setTaxPayableAccountId(taxPayableAccount.id)
       .setDiscountAccountId(discountAccount.id)
       .setOtherChargesAccountId(otherChargesAccount.id)
@@ -323,7 +347,33 @@ export class PaymentReceivedGLEntries {
       knex,
       laterPayments.filter((payment) => payment.id !== after.id),
       'PaymentReceive',
-      (paymentId) => this.rewritePaymentCashGLEntries(paymentId, trx),
+      (paymentId) => this.rewriteLaterPayment(paymentId, trx),
     );
+  };
+
+  /**
+   * Rewrites a later payment: its cash basis entries, and its accrual ones
+   * too when it pays a foreign currency invoice (their A/R relief is a
+   * running total at the invoice rate, so it moves with the payments
+   * before it). In the base currency the accrual entries never move.
+   * @param {number} paymentReceiveId - Payment received id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  private rewriteLaterPayment = async (
+    paymentReceiveId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const payment = await this.paymentReceivedModel()
+      .query(trx)
+      .findById(paymentReceiveId)
+      .withGraphFetched('entries.invoice');
+    if (!payment) return;
+
+    const paysForeignInvoice = (payment.entries || []).some(
+      (entry) => entry.invoice && Number(entry.invoice.exchangeRate ?? 1) !== 1,
+    );
+    return paysForeignInvoice
+      ? this.rewritePaymentGLEntries(paymentReceiveId, trx)
+      : this.rewritePaymentCashGLEntries(paymentReceiveId, trx);
   };
 }

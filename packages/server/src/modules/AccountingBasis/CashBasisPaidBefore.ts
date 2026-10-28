@@ -227,4 +227,48 @@ export const rewritePaymentsInOrder = async (
   return skipped;
 };
 
+/**
+ * The accrual lines of the given documents in the base currency, by
+ * document and account, as stored (A/R and A/P left out): credits positive
+ * (sign 1, invoices) or debits positive (sign -1, bills). The cash split of
+ * a payment aims at them so a fully paid document ends at them exactly.
+ * @param {Knex} knex - Tenant connection or transaction.
+ * @param {string} documentType - 'SaleInvoice' or 'Bill'.
+ * @param {number[]} documentIds - The documents.
+ * @param {1 | -1} sign - 1: credit - debit, -1: debit - credit.
+ * @returns {Promise<Record<number, Record<number, number>>>}
+ */
+export const getDocumentsAccrualLines = async (
+  knex: Knex | Knex.Transaction,
+  documentType: string,
+  documentIds: number[],
+  sign: 1 | -1,
+): Promise<Record<number, Record<number, number>>> => {
+  const ids = [...new Set(documentIds.filter(Boolean))];
+  if (ids.length === 0) return {};
+
+  const rows: any[] = await knex
+    .queryBuilder()
+    .from('accounts_transactions as t')
+    .join('accounts as a', 'a.id', 't.account_id')
+    .where('t.reference_type', documentType)
+    .whereIn('t.reference_id', ids)
+    .where((builder) =>
+      builder.whereNull('t.basis').orWhere('t.basis', '<>', 'cash'),
+    )
+    .whereNotIn('a.account_type', ['accounts-receivable', 'accounts-payable'])
+    .groupBy('t.reference_id', 't.account_id')
+    .select('t.reference_id as documentId', 't.account_id as accountId')
+    .select(knex.raw('SUM(?? - ??) as ??', ['t.credit', 't.debit', 'amount']));
+
+  return rows.reduce(
+    (acc, row) => {
+      acc[row.documentId] = acc[row.documentId] || {};
+      acc[row.documentId][row.accountId] = Number(row.amount) * sign;
+      return acc;
+    },
+    {} as Record<number, Record<number, number>>,
+  );
+};
+
 const logger = new Logger('CashBasisPaidBefore');

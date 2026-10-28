@@ -3,6 +3,7 @@ import {
   multiplyMoney,
   roundMoney,
   subtractMoney,
+  sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
 import { BillPayment } from '../models/BillPayment';
@@ -21,9 +22,20 @@ export class BillPaymentAccrualGL {
   private APAccountId: number;
   private gainLossAccountId: number;
   private baseCurrency: string;
+  private paidBefore: Record<number, number> = {};
 
   constructor(billPayment: BillPayment) {
     this.billPayment = billPayment;
+  }
+
+  /**
+   * Sets what the earlier payments paid on each bill (bill currency), for
+   * the running-total A/P relief.
+   * @param {Record<number, number>} paidBefore - By bill id.
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore || {};
+    return this;
   }
 
   /**
@@ -101,14 +113,24 @@ export class BillPaymentAccrualGL {
       sumMoneyBy(entries, 'paymentAmount'),
       this.billPayment.exchangeRate,
     );
-    const paidAtBillRates = sumMoneyBy(entries, (entry) =>
+    const paidAtBillRates = sumMoneyBy(entries, (entry) => {
       // Opening balance lines have no bill: no exchange difference
       // (foreign currency opening balances are not handled here).
-      multiplyMoney(
-        entry.paymentAmount,
-        entry.bill?.exchangeRate ?? this.billPayment.exchangeRate,
-      ),
-    );
+      if (!entry.bill) {
+        return multiplyMoney(
+          entry.paymentAmount,
+          this.billPayment.exchangeRate,
+        );
+      }
+      // The A/P relief at the bill rate is a running total (see the
+      // payment received accrual GL): no cent left once paid in parts.
+      const rate = entry.bill.exchangeRate ?? this.billPayment.exchangeRate;
+      const before = this.paidBefore[entry.billId] ?? 0;
+      return subtractMoney(
+        multiplyMoney(sumMoney(before, entry.paymentAmount), rate),
+        multiplyMoney(before, rate),
+      );
+    });
     return subtractMoney(paidAtBillRates, paidAtPaymentRate);
   }
 
@@ -141,6 +163,10 @@ export class BillPaymentAccrualGL {
             debit: totalExGainOrLoss > 0 ? absExGainOrLoss : 0,
             credit: totalExGainOrLoss < 0 ? absExGainOrLoss : 0,
             accountId: this.APAccountId,
+            // On the vendor, as the A/R line of a payment received is on
+            // the customer: without it the vendor's A/P balance missed
+            // every exchange difference.
+            contactId: this.billPayment.vendorId,
             index: 3,
             accountNormal: AccountNormal.DEBIT,
           },

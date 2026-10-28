@@ -2,6 +2,7 @@ import {
   multiplyMoney,
   roundMoney,
   subtractMoney,
+  sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
@@ -15,6 +16,7 @@ export class PaymentReceivedAccrualGL {
   private ARAccountId: number;
   private exchangeGainOrLossAccountId: number;
   private baseCurrencyCode: string;
+  private paidBefore: Record<number, number> = {};
 
   /**
    * Constructor method.
@@ -22,6 +24,16 @@ export class PaymentReceivedAccrualGL {
    */
   constructor(paymentReceived: PaymentReceived) {
     this.paymentReceived = paymentReceived;
+  }
+
+  /**
+   * Sets what the earlier payments paid on each invoice (invoice currency),
+   * for the running-total A/R relief.
+   * @param {Record<number, number>} paidBefore - By invoice id.
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore || {};
+    return this;
   }
 
   /**
@@ -69,14 +81,27 @@ export class PaymentReceivedAccrualGL {
       sumMoneyBy(entries, 'paymentAmount'),
       this.paymentReceived.exchangeRate,
     );
-    const paidAtInvoiceRates = sumMoneyBy(entries, (entry) =>
+    const paidAtInvoiceRates = sumMoneyBy(entries, (entry) => {
       // Opening balance lines have no invoice: no exchange difference
       // (foreign currency opening balances are not handled here).
-      multiplyMoney(
-        entry.paymentAmount,
-        entry.invoice?.exchangeRate ?? this.paymentReceived.exchangeRate,
-      ),
-    );
+      if (!entry.invoice) {
+        return multiplyMoney(
+          entry.paymentAmount,
+          this.paymentReceived.exchangeRate,
+        );
+      }
+      // The A/R relief at the invoice rate is a running total: (paid so
+      // far, this payment included) at the rate less (paid before) at the
+      // rate. Rounding each payment alone left a cent on A/R once a
+      // foreign currency invoice was paid in parts.
+      const rate =
+        entry.invoice.exchangeRate ?? this.paymentReceived.exchangeRate;
+      const before = this.paidBefore[entry.invoiceId] ?? 0;
+      return subtractMoney(
+        multiplyMoney(sumMoney(before, entry.paymentAmount), rate),
+        multiplyMoney(before, rate),
+      );
+    });
     return subtractMoney(paidAtPaymentRate, paidAtInvoiceRates);
   };
 

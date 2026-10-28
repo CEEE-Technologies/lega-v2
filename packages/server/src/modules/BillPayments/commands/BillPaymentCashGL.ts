@@ -11,10 +11,14 @@ import { BillPaymentEntry } from '../models/BillPaymentEntry';
 import {
   allocateCumulativeShare,
   balanceEntries,
+  fromCents,
   moneyGt,
+  moneyGte,
   multiplyMoney,
   roundMoney,
   subtractMoney,
+  sumMoney,
+  toCents,
 } from '@bigcapital/utils';
 import { debitSide, roundLedgerAmount } from '@/utils/ledger-rounding';
 import {
@@ -52,6 +56,8 @@ export class BillPaymentCashGL {
    * bill id: the running-total split starts from there.
    */
   private paidBefore: Record<number, number> = {};
+  private exchangeGainOrLossAccountId: number | null = null;
+  private accrualLines: Record<number, Record<number, number>> = {};
 
   /**
    * Sets the amount paid on each bill by the earlier payments.
@@ -98,6 +104,28 @@ export class BillPaymentCashGL {
    */
   setOtherExpensesAccountId(otherExpensesAccountId: number) {
     this.otherExpensesAccountId = otherExpensesAccountId;
+    return this;
+  }
+
+  /**
+   * Sets the exchange gain/loss account: it takes the currency rounding
+   * cent of a foreign currency payment (see balanceCashEntries).
+   * @param {number} exchangeGainOrLossAccountId - Account id.
+   */
+  setExchangeGainOrLossAccountId(exchangeGainOrLossAccountId: number) {
+    this.exchangeGainOrLossAccountId = exchangeGainOrLossAccountId;
+    return this;
+  }
+
+  /**
+   * Sets the bills' accrual lines in the base currency, by bill id and
+   * account (debit positive), as the ledger holds them: posting rounds
+   * each converted line and puts the leftover cent on the largest line, so
+   * the cash split aims at these to end exactly at them.
+   * @param {Record<number, Record<number, number>>} accrualLines
+   */
+  setAccrualLines(accrualLines: Record<number, Record<number, number>>) {
+    this.accrualLines = accrualLines || {};
     return this;
   }
 
@@ -221,12 +249,47 @@ export class BillPaymentCashGL {
       defaultTo(bill.adjustment, 0),
     ];
     const exchangeRate = defaultTo(this.billPayment.exchangeRate, 1);
-    const parts = allocateCumulativeShare(
-      this.paidBefore[entry.billId] || 0,
-      this.getPaymentEntryRecognizedAmount(entry),
-      bill.total,
+    // The running total in the base currency too: each line's share of
+    // everything paid so far, converted and rounded, less the same before
+    // this payment. So once fully paid a line ends at its converted amount,
+    // like the accrual line (rounding each payment's share alone left a
+    // cent off with a foreign rate).
+    const paidBefore = this.paidBefore[entry.billId] || 0;
+    // At the bill rate the split runs on the accrual lines themselves, so a
+    // fully paid bill ends at them to the cent, account by account.
+    const targets = this.getLineLocalTargets(
+      bill.id,
+      defaultTo(bill.exchangeRate, 1),
       lines,
-    ).map((part) => multiplyMoney(part, exchangeRate));
+      [
+        ...items.map((item) =>
+          ['inventory'].indexOf(item.item?.type) !== -1
+            ? item.item.inventoryAccountId
+            : item.costAccountId,
+        ),
+        ...taxedItems.map(() => this.taxPayableAccountId),
+        this.purchaseDiscountAccountId,
+        this.otherExpensesAccountId,
+      ],
+    );
+    const totalLocal = targets ? sumMoney(...targets) : 0;
+    const recognizedUpTo = (paid: number) =>
+      targets
+        ? moneyGte(paid, bill.total)
+          ? targets
+          : allocateCumulativeShare(
+              0,
+              multiplyMoney(paid, exchangeRate),
+              totalLocal,
+              targets,
+            )
+        : allocateCumulativeShare(0, paid, bill.total, lines).map((part) =>
+            multiplyMoney(part, exchangeRate),
+          );
+    const before = recognizedUpTo(paidBefore);
+    const parts = recognizedUpTo(
+      sumMoney(paidBefore, this.getPaymentEntryRecognizedAmount(entry)),
+    ).map((part, index) => subtractMoney(part, before[index]));
 
     const itemsCount = items.length;
     const taxesCount = taxedItems.length;
@@ -356,22 +419,92 @@ export class BillPaymentCashGL {
     const bill = entry.bill;
     const shares = this.getPaymentEntryShares(entry);
 
-    // Converting each part with a foreign rate can leave a rounding cent:
-    // it goes on the largest expense line, never the bank line.
-    return balanceEntries(
-      [
-        this.getPaymentEntryPaymentAccountEntry(entry),
-        ...this.getPaymentEntryItemEntries(bill, shares.items),
-        ...this.getPaymentEntryTaxEntries(
-          bill,
-          shares.taxedItems,
-          shares.taxes,
-        ),
-        ...this.getPaymentEntryDiscountEntry(shares.discount),
-        ...this.getPaymentEntryAdjustmentEntry(shares.adjustment),
-      ],
-      { canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null },
-    ).entries;
+    return this.balanceCashEntries([
+      this.getPaymentEntryPaymentAccountEntry(entry),
+      ...this.getPaymentEntryItemEntries(bill, shares.items),
+      ...this.getPaymentEntryTaxEntries(bill, shares.taxedItems, shares.taxes),
+      ...this.getPaymentEntryDiscountEntry(shares.discount),
+      ...this.getPaymentEntryAdjustmentEntry(shares.adjustment),
+    ]);
+  };
+
+  /**
+   * The base currency amount each line of the bill ends at once fully paid:
+   * the line converted at the bill rate, with the cent the posting moved
+   * (see setAccrualLines) put back on the same account's largest line.
+   * Null when the payment rate is not the bill rate (the cash is then
+   * converted at the payment rate) or the accrual lines are unknown.
+   */
+  private getLineLocalTargets = (
+    docId: number,
+    docRate: number,
+    lines: number[],
+    accounts: number[],
+  ): number[] | null => {
+    const accrual = this.accrualLines[docId];
+    const paymentRate = defaultTo(this.billPayment.exchangeRate, 1);
+    if (!accrual || Math.abs(paymentRate - docRate) > 1e-9) return null;
+
+    const targets = lines.map((line) => multiplyMoney(line, docRate));
+    const accountIds = [...new Set(accounts)];
+    let moved = 0;
+    accountIds.forEach((accountId) => {
+      const indexes = accounts
+        .map((id, index) => (id === accountId ? index : -1))
+        .filter((index) => index !== -1);
+      const diffCents =
+        toCents(accrual[accountId] ?? 0) -
+        indexes.reduce((sum, index) => sum + toCents(targets[index]), 0);
+      if (diffCents === 0) return;
+      moved += Math.abs(diffCents);
+      const largest = indexes.reduce((a, b) =>
+        Math.abs(targets[b]) > Math.abs(targets[a]) ? b : a,
+      );
+      targets[largest] = fromCents(toCents(targets[largest]) + diffCents);
+    });
+    // More than rounding: the ledger differs from the bill; keep the plain
+    // conversion.
+    return moved <= lines.length
+      ? targets
+      : lines.map((line) => multiplyMoney(line, docRate));
+  };
+
+  /**
+   * Balances the cash set of a payment entry. With a foreign rate the
+   * converted lines can miss the payment account line by a cent: that currency
+   * rounding cent goes to exchange gain/loss, as on the accrual side, so
+   * every expense line still ends at its accrual amount. Without that
+   * account the cent goes on the largest expense line, never the bank line.
+   * @param {ILedgerEntry[]} entries - The cash set of the payment entry.
+   * @returns {ILedgerEntry[]}
+   */
+  private balanceCashEntries = (entries: ILedgerEntry[]): ILedgerEntry[] => {
+    const leftoverCents = entries.reduce(
+      (sum, e) => sum + toCents(e.debit || 0) - toCents(e.credit || 0),
+      0,
+    );
+    if (
+      leftoverCents !== 0 &&
+      this.exchangeGainOrLossAccountId &&
+      defaultTo(this.billPayment.exchangeRate, 1) !== 1 &&
+      Math.abs(leftoverCents) <= entries.length
+    ) {
+      const amount = fromCents(Math.abs(leftoverCents));
+      return [
+        ...entries,
+        {
+          ...this.cashEntriesCommonEntry,
+          debit: leftoverCents < 0 ? amount : 0,
+          credit: leftoverCents > 0 ? amount : 0,
+          accountId: this.exchangeGainOrLossAccountId,
+          accountNormal: AccountNormal.DEBIT,
+          index: 99,
+        },
+      ];
+    }
+    return balanceEntries(entries, {
+      canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null,
+    }).entries;
   };
 
   /**
