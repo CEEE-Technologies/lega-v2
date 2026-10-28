@@ -348,8 +348,11 @@ export const valueParser =
     } else if (field.fieldType === 'number') {
       _value = multiNumberParse(value);
 
-      // Money is whole cents: round it, and report the rounding.
-      if (typeof _value === 'number' && isMoneyImportField(key)) {
+      // Money is whole cents: round it, and report the rounding. Only a
+      // finite number is rounded: "abc" or "12,34,567.00" parse to NaN,
+      // which must reach the validation unchanged so the row is rejected
+      // (rounding NaN would turn it into a silent 0).
+      if (Number.isFinite(_value) && isMoneyImportField(key)) {
         const roundedValue = roundMoney(_value);
         if (roundedValue !== _value) {
           onMoneyRounded?.(key, _value, roundedValue);

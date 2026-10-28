@@ -122,18 +122,19 @@ export class ImportFileDataTransformer {
 
     const parseAsync = async (valueDTO, index: number) => {
       // Money values with more than 2 decimals are rounded to cents and
-      // listed as warnings (row numbers count the header row).
+      // listed as warnings. Rows are numbered like the import errors
+      // (ImportFileCommon): the first data row is 1.
       const _valueParser = valueParser(
         fields,
         modelResolver,
         trx,
         (key, value, roundedValue) => {
           warnings?.push({
-            rowNumber: index + 2,
+            rowNumber: index + 1,
             field: key,
             value,
             roundedValue,
-            message: `Row ${index + 2}: ${key} ${value} was rounded to ${roundedValue} (money keeps 2 decimals).`,
+            message: `Row ${index + 1}: ${key} ${value} was rounded to ${roundedValue} (money keeps 2 decimals).`,
           });
         },
       );

@@ -308,6 +308,20 @@ describe('valueParser — money values', () => {
     expect(rounded).toEqual([['amount', 100.005, 100.01]]);
   });
 
+  it('leaves invalid numbers as NaN so validation rejects the row', async () => {
+    const rounded: any[] = [];
+    const parse = valueParser(
+      fields,
+      () => null,
+      undefined,
+      (...args) => rounded.push(args),
+    );
+    // Before the fix both became 0 and were imported silently.
+    expect(await parse('abc', 'amount')).toBeNaN();
+    expect(await parse('12,34,567.00', 'amount')).toBeNaN();
+    expect(rounded).toEqual([]);
+  });
+
   it('keeps the decimals of quantities', async () => {
     const parse = valueParser(fields, () => null);
     expect(await parse('0.333', 'quantity')).toBe(0.333);
