@@ -40,7 +40,7 @@ interface EstimateUniversalSearchReference {
   id: number;
   estimateNumber: string;
   formattedEstimateDate: string;
-  formattedAmount: string;
+  totalFormatted: string;
   isDelivered: boolean;
   isApproved: boolean;
   isRejected: boolean;
@@ -107,7 +107,7 @@ export const EstimateUniversalSearchItem: ItemRenderer<
             <Icon icon={'caret-right-16'} iconSize={16} />
             {item.reference.formattedEstimateDate}
           </span>
-          <div className="amount">{item.reference.formattedAmount}</div>
+          <div className="amount">{item.reference.totalFormatted}</div>
           <EstimateStatus estimate={item.reference} />
         </div>
       }
@@ -125,7 +125,7 @@ const transformEstimatesToSearch = (
 ): EstimateUniversalSearchItem => ({
   id: estimate.id,
   text: estimate.customer?.displayName ?? '',
-  label: estimate.formattedAmount ?? '',
+  label: estimate.totalFormatted ?? '',
   reference: estimate,
 });
 

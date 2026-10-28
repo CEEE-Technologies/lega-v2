@@ -7,7 +7,6 @@ import type { SaleEstimatesListResponse } from '@bigcapital/sdk-ts';
 import {
   FormatDateCell,
   FormattedMessage as T,
-  Money,
   Choose,
   Icon,
   If,
@@ -174,10 +173,6 @@ export function ActionsMenu({
   );
 }
 
-function AmountAccessor({ amount, currencyCode }: EstimateTableRow) {
-  return <Money amount={amount} currency={currencyCode} />;
-}
-
 export function useEstiamtesTableColumns(): DataTableColumn<EstimateTableRow>[] {
   return React.useMemo(
     () =>
@@ -223,7 +218,8 @@ export function useEstiamtesTableColumns(): DataTableColumn<EstimateTableRow>[] 
         {
           id: 'amount',
           Header: intl.get('amount'),
-          accessor: AmountAccessor,
+          // The total after the discount and adjustment.
+          accessor: 'totalFormatted',
           width: 140,
           align: 'right',
           clickable: true,

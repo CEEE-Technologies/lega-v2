@@ -1,6 +1,7 @@
 import {
   calcDiscountMoney,
   roundMoney,
+  subtractMoney,
   sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
@@ -504,13 +505,14 @@ export const useBillTotalFormatted = (): string => {
 };
 
 /**
- * Retrieves the bill paid amount.
+ * Retrieves the bill paid amount: the payments and the applied vendor
+ * credits of the edited bill (the server's bill balance), 0 for a new bill.
  * @returns {number}
  */
 export const useBillPaidAmount = (): number => {
-  const { values } = useFormikContext<BillFormValues>();
+  const { bill } = useBillFormContext();
 
-  return toSafeNumber(0);
+  return sumMoney(bill?.paymentAmount, bill?.creditedAmount);
 };
 
 /**
@@ -532,7 +534,7 @@ export const useBillDueAmount = (): number => {
   const total = useBillTotal();
   const paidAmount = useBillPaidAmount();
 
-  return total - paidAmount;
+  return Math.max(subtractMoney(total, paidAmount), 0);
 };
 
 /**

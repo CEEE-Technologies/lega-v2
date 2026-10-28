@@ -111,7 +111,7 @@ export function VendorCreditUniversalSearchItem(
       }
       labelElement={
         <>
-          <div className="amount">{item.reference.formattedAmount}</div>
+          <div className="amount">{item.reference.totalFormatted}</div>
           <VendorCreditUniversalSearchStatus receipt={item.reference} />
         </>
       }
@@ -127,7 +127,7 @@ export function VendorCreditUniversalSearchItem(
 const transformVendorCreditsToSearch = (vendorCredit: VendorCredit) => ({
   id: vendorCredit.id,
   text: vendorCredit.vendor?.displayName ?? '',
-  label: vendorCredit.formattedAmount ?? '',
+  label: vendorCredit.totalFormatted ?? '',
   reference: vendorCredit,
 });
 

@@ -9,8 +9,14 @@ export const transformCreditNoteToPdfTemplate = (
     creditNoteDate: creditNote.formattedCreditNoteDate,
     creditNoteNumebr: creditNote.creditNoteNumber,
 
-    total: creditNote.formattedAmount,
+    total: creditNote.totalFormatted,
     subtotal: creditNote.formattedSubtotal,
+    // Shown between the subtotal and the total, so the PDF adds up.
+    discount: creditNote.discountAmountFormatted,
+    discountLabel: creditNote.discountPercentageFormatted
+      ? `Discount [${creditNote.discountPercentageFormatted}]`
+      : 'Discount',
+    adjustment: creditNote.adjustmentFormatted,
 
     lines: creditNote.entries?.map((entry) => ({
       item: entry.item.name,
@@ -30,6 +36,6 @@ export const transformCreditNoteToMailDataArgs = (creditNote: any) => {
     'Customer Name': creditNote.customer?.displayName,
     'Credit Note Number': creditNote.creditNoteNumber,
     'Credit Note Date': creditNote.formattedCreditNoteDate,
-    'Credit Note Amount': creditNote.formattedAmount,
+    'Credit Note Amount': creditNote.totalFormatted,
   };
 };

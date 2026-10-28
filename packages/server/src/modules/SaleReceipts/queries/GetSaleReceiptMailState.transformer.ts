@@ -82,7 +82,7 @@ export class GetSaleReceiptMailStateTransformer extends Transformer {
    * @returns
    */
   protected total = (receipt) => {
-    return receipt.amount;
+    return receipt.total;
   };
 
   /**
@@ -91,7 +91,7 @@ export class GetSaleReceiptMailStateTransformer extends Transformer {
    * @returns
    */
   protected totalFormatted = (receipt) => {
-    return this.formatMoney(receipt.amount, {
+    return this.formatMoney(receipt.total, {
       currencyCode: receipt.currencyCode,
     });
   };

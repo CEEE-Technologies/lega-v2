@@ -159,7 +159,8 @@ export function useCreditNoteTableColumns(): DataTableColumn<CreditNoteTableRow>
         {
           id: 'amount',
           Header: intl.get('amount'),
-          accessor: 'formattedAmount',
+          // The total after the discount and adjustment.
+          accessor: 'totalFormatted',
           width: 120,
           align: 'right',
           clickable: true,

@@ -27,7 +27,8 @@ export const transformInvoiceToPdfTemplate = (
 
     total: invoice.totalFormatted,
     subtotal: invoice.subtotalFormatted,
-    paymentMade: invoice.paymentAmountFormatted,
+    // Payments, applied credits and write-offs, so total - this = due.
+    paymentMade: invoice.balanceAmountFormatted,
     dueAmount: invoice.dueAmountFormatted,
 
     termsConditions: invoice.termsConditions,

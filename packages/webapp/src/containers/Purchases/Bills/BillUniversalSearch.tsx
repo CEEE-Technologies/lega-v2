@@ -120,7 +120,7 @@ export function BillUniversalSearchItem(
       }
       labelElement={
         <>
-          <div className="amount">{item.reference.formattedAmount}</div>
+          <div className="amount">{item.reference.totalFormatted}</div>
           <BillStatus bill={item.reference} />
         </>
       }

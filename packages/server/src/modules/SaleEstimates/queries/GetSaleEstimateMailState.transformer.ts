@@ -95,7 +95,7 @@ export class GetSaleEstimateMailStateTransformer extends SaleEstimateTransfromer
    * @returns
    */
   protected total(estimate) {
-    return estimate.amount;
+    return estimate.total;
   }
 
   /**

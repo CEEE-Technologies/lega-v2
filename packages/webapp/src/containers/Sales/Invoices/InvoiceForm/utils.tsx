@@ -1,6 +1,7 @@
 import {
   calcDiscountMoney,
   roundMoney,
+  subtractMoney,
   sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
@@ -594,14 +595,25 @@ export const useInvoicePaidAmountFormatted = () => {
 };
 
 /**
- * Retreives the invoice due amount.
+ * Retreives the invoice due amount: the total less what settled it, the
+ * payments, the applied credits and the written-off amount (as the server).
  * @returns {number}
  */
 export const useInvoiceDueAmount = () => {
   const total = useInvoiceTotal();
-  const paidAmount = useInvoicePaidAmount();
+  const { invoice } = useInvoiceFormContext();
 
-  return Math.max(total - paidAmount, 0);
+  // The write-off amount is returned by the API but not typed on the DTO.
+  const writtenoffAmount = (
+    invoice as { writtenoffAmount?: number | null } | undefined
+  )?.writtenoffAmount;
+
+  const settledAmount = sumMoney(
+    invoice?.paymentAmount,
+    invoice?.creditedAmount,
+    writtenoffAmount,
+  );
+  return Math.max(subtractMoney(total, settledAmount), 0);
 };
 
 /**
