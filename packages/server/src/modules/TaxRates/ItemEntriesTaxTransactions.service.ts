@@ -28,11 +28,10 @@ export class ItemEntriesTaxTransactions {
     const entries = model.entries.map((entry) =>
       this.itemEntryModel().fromJson(entry),
     );
-    const taxAmountWithheld = sumMoneyBy(entries, 'taxAmount');
-
-    if (taxAmountWithheld) {
-      model.taxAmountWithheld = taxAmountWithheld;
-    }
+    // Always set, 0 included: on edit, leaving it out kept the old tax in
+    // the stored column (the update only writes the fields it is given),
+    // so removing every tax still added the old tax to the total.
+    model.taxAmountWithheld = sumMoneyBy(entries, 'taxAmount');
     return model;
   };
 

@@ -26,11 +26,11 @@ export type MoneyInput = number | string | null | undefined;
  * @returns {number}
  */
 export const toMoneyNumber = (value: MoneyInput): number => {
-  if (value === null || value === undefined || value === '') return 0;
+  if (value === null || value === undefined || value === "") return 0;
 
   const number =
-    typeof value === 'string'
-      ? Number(value.replace(/[,\s]/g, ''))
+    typeof value === "string"
+      ? Number(value.replace(/[,\s]/g, ""))
       : Number(value);
 
   return Number.isFinite(number) && number !== 0 ? number : 0;
@@ -156,7 +156,7 @@ export const sumMoneyBy = <T>(
   iteratee: keyof T | ((item: T) => MoneyInput),
 ): number => {
   const getValue =
-    typeof iteratee === 'function'
+    typeof iteratee === "function"
       ? iteratee
       : (item: T) => item?.[iteratee] as unknown as MoneyInput;
 
@@ -300,7 +300,10 @@ export const allocateCumulativeShare = (
   lines: MoneyInput[],
 ): number[] => {
   const totalCents = toCents(documentTotal);
-  const linesCents = lines.reduce<number>((sum, line) => sum + toCents(line), 0);
+  const linesCents = lines.reduce<number>(
+    (sum, line) => sum + toCents(line),
+    0,
+  );
   const beforeCents = Math.max(toCents(paidBefore), 0);
   const afterCents = Math.max(beforeCents + toCents(payment), 0);
 
@@ -318,7 +321,7 @@ export const allocateCumulativeShare = (
   return after.map((part, index) => fromCents(part - before[index]));
 };
 
-export type LineDiscountType = 'percentage' | 'amount';
+export type LineDiscountType = "percentage" | "amount";
 
 export interface ILineMoneyInput {
   quantity: MoneyInput;
@@ -367,7 +370,7 @@ export const calcLineMoney = (line: ILineMoneyInput): ILineMoney => {
   );
   const discount = toMoneyNumber(line.discount);
   const discountCents =
-    line.discountType === 'amount'
+    line.discountType === "amount"
       ? toCents(discount)
       : roundHalfAwayFromZero((amountCents * discount) / 100, 0);
 
@@ -399,7 +402,9 @@ export const calcLineMoney = (line: ILineMoneyInput): ILineMoney => {
  * rounded to cents.
  * @param {MoneyInput} subtotal
  * @param {MoneyInput} discount
- * @param {string} discountType - 'percentage' or 'amount' (default amount).
+ * @param {string} discountType - 'amount' or 'percentage'. Anything else
+ *   (an empty type on old rows) is a percentage, as the server always
+ *   posted it and as line discounts default.
  * @returns {number}
  */
 export const calcDiscountMoney = (
@@ -407,9 +412,53 @@ export const calcDiscountMoney = (
   discount: MoneyInput,
   discountType?: LineDiscountType | string | null,
 ): number =>
-  discountType === 'percentage'
-    ? roundMoney((toMoneyNumber(subtotal) * toMoneyNumber(discount)) / 100)
-    : roundMoney(discount);
+  discountType === "amount"
+    ? roundMoney(discount)
+    : roundMoney((toMoneyNumber(subtotal) * toMoneyNumber(discount)) / 100);
+
+/** Money fields of a document (invoice, bill, estimate, receipt, credits). */
+export interface IDocumentMoneyInput {
+  /** Sum of the line amounts after line discounts (tax-inclusive lines keep their tax). */
+  subtotal: MoneyInput;
+  discount?: MoneyInput;
+  /** 'amount' or 'percentage'; anything else counts as a percentage. */
+  discountType?: LineDiscountType | string | null;
+  adjustment?: MoneyInput;
+  /** Tax of the document; added to the total only when it is exclusive. */
+  taxAmountWithheld?: MoneyInput;
+  isInclusiveTax?: boolean | number | null;
+}
+
+export interface IDocumentMoney {
+  discountAmount: number;
+  total: number;
+}
+
+/**
+ * The document discount and total, in whole cents:
+ *   discount = percentage ? round(subtotal x % / 100) : round(discount)
+ *   total    = round(subtotal) - discount + round(adjustment) + round(exclusive tax)
+ *
+ * This is the one formula every document model getter uses. Its SQL copy is
+ * `sqlDocumentTotal()` in packages/server/src/utils/document-money-sql.ts;
+ * the two must give the same answer (the money parity e2e test checks it on
+ * the database). Change both together.
+ * @param {IDocumentMoneyInput} doc
+ * @returns {IDocumentMoney}
+ */
+export const calcDocumentMoney = (doc: IDocumentMoneyInput): IDocumentMoney => {
+  const discountAmount = calcDiscountMoney(
+    doc.subtotal,
+    doc.discount,
+    doc.discountType,
+  );
+  const tax = doc.isInclusiveTax ? 0 : doc.taxAmountWithheld;
+
+  return {
+    discountAmount,
+    total: sumMoney(doc.subtotal, -discountAmount, doc.adjustment, tax),
+  };
+};
 
 export interface IBalanceEntry {
   debit: number;

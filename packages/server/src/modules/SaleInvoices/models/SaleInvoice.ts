@@ -1,9 +1,10 @@
 import {
   calcDiscountMoney,
+  calcDocumentMoney,
   moneyEq,
   moneyGt,
   moneyIsZero,
-  roundMoney,
+  multiplyMoney,
   subtractMoney,
   sumMoney,
 } from '@bigcapital/utils';
@@ -29,33 +30,35 @@ import { InjectModelMeta } from '@/modules/Tenancy/TenancyModels/decorators/Inje
 import { SaleInvoiceMeta } from './SaleInvoice.meta';
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { SaleInvoiceDefaultViews } from '../constants';
+import {
+  sqlDocumentTotal,
+  sqlMoneyLeft,
+  sqlSumMoney,
+} from '@/utils/document-money-sql';
 
 /**
- * SQL of the invoice total: subtotal - discount + adjustment + exclusive tax
- * (same as the `total` getter).
+ * SQL of the invoice total, due and settled amounts in cents: the same
+ * formulas as the `total`, `dueAmount` and `balanceAmount` getters (both
+ * sides come from calcDocumentMoney / document-money-sql.ts).
  */
-const INVOICE_TOTAL_SQL = `(COALESCE(BALANCE, 0)
-  - CASE WHEN DISCOUNT_TYPE = 'percentage'
-      THEN COALESCE(BALANCE, 0) * COALESCE(DISCOUNT, 0) / 100
-      ELSE COALESCE(DISCOUNT, 0) END
-  + COALESCE(ADJUSTMENT, 0)
-  + CASE WHEN IS_INCLUSIVE_TAX THEN 0 ELSE COALESCE(TAX_AMOUNT_WITHHELD, 0) END)`;
+const INVOICE_TOTAL_SQL = sqlDocumentTotal('BALANCE', true);
+const INVOICE_SETTLED_COLUMNS = [
+  'PAYMENT_AMOUNT',
+  'WRITTENOFF_AMOUNT',
+  'CREDITED_AMOUNT',
+];
+const INVOICE_DUE_SQL = sqlMoneyLeft(
+  INVOICE_TOTAL_SQL,
+  ...INVOICE_SETTLED_COLUMNS,
+);
+const INVOICE_SETTLED_SQL = sqlSumMoney(...INVOICE_SETTLED_COLUMNS);
 
-/**
- * SQL of the invoice amount still due in whole cents: the total less the
- * paid, written-off and credited amounts (same as `dueAmount`).
- */
-const INVOICE_DUE_SQL = `ROUND(${INVOICE_TOTAL_SQL}
-  - COALESCE(PAYMENT_AMOUNT, 0)
-  - COALESCE(WRITTENOFF_AMOUNT, 0)
-  - COALESCE(CREDITED_AMOUNT, 0), 2)`;
-
-/**
- * SQL of the invoice settled amount (paid, written-off and credited), in cents.
- */
-const INVOICE_SETTLED_SQL = `ROUND(COALESCE(PAYMENT_AMOUNT, 0)
-  + COALESCE(WRITTENOFF_AMOUNT, 0)
-  + COALESCE(CREDITED_AMOUNT, 0), 2)`;
+/** The invoice money SQL, for the money parity test and reports. */
+export const SALE_INVOICE_MONEY_SQL = {
+  total: INVOICE_TOTAL_SQL,
+  due: INVOICE_DUE_SQL,
+  settled: INVOICE_SETTLED_SQL,
+};
 
 @InjectAttachable()
 @ExportableModel()
@@ -172,7 +175,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get amountLocal() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**
@@ -206,7 +209,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get taxAmountWithheldLocal() {
-    return this.taxAmountWithheld * this.exchangeRate;
+    return multiplyMoney(this.taxAmountWithheld, this.exchangeRate);
   }
 
   /**
@@ -215,13 +218,7 @@ export class SaleInvoice extends TenantBaseModel {
    */
   get discountAmount() {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -229,7 +226,9 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number | null}
    */
   get discountAmountLocal() {
-    return this.discountAmount ? this.discountAmount * this.exchangeRate : null;
+    return this.discountAmount
+      ? multiplyMoney(this.discountAmount, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -245,7 +244,9 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number | null}
    */
   get adjustmentLocal(): number | null {
-    return this.adjustment ? this.adjustment * this.exchangeRate : null;
+    return this.adjustment
+      ? multiplyMoney(this.adjustment, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -253,18 +254,15 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get total() {
-    const adjustmentAmount = defaultTo(0, this.adjustment);
-    const totalTax = this.isInclusiveTax
-      ? 0
-      : defaultTo(0, this.taxAmountWithheld);
-
-    // In whole cents.
-    return sumMoney(
-      this.subtotal,
-      -this.discountAmount,
-      adjustmentAmount,
-      totalTax,
-    );
+    // In whole cents; INVOICE_TOTAL_SQL is the SQL copy.
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+      taxAmountWithheld: this.taxAmountWithheld,
+      isInclusiveTax: this.isInclusiveTax,
+    }).total;
   }
 
   /**
@@ -272,7 +270,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get totalLocal() {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -317,7 +315,16 @@ export class SaleInvoice extends TenantBaseModel {
    * @return {number}
    */
   get dueAmountLocal() {
-    return this.dueAmount * defaultTo(1, this.exchangeRate);
+    // In cents, as the A/R ledger holds it: the total in the base currency
+    // less the settled part at the invoice rate (so 0 when fully paid).
+    const rate = defaultTo(1, this.exchangeRate);
+    return Math.max(
+      subtractMoney(
+        multiplyMoney(this.total, rate),
+        multiplyMoney(this.balanceAmount, rate),
+      ),
+      0,
+    );
   }
 
   /**
@@ -368,7 +375,7 @@ export class SaleInvoice extends TenantBaseModel {
    * @returns {number}
    */
   get writtenoffAmountLocal() {
-    return this.writtenoffAmount * this.exchangeRate;
+    return multiplyMoney(this.writtenoffAmount, this.exchangeRate);
   }
 
   /**
@@ -435,7 +442,11 @@ export class SaleInvoice extends TenantBaseModel {
        * Filters the unpaid invoices.
        */
       unpaid(query) {
-        query.where(raw('ROUND(COALESCE(PAYMENT_AMOUNT, 0), 2) = 0'));
+        // Nothing settled yet (no payment, credit or write-off) and still
+        // owed: a fully credited invoice is not unpaid (it is paid for the
+        // getters too).
+        query.where(raw(`${INVOICE_SETTLED_SQL} = 0`));
+        query.where(raw(`${INVOICE_DUE_SQL} > 0`));
       },
       /**
        * Filters the overdue invoices.
@@ -537,12 +548,15 @@ export class SaleInvoice extends TenantBaseModel {
       },
 
       dueInvoicesFromDate(query, asDate = moment().format('YYYY-MM-DD')) {
+        // Delivered invoices only: a draft is not in the A/R ledger.
+        query.modify('delivered');
         query.modify('dueInvoices');
         query.modify('notOverdue', asDate);
         query.modify('fromDate', asDate);
       },
 
       overdueInvoicesFromDate(query, asDate = moment().format('YYYY-MM-DD')) {
+        query.modify('delivered');
         query.modify('dueInvoices');
         query.modify('overdue', asDate);
         query.modify('fromDate', asDate);

@@ -1,3 +1,4 @@
+import { multiplyMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 import { BaseModel } from '@/models/Model';
 import {
@@ -74,7 +75,7 @@ export class BankTransaction extends BaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**

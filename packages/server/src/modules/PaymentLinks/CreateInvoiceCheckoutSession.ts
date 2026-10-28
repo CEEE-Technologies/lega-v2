@@ -1,3 +1,4 @@
+import { toCents } from '@bigcapital/utils';
 import { StripePaymentService } from '../StripePayment/StripePaymentService';
 import { Inject, Injectable } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
@@ -107,7 +108,9 @@ export class CreateInvoiceCheckoutSession {
               product_data: {
                 name: invoice.invoiceNo,
               },
-              unit_amount: invoice.total * 100, // Amount in cents
+              // What is still owed (not the total: part may be paid), in
+              // whole cents: 19.99 * 100 is 1998.9999999999998 in floats.
+              unit_amount: toCents(invoice.dueAmount),
             },
             quantity: 1,
           },

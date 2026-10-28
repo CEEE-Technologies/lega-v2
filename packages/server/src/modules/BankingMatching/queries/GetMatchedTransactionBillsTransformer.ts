@@ -41,12 +41,14 @@ export class GetMatchedTransactionBillsTransformer extends Transformer {
   }
 
   /**
-   * Retrieve the amount of the bill.
+   * Retrieve the amount of the bill: what is still due, as for invoices.
+   * The match is checked against it and the bill payment made for it (the
+   * subtotal `amount` left out the discount, adjustment and tax).
    * @param {Object} bill - The bill object.
    * @returns {number}
    */
   protected amount(bill) {
-    return bill.amount;
+    return bill.dueAmount;
   }
 
   /**
@@ -55,7 +57,7 @@ export class GetMatchedTransactionBillsTransformer extends Transformer {
    * @returns {string}
    */
   protected amountFormatted(bill) {
-    return this.formatNumber(bill.amount, {
+    return this.formatNumber(bill.dueAmount, {
       currencyCode: bill.currencyCode,
       money: true,
     });

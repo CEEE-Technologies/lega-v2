@@ -1,8 +1,9 @@
 import {
   calcDiscountMoney,
+  calcDocumentMoney,
   moneyGt,
   moneyIsZero,
-  roundMoney,
+  multiplyMoney,
   subtractMoney,
   sumMoney,
 } from '@bigcapital/utils';
@@ -21,6 +22,25 @@ import { sanitizeSortDirection } from '@/modules/DynamicListing/DynamicFilter/sa
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { VendorCreditDefaultViews } from '../constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
+import { sqlDocumentTotal, sqlMoneyLeft } from '@/utils/document-money-sql';
+
+/**
+ * SQL of the vendor credit total and the credit still left to use, in cents: the
+ * same formulas as the `total` and `creditsRemaining` getters (both sides
+ * come from calcDocumentMoney / document-money-sql.ts).
+ */
+const VENDOR_CREDIT_TOTAL_SQL = sqlDocumentTotal('AMOUNT', false);
+const VENDOR_CREDIT_REMAINING_SQL = sqlMoneyLeft(
+  VENDOR_CREDIT_TOTAL_SQL,
+  'REFUNDED_AMOUNT',
+  'INVOICED_AMOUNT',
+);
+
+/** The vendor credit money SQL, for the money parity test and reports. */
+export const VENDOR_CREDIT_MONEY_SQL = {
+  total: VENDOR_CREDIT_TOTAL_SQL,
+  remaining: VENDOR_CREDIT_REMAINING_SQL,
+};
 
 @InjectAttachable()
 @ExportableModel()
@@ -70,7 +90,7 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**
@@ -86,7 +106,7 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get subtotalLocal() {
-    return this.subtotal * this.exchangeRate;
+    return multiplyMoney(this.subtotal, this.exchangeRate);
   }
 
   /**
@@ -95,13 +115,7 @@ export class VendorCredit extends TenantBaseModel {
    */
   get discountAmount() {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -109,7 +123,9 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number | null}
    */
   get discountAmountLocal() {
-    return this.discountAmount ? this.discountAmount * this.exchangeRate : null;
+    return this.discountAmount
+      ? multiplyMoney(this.discountAmount, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -125,7 +141,9 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number | null}
    */
   get adjustmentLocal() {
-    return this.adjustment ? this.adjustment * this.exchangeRate : null;
+    return this.adjustment
+      ? multiplyMoney(this.adjustment, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -133,8 +151,13 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get total() {
-    // In whole cents; a missing adjustment counts as 0.
-    return sumMoney(this.subtotal, -this.discountAmount, this.adjustment);
+    // In whole cents; VENDOR_CREDIT_TOTAL_SQL is the SQL copy.
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+    }).total;
   }
 
   /**
@@ -142,7 +165,7 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get totalLocal() {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -169,11 +192,7 @@ export class VendorCredit extends TenantBaseModel {
        */
       open(query) {
         query
-          .where(
-            raw(
-              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) > 0`,
-            ),
-          )
+          .where(raw(`${VENDOR_CREDIT_REMAINING_SQL} > 0`))
           .modify('published');
       },
 
@@ -182,11 +201,7 @@ export class VendorCredit extends TenantBaseModel {
        */
       closed(query) {
         query
-          .where(
-            raw(
-              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) <= 0`,
-            ),
-          )
+          .where(raw(`${VENDOR_CREDIT_REMAINING_SQL} <= 0`))
           .modify('published');
       },
 
@@ -216,9 +231,7 @@ export class VendorCredit extends TenantBaseModel {
        */
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
-        query.orderByRaw(
-          `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICED_AMOUNT, 0), 2) <= 0 ${dir}`,
-        );
+        query.orderByRaw(`${VENDOR_CREDIT_REMAINING_SQL} <= 0 ${dir}`);
       },
     };
   }
@@ -291,9 +304,12 @@ export class VendorCredit extends TenantBaseModel {
    * @returns {number}
    */
   get creditsRemaining() {
+    // What is left of the total (after discount and adjustment, the amount
+    // the ledger posts), not of the subtotal; VENDOR_CREDIT_REMAINING_SQL is the
+    // SQL copy.
     return Math.max(
       subtractMoney(
-        this.amount,
+        this.total,
         sumMoney(this.refundedAmount, this.invoicedAmount),
       ),
       0,

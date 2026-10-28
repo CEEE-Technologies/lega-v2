@@ -181,7 +181,10 @@ export class Vendor extends TenantBaseModel {
        * Filters the unpaid customers.
        */
       unpaid(query) {
-        query.whereRaw('`BALANCE` + `OPENING_BALANCE` <> 0');
+        // The balance already holds the opening balance (it is posted to
+        // the contact's ledger), so it is not added again; in cents, like
+        // the closingBalance shown.
+        query.whereRaw('ROUND(COALESCE(`BALANCE`, 0), 2) <> 0');
       },
     };
   }

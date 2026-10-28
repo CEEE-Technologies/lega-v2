@@ -1,3 +1,4 @@
+import { multiplyMoney } from '@bigcapital/utils';
 import { Model, raw } from 'objection';
 import * as moment from 'moment';
 import { ExpenseCategory } from './ExpenseCategory.model';
@@ -79,7 +80,7 @@ export class Expense extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.totalAmount * this.exchangeRate;
+    return multiplyMoney(this.totalAmount, this.exchangeRate);
   }
 
   /**
@@ -87,7 +88,7 @@ export class Expense extends TenantBaseModel {
    * @returns {number}
    */
   get localLandedCostAmount() {
-    return this.landedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.landedCostAmount, this.exchangeRate);
   }
 
   /**
@@ -95,7 +96,7 @@ export class Expense extends TenantBaseModel {
    * @returns {number}
    */
   get localAllocatedCostAmount() {
-    return this.allocatedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.allocatedCostAmount, this.exchangeRate);
   }
 
   /**
@@ -111,7 +112,7 @@ export class Expense extends TenantBaseModel {
    * @returns {number}
    */
   get localUnallocatedCostAmount() {
-    return this.unallocatedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.unallocatedCostAmount, this.exchangeRate);
   }
 
   /**

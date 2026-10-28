@@ -1,3 +1,4 @@
+import { moneyGt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import { first } from 'lodash';
@@ -47,7 +48,6 @@ export class GetMatchedTransactionsByInvoices extends GetMatchedTransactionsByTy
       .onBuild((q) => {
         q.withGraphJoined('matchedBankTransaction');
         q.whereNull('matchedBankTransaction.id');
-        q.modify('unpaid');
         q.modify('published');
 
         if (filter.fromDate) {
@@ -59,8 +59,11 @@ export class GetMatchedTransactionsByInvoices extends GetMatchedTransactionsByTy
         q.orderBy('invoiceDate', 'DESC');
       });
 
+    // Every invoice with something still due, part paid ones included (the
+    // `unpaid` filter only took invoices with no payment, and kept fully
+    // credited ones at 0). Filtered on the due amount the match pays.
     return this.transformer.transform(
-      invoices,
+      invoices.filter((invoice) => moneyGt(invoice.dueAmount, 0)),
       new GetMatchedTransactionInvoicesTransformer(),
     );
   }

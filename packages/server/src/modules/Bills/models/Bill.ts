@@ -1,9 +1,10 @@
 import {
   calcDiscountMoney,
+  calcDocumentMoney,
   moneyEq,
   moneyGt,
   moneyIsZero,
-  roundMoney,
+  multiplyMoney,
   subtractMoney,
   sumMoney,
 } from '@bigcapital/utils';
@@ -22,30 +23,29 @@ import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelD
 import { BillDefaultViews } from '../Bills.constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
 import { TaxRateTransaction } from '@/modules/TaxRates/models/TaxRateTransaction.model';
+import {
+  sqlDocumentTotal,
+  sqlMoney,
+  sqlMoneyLeft,
+  sqlSumMoney,
+} from '@/utils/document-money-sql';
 
 /**
- * SQL of the bill total: subtotal - discount + adjustment + exclusive tax
- * (same as the `total` getter).
+ * SQL of the bill total, due and settled amounts in cents: the same formulas
+ * as the `total`, `dueAmount` and `balance` getters (both sides come from
+ * calcDocumentMoney / document-money-sql.ts).
  */
-const BILL_TOTAL_SQL = `(COALESCE(AMOUNT, 0)
-  - CASE WHEN DISCOUNT_TYPE = 'percentage'
-      THEN COALESCE(AMOUNT, 0) * COALESCE(DISCOUNT, 0) / 100
-      ELSE COALESCE(DISCOUNT, 0) END
-  + COALESCE(ADJUSTMENT, 0)
-  + CASE WHEN IS_INCLUSIVE_TAX THEN 0 ELSE COALESCE(TAX_AMOUNT_WITHHELD, 0) END)`;
+const BILL_TOTAL_SQL = sqlDocumentTotal('AMOUNT', true);
+const BILL_SETTLED_COLUMNS = ['PAYMENT_AMOUNT', 'CREDITED_AMOUNT'];
+const BILL_DUE_SQL = sqlMoneyLeft(BILL_TOTAL_SQL, ...BILL_SETTLED_COLUMNS);
+const BILL_SETTLED_SQL = sqlSumMoney(...BILL_SETTLED_COLUMNS);
 
-/**
- * SQL of the bill amount still due in whole cents: the total less the paid
- * and credited amounts (same as `dueAmount`).
- */
-const BILL_DUE_SQL = `ROUND(${BILL_TOTAL_SQL}
-  - COALESCE(PAYMENT_AMOUNT, 0)
-  - COALESCE(CREDITED_AMOUNT, 0), 2)`;
-
-/**
- * SQL of the bill settled amount (paid and credited), in cents.
- */
-const BILL_SETTLED_SQL = `ROUND(COALESCE(PAYMENT_AMOUNT, 0) + COALESCE(CREDITED_AMOUNT, 0), 2)`;
+/** The bill money SQL, for the money parity test and reports. */
+export const BILL_MONEY_SQL = {
+  total: BILL_TOTAL_SQL,
+  due: BILL_DUE_SQL,
+  settled: BILL_SETTLED_SQL,
+};
 
 @InjectAttachable()
 @ExportableModel()
@@ -135,7 +135,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get amountLocal(): number {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**
@@ -169,7 +169,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get taxAmountWithheldLocal(): number {
-    return this.taxAmountWithheld * this.exchangeRate;
+    return multiplyMoney(this.taxAmountWithheld, this.exchangeRate);
   }
 
   /**
@@ -178,13 +178,7 @@ export class Bill extends TenantBaseModel {
    */
   get discountAmount(): number {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -192,7 +186,9 @@ export class Bill extends TenantBaseModel {
    * @returns {number | null}
    */
   get discountAmountLocal(): number | null {
-    return this.discountAmount ? this.discountAmount * this.exchangeRate : null;
+    return this.discountAmount
+      ? multiplyMoney(this.discountAmount, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -209,7 +205,9 @@ export class Bill extends TenantBaseModel {
    * @returns {number | null}
    */
   get adjustmentLocal(): number | null {
-    return this.adjustment ? this.adjustment * this.exchangeRate : null;
+    return this.adjustment
+      ? multiplyMoney(this.adjustment, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -217,18 +215,15 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get total(): number {
-    const adjustmentAmount = defaultTo(this.adjustment, 0);
-    const totalTax = this.isInclusiveTax
-      ? 0
-      : defaultTo(this.taxAmountWithheld, 0);
-
-    // In whole cents.
-    return sumMoney(
-      this.subtotal,
-      -this.discountAmount,
-      adjustmentAmount,
-      totalTax,
-    );
+    // In whole cents; BILL_TOTAL_SQL is the SQL copy.
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+      taxAmountWithheld: this.taxAmountWithheld,
+      isInclusiveTax: this.isInclusiveTax,
+    }).total;
   }
 
   /**
@@ -236,7 +231,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get totalLocal(): number {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -253,7 +248,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get localAllocatedCostAmount(): number {
-    return this.allocatedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.allocatedCostAmount, this.exchangeRate);
   }
 
   /**
@@ -261,7 +256,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get localLandedCostAmount(): number {
-    return this.landedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.landedCostAmount, this.exchangeRate);
   }
 
   /**
@@ -269,7 +264,7 @@ export class Bill extends TenantBaseModel {
    * @returns {number}
    */
   get localUnallocatedCostAmount(): number {
-    return this.unallocatedCostAmount * this.exchangeRate;
+    return multiplyMoney(this.unallocatedCostAmount, this.exchangeRate);
   }
 
   /**
@@ -293,7 +288,16 @@ export class Bill extends TenantBaseModel {
    * @return {number}
    */
   get dueAmountLocal(): number {
-    return this.dueAmount * defaultTo(this.exchangeRate, 1);
+    // In cents, as the A/P ledger holds it: the total in the base currency
+    // less the settled part at the bill rate (so 0 when fully paid).
+    const rate = defaultTo(this.exchangeRate, 1);
+    return Math.max(
+      subtractMoney(
+        multiplyMoney(this.total, rate),
+        multiplyMoney(this.balance, rate),
+      ),
+      0,
+    );
   }
 
   /**
@@ -370,7 +374,7 @@ export class Bill extends TenantBaseModel {
    * Retrieves the calculated amount which have not been invoiced.
    */
   get billableAmount(): number {
-    return Math.max(this.total - this.invoicedAmount, 0);
+    return Math.max(subtractMoney(this.total, this.invoicedAmount), 0);
   }
 
   /**
@@ -409,7 +413,9 @@ export class Bill extends TenantBaseModel {
        * Filters the unpaid bills.
        */
       unpaid(query) {
-        query.where(raw('ROUND(COALESCE(PAYMENT_AMOUNT, 0), 2) = 0'));
+        // Nothing settled yet (no payment or vendor credit) and still owed.
+        query.where(raw(`${BILL_SETTLED_SQL} = 0`));
+        query.where(raw(`${BILL_DUE_SQL} > 0`));
       },
       /**
        * Filters the due bills.
@@ -420,8 +426,8 @@ export class Bill extends TenantBaseModel {
       /**
        * Filters the overdue bills.
        */
-      overdue(query) {
-        query.where('due_date', '<', moment().format('YYYY-MM-DD'));
+      overdue(query, asDate = moment().format('YYYY-MM-DD')) {
+        query.where('due_date', '<', asDate);
       },
       /**
        * Filters the not overdue invoices.
@@ -465,8 +471,11 @@ export class Bill extends TenantBaseModel {
           case 'draft':
             query.modify('draft');
             break;
+          // "Opened" (the list view) and "delivered": bills have an
+          // `opened` filter only (both fell through to "overdue").
+          case 'opened':
           case 'delivered':
-            query.modify('delivered');
+            query.modify('opened');
             break;
           case 'unpaid':
             query.modify('unpaid');
@@ -494,12 +503,15 @@ export class Bill extends TenantBaseModel {
       },
 
       dueBillsFromDate(query, asDate = moment().format('YYYY-MM-DD')) {
+        // Open bills only: a draft is not in the A/P ledger.
+        query.modify('opened');
         query.modify('dueBills');
-        query.modify('notOverdue');
+        query.modify('notOverdue', asDate);
         query.modify('fromDate', asDate);
       },
 
       overdueBillsFromDate(query, asDate = moment().format('YYYY-MM-DD')) {
+        query.modify('opened');
         query.modify('dueBills');
         query.modify('overdue', asDate);
         query.modify('fromDate', asDate);
@@ -509,7 +521,8 @@ export class Bill extends TenantBaseModel {
        *
        */
       billable(query) {
-        query.where(raw('AMOUNT > INVOICED_AMOUNT'));
+        // Same as billableAmount: the total, not the subtotal.
+        query.where(raw(`${BILL_TOTAL_SQL} > ${sqlMoney('INVOICED_AMOUNT')}`));
       },
     };
   }

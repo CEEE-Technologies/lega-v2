@@ -1,6 +1,9 @@
-import { calcDiscountMoney, roundMoney, sumMoney } from '@bigcapital/utils';
+import {
+  calcDiscountMoney,
+  calcDocumentMoney,
+  multiplyMoney,
+} from '@bigcapital/utils';
 import { Model } from 'objection';
-import { defaultTo } from 'lodash';
 import * as R from 'ramda';
 import { BaseModel } from '@/models/Model';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
@@ -114,7 +117,7 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**
@@ -139,13 +142,7 @@ export class SaleReceipt extends ExtendedModel {
    */
   get discountAmount() {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -153,7 +150,9 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number | null}
    */
   get discountAmountLocal() {
-    return this.discountAmount ? this.discountAmount * this.exchangeRate : null;
+    return this.discountAmount
+      ? multiplyMoney(this.discountAmount, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -169,10 +168,13 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get total(): number {
-    const adjustmentAmount = defaultTo(this.adjustment, 0);
-
-    // In whole cents.
-    return sumMoney(this.subtotal, -this.discountAmount, adjustmentAmount);
+    // In whole cents (calcDocumentMoney, as on every document).
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+    }).total;
   }
 
   /**
@@ -180,7 +182,7 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get totalLocal() {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -188,7 +190,7 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get adjustmentLocal() {
-    return this.adjustment * this.exchangeRate;
+    return multiplyMoney(this.adjustment, this.exchangeRate);
   }
 
   /**
@@ -204,7 +206,7 @@ export class SaleReceipt extends ExtendedModel {
    * @returns {number}
    */
   get paidLocal() {
-    return this.paid * this.exchangeRate;
+    return multiplyMoney(this.paid, this.exchangeRate);
   }
 
   /**

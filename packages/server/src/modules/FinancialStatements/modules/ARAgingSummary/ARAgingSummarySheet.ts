@@ -1,5 +1,6 @@
 import { flow } from 'fp-ts/function';
-import { isEmpty, sum } from 'lodash';
+import { sumMoney } from '@bigcapital/utils';
+import { isEmpty } from 'lodash';
 import { when } from '@/common/fp';
 import { IAgingPeriod } from '../AgingSummary/AgingSummary.types';
 import {
@@ -76,7 +77,7 @@ export class ARAgingSummarySheet extends AgingSummaryReport {
     const agingPeriods = this.getContactAgingPeriods(customer.id);
     const currentTotal = this.getContactCurrentTotal(customer.id);
     const agingPeriodsTotal = this.getAgingPeriodsTotal(agingPeriods);
-    const amount = sum([agingPeriodsTotal, currentTotal]);
+    const amount = sumMoney(agingPeriodsTotal, currentTotal);
 
     return {
       customerName: customer.displayName,

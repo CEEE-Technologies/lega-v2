@@ -1,8 +1,9 @@
 import {
   calcDiscountMoney,
+  calcDocumentMoney,
   moneyGt,
   moneyIsZero,
-  roundMoney,
+  multiplyMoney,
   subtractMoney,
   sumMoney,
 } from '@bigcapital/utils';
@@ -21,6 +22,25 @@ import { sanitizeSortDirection } from '@/modules/DynamicListing/DynamicFilter/sa
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { CreditNoteDefaultViews } from '../constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
+import { sqlDocumentTotal, sqlMoneyLeft } from '@/utils/document-money-sql';
+
+/**
+ * SQL of the credit note total and the credit still left to use, in cents: the
+ * same formulas as the `total` and `creditsRemaining` getters (both sides
+ * come from calcDocumentMoney / document-money-sql.ts).
+ */
+const CREDIT_NOTE_TOTAL_SQL = sqlDocumentTotal('AMOUNT', false);
+const CREDIT_NOTE_REMAINING_SQL = sqlMoneyLeft(
+  CREDIT_NOTE_TOTAL_SQL,
+  'REFUNDED_AMOUNT',
+  'INVOICES_AMOUNT',
+);
+
+/** The credit note money SQL, for the money parity test and reports. */
+export const CREDIT_NOTE_MONEY_SQL = {
+  total: CREDIT_NOTE_TOTAL_SQL,
+  remaining: CREDIT_NOTE_REMAINING_SQL,
+};
 
 @InjectAttachable()
 @ExportableModel()
@@ -103,7 +123,7 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**
@@ -119,7 +139,7 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get subtotalLocal() {
-    return this.subtotal * this.exchangeRate;
+    return multiplyMoney(this.subtotal, this.exchangeRate);
   }
 
   /**
@@ -128,13 +148,7 @@ export class CreditNote extends TenantBaseModel {
    */
   get discountAmount() {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -142,7 +156,9 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get discountAmountLocal() {
-    return this.discountAmount ? this.discountAmount * this.exchangeRate : null;
+    return this.discountAmount
+      ? multiplyMoney(this.discountAmount, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -158,7 +174,9 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get adjustmentLocal() {
-    return this.adjustment ? this.adjustment * this.exchangeRate : null;
+    return this.adjustment
+      ? multiplyMoney(this.adjustment, this.exchangeRate)
+      : null;
   }
 
   /**
@@ -166,8 +184,13 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get total() {
-    // In whole cents; a missing adjustment counts as 0 (was NaN).
-    return sumMoney(this.subtotal, -this.discountAmount, this.adjustment);
+    // In whole cents; CREDIT_NOTE_TOTAL_SQL is the SQL copy.
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+    }).total;
   }
 
   /**
@@ -175,7 +198,7 @@ export class CreditNote extends TenantBaseModel {
    * @returns {number}
    */
   get totalLocal() {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -214,9 +237,12 @@ export class CreditNote extends TenantBaseModel {
    * Retrieve the credits remaining.
    */
   get creditsRemaining() {
+    // What is left of the total (after discount and adjustment, the amount
+    // the ledger posts), not of the subtotal; CREDIT_NOTE_REMAINING_SQL is the
+    // SQL copy.
     return Math.max(
       subtractMoney(
-        this.amount,
+        this.total,
         sumMoney(this.refundedAmount, this.invoicesAmount),
       ),
       0,
@@ -227,7 +253,7 @@ export class CreditNote extends TenantBaseModel {
    * Retrieve the credits used.
    */
   get creditsUsed() {
-    return this.refundedAmount + this.invoicesAmount;
+    return sumMoney(this.refundedAmount, this.invoicesAmount);
   }
 
   /**
@@ -254,11 +280,7 @@ export class CreditNote extends TenantBaseModel {
        */
       open(query) {
         query
-          .where(
-            raw(
-              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) > 0`,
-            ),
-          )
+          .where(raw(`${CREDIT_NOTE_REMAINING_SQL} > 0`))
           .modify('published');
       },
 
@@ -267,11 +289,7 @@ export class CreditNote extends TenantBaseModel {
        */
       closed(query) {
         query
-          .where(
-            raw(
-              `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) <= 0`,
-            ),
-          )
+          .where(raw(`${CREDIT_NOTE_REMAINING_SQL} <= 0`))
           .modify('published');
       },
 
@@ -301,9 +319,7 @@ export class CreditNote extends TenantBaseModel {
        */
       sortByStatus(query, order) {
         const dir = sanitizeSortDirection(order);
-        query.orderByRaw(
-          `ROUND(COALESCE(AMOUNT, 0) - COALESCE(REFUNDED_AMOUNT, 0) - COALESCE(INVOICES_AMOUNT, 0), 2) <= 0 ${dir}`,
-        );
+        query.orderByRaw(`${CREDIT_NOTE_REMAINING_SQL} <= 0 ${dir}`);
       },
     };
   }

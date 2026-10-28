@@ -1,3 +1,4 @@
+import { moneyGt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import { first } from 'lodash';
@@ -55,8 +56,10 @@ export class GetMatchedTransactionsByBills extends GetMatchedTransactionsByType 
         q.orderBy('billDate', 'DESC');
       });
 
+    // Only bills with something still due (filtered here, not in SQL: the
+    // joined table has its own AMOUNT column).
     return this.transformer.transform(
-      bills,
+      bills.filter((bill) => moneyGt(bill.dueAmount, 0)),
       new GetMatchedTransactionBillsTransformer(),
     );
   }

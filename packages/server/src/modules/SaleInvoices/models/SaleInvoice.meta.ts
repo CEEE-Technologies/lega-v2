@@ -75,6 +75,9 @@ export const SaleInvoiceMeta = {
       column: 'due_amount',
       fieldType: 'number',
       virtualColumn: true,
+      // There is no due_amount column: sort by the due SQL (the same
+      // formula as the dueAmount getter) instead of an unknown column.
+      sortCustomQuery: DueAmountFieldSortQuery,
     },
     status: {
       name: 'invoice.field.status',
@@ -313,4 +316,8 @@ function StatusFieldFilterQuery(query, role) {
  */
 function StatusFieldSortQuery(query, role) {
   query.modify('sortByStatus', role.order);
+}
+
+function DueAmountFieldSortQuery(query, role) {
+  query.modify('sortByDueAmount', role.order);
 }

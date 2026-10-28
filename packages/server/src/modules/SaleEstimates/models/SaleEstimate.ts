@@ -1,7 +1,10 @@
-import { calcDiscountMoney, roundMoney, sumMoney } from '@bigcapital/utils';
+import {
+  calcDiscountMoney,
+  calcDocumentMoney,
+  multiplyMoney,
+} from '@bigcapital/utils';
 import * as moment from 'moment';
 import { Model } from 'objection';
-import { defaultTo } from 'lodash';
 import { TenantBaseModel } from '@/modules/System/models/TenantBaseModel';
 import { ExportableModel } from '@/modules/Export/decorators/ExportableModel.decorator';
 import { ImportableModel } from '@/modules/Import/decorators/Import.decorator';
@@ -116,13 +119,7 @@ export class SaleEstimate extends TenantBaseModel {
    */
   get discountAmount() {
     // Rounded to cents; a missing discount counts as 0 (never NaN).
-    return this.discountType === DiscountType.Amount
-      ? roundMoney(this.discount)
-      : calcDiscountMoney(
-          this.subtotal,
-          this.discount,
-          DiscountType.Percentage,
-        );
+    return calcDiscountMoney(this.subtotal, this.discount, this.discountType);
   }
 
   /**
@@ -138,11 +135,13 @@ export class SaleEstimate extends TenantBaseModel {
    * @returns {number}
    */
   get total() {
-    const adjustmentAmount = defaultTo(this.adjustment, 0);
-
-    // In whole cents. The adjustment is added, as on every other document
-    // (it was subtracted).
-    return sumMoney(this.subtotal, -this.discountAmount, adjustmentAmount);
+    // In whole cents (calcDocumentMoney, as on every document).
+    return calcDocumentMoney({
+      subtotal: this.subtotal,
+      discount: this.discount,
+      discountType: this.discountType,
+      adjustment: this.adjustment,
+    }).total;
   }
 
   /**
@@ -150,7 +149,7 @@ export class SaleEstimate extends TenantBaseModel {
    * @returns {number}
    */
   get totalLocal() {
-    return this.total * this.exchangeRate;
+    return multiplyMoney(this.total, this.exchangeRate);
   }
 
   /**
@@ -158,7 +157,7 @@ export class SaleEstimate extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**

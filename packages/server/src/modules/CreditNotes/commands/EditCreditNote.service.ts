@@ -1,3 +1,4 @@
+import { calcDocumentMoney } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   ICreditNoteEditedPayload,
@@ -130,9 +131,15 @@ export class EditCreditNoteService {
       );
     // Validate the new amount is not smaller than the already refunded
     // and applied-to-invoices amounts against the locked row.
+    // The new total (after discount and adjustment) is what can be used.
     this.commandCreditNoteDTOTransform.validateCreditAmountNotBelowUsed(
       oldCreditNote,
-      creditNoteModel.amount,
+      calcDocumentMoney({
+        subtotal: creditNoteModel.amount,
+        discount: creditNoteModel.discount,
+        discountType: creditNoteModel.discountType,
+        adjustment: creditNoteModel.adjustment,
+      }).total,
     );
     return { oldCreditNote, creditNoteModel };
   }

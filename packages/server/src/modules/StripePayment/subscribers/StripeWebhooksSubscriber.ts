@@ -1,3 +1,4 @@
+import { fromCents } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ClsService } from 'nestjs-cls';
@@ -62,7 +63,7 @@ export class StripeWebhooksSubscriber {
     const amount = event.data.object.amount_total;
 
     // Convert from Stripe amount (cents) to normal amount (dollars)
-    const amountInDollars = amount / 100;
+    const amountInDollars = fromCents(amount);
 
     // Creates a new payment received transaction.
     await this.createPaymentReceiveStripePayment.createPaymentReceived(
