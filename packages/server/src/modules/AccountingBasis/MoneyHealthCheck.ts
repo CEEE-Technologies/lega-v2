@@ -1,4 +1,4 @@
-import { moneyGt, moneyGte } from '@bigcapital/utils';
+import { moneyGt, moneyGte, toCents } from '@bigcapital/utils';
 import { Knex } from 'knex';
 import * as moment from 'moment';
 import {
@@ -6,6 +6,19 @@ import {
   ACCOUNT_TYPE,
   ACCOUNT_TYPES,
 } from '@/constants/accounts';
+import {
+  SaleInvoice,
+  SALE_INVOICE_MONEY_SQL,
+} from '@/modules/SaleInvoices/models/SaleInvoice';
+import { Bill, BILL_MONEY_SQL } from '@/modules/Bills/models/Bill';
+import {
+  CreditNote,
+  CREDIT_NOTE_MONEY_SQL,
+} from '@/modules/CreditNotes/models/CreditNote';
+import {
+  VendorCredit,
+  VENDOR_CREDIT_MONEY_SQL,
+} from '@/modules/VendorCredit/models/VendorCredit';
 
 /**
  * Read-only money health check of one tenant database. It reports:
@@ -14,7 +27,10 @@ import {
  * - (c) stored account and contact balances that differ from the sum of
  *   their ledger rows,
  * - (d) fully paid invoices and bills whose cash basis lines don't add up to
- *   the document's accrual lines.
+ *   the document's accrual lines,
+ * - (e) documents whose total or amount left (due / credit remaining) is
+ *   not the same in the SQL the lists, due lists and aging reports use and
+ *   in the app getters (the "one answer" parity of the money SQL).
  *
  * Plain queries on the given tenant connection (snake case mappers), so the
  * CLI can run it without the application context. Nothing is written.
@@ -62,6 +78,15 @@ export interface IMoneyHealthCashDocumentDifference {
   locked: boolean;
 }
 
+export interface IMoneyHealthDocumentDifference {
+  documentType: 'SaleInvoice' | 'Bill' | 'CreditNote' | 'VendorCredit';
+  documentId: number;
+  documentNo: string;
+  field: 'total' | 'left';
+  sql: number;
+  app: number;
+}
+
 export interface IMoneyHealthResult {
   unbalancedSets: IMoneyHealthUnbalancedSet[];
   nonCentRows: IMoneyHealthNonCentRow[];
@@ -71,7 +96,107 @@ export interface IMoneyHealthResult {
   cashDocumentsSkipped: number;
   /** Fully paid documents checked by (d). */
   cashDocumentsChecked: number;
+  /** (e) Documents whose SQL and app money differ. */
+  documentDifferences: IMoneyHealthDocumentDifference[];
+  /** Documents checked by (e). */
+  documentsChecked: number;
 }
+
+/**
+ * The documents whose money is also computed in SQL (list tabs, due lists,
+ * credit apply lists, aging reports), with that SQL and the getter of the
+ * amount left.
+ */
+const PARITY_DOCUMENTS = [
+  {
+    documentType: 'SaleInvoice' as const,
+    table: 'sales_invoices',
+    numberColumn: 'invoice_no',
+    model: SaleInvoice,
+    totalSql: SALE_INVOICE_MONEY_SQL.total,
+    leftSql: SALE_INVOICE_MONEY_SQL.due,
+    left: (doc: any) => doc.dueAmount,
+  },
+  {
+    documentType: 'Bill' as const,
+    table: 'bills',
+    numberColumn: 'bill_number',
+    model: Bill,
+    totalSql: BILL_MONEY_SQL.total,
+    leftSql: BILL_MONEY_SQL.due,
+    left: (doc: any) => doc.dueAmount,
+  },
+  {
+    documentType: 'CreditNote' as const,
+    table: 'credit_notes',
+    numberColumn: 'credit_note_number',
+    model: CreditNote,
+    totalSql: CREDIT_NOTE_MONEY_SQL.total,
+    leftSql: CREDIT_NOTE_MONEY_SQL.remaining,
+    left: (doc: any) => doc.creditsRemaining,
+  },
+  {
+    documentType: 'VendorCredit' as const,
+    table: 'vendor_credits',
+    numberColumn: 'vendor_credit_number',
+    model: VendorCredit,
+    totalSql: VENDOR_CREDIT_MONEY_SQL.total,
+    leftSql: VENDOR_CREDIT_MONEY_SQL.remaining,
+    left: (doc: any) => doc.creditsRemaining,
+  },
+];
+
+/**
+ * (e) Selects each stored document's total and amount left with the SQL
+ * the lists use and compares them with the model getters on the same row.
+ * Any difference means a list, due list or aging report gives another
+ * answer than the document itself (Codex P2 was one: 0.01 "due" on a paid
+ * invoice).
+ */
+const getDocumentParityDifferences = async (
+  knex: Knex,
+): Promise<{
+  differences: IMoneyHealthDocumentDifference[];
+  checked: number;
+}> => {
+  const differences: IMoneyHealthDocumentDifference[] = [];
+  let checked = 0;
+
+  for (const kind of PARITY_DOCUMENTS) {
+    const rows: any[] = await knex
+      .queryBuilder()
+      .from(kind.table)
+      .select('*')
+      .select(knex.raw(`${kind.totalSql} as parity_sql_total`))
+      .select(knex.raw(`${kind.leftSql} as parity_sql_left`));
+
+    rows.forEach((row) => {
+      checked += 1;
+      const doc: any = (kind.model as any).fromJson(row, {
+        skipValidation: true,
+      });
+      const compare = (field: 'total' | 'left', sql: number, app: number) => {
+        if (toCents(sql) !== toCents(app)) {
+          differences.push({
+            documentType: kind.documentType,
+            documentId: row.id,
+            documentNo: row[camel(kind.numberColumn)] ?? `#${row.id}`,
+            field,
+            sql: Number(sql),
+            app: Number(app),
+          });
+        }
+      };
+      compare('total', Number(row.paritySqlTotal), doc.total);
+      // The getters clamp what is left at 0 (an over-settled document).
+      compare('left', Math.max(Number(row.paritySqlLeft), 0), kind.left(doc));
+    });
+  }
+  return { differences, checked };
+};
+
+const camel = (column: string) =>
+  column.replace(/_([a-z])/g, (_m, c) => c.toUpperCase());
 
 /** Float noise allowed when comparing sums read back as JS numbers. */
 const NOISE = 0.000001;
@@ -344,8 +469,12 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
     const fromLedger = Number((isForeign ? sums?.foreign : sums?.local) || 0);
     const stored = Number(contact.balance || 0);
 
-    // The contact balance column keeps 3 decimals.
-    if (Math.abs(stored - fromLedger) > 0.0005 + NOISE) {
+    // The contact balance column keeps 3 decimals. A foreign currency
+    // contact's balance is its ledger rows converted back to its currency
+    // (base amount / rate), each rounded to 3 decimals as it is saved, so
+    // it can drift below half a cent; a real difference is a cent or more.
+    const tolerance = isForeign ? 0.005 : 0.0005;
+    if (Math.abs(stored - fromLedger) > tolerance + NOISE) {
       differences.push({
         kind: 'contact',
         id: contact.id,
@@ -605,6 +734,7 @@ export const checkMoneyHealth = async (
   const nonCentRows = await getNonCentRows(knex, isLocked);
   const balanceDifferences = await getBalanceDifferences(knex, baseCurrency);
   const cashDocuments = await getCashDocumentDifferences(knex, isLocked);
+  const documentParity = await getDocumentParityDifferences(knex);
 
   return {
     unbalancedSets,
@@ -613,6 +743,8 @@ export const checkMoneyHealth = async (
     cashDocumentDifferences: cashDocuments.differences,
     cashDocumentsSkipped: cashDocuments.skipped,
     cashDocumentsChecked: cashDocuments.checked,
+    documentDifferences: documentParity.differences,
+    documentsChecked: documentParity.checked,
   };
 };
 
@@ -625,7 +757,8 @@ export const isMoneyHealthClean = (result: IMoneyHealthResult) =>
   result.unbalancedSets.every((row) => row.locked) &&
   result.nonCentRows.every((row) => row.locked) &&
   result.balanceDifferences.length === 0 &&
-  result.cashDocumentDifferences.every((row) => row.locked);
+  result.cashDocumentDifferences.every((row) => row.locked) &&
+  (result.documentDifferences ?? []).length === 0;
 
 /**
  * Formats the result as printable lines.
@@ -665,6 +798,16 @@ export const formatMoneyHealth = (result: IMoneyHealthResult): string[] => {
   result.cashDocumentDifferences.forEach((row) =>
     lines.push(
       `      ${row.documentType} ${row.documentNo} account #${row.accountId}: accrual ${row.accrual}, cash ${row.cash} (diff ${row.difference})${lockedTag(row.locked)}`,
+    ),
+  );
+  const documentDifferences = result.documentDifferences ?? [];
+  lines.push(
+    `  (e) Documents whose list SQL and app give another total or amount left: ${documentDifferences.length}` +
+      ` (${result.documentsChecked ?? 0} documents checked)`,
+  );
+  documentDifferences.forEach((row) =>
+    lines.push(
+      `      ${row.documentType} ${row.documentNo}: ${row.field} SQL ${row.sql}, app ${row.app}`,
     ),
   );
   return lines;
