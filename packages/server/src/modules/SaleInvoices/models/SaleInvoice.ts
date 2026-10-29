@@ -371,11 +371,23 @@ export class SaleInvoice extends TenantBaseModel {
   }
 
   /**
-   * Written-off amount in local currency.
+   * Written-off amount in local currency: what is left of the receivable at
+   * the invoice rate, as a running total on top of what the payments and
+   * credits settled (round((settled + written off) x rate) - round(settled x
+   * rate)). Payments relieve A/R the same way, so a written-off invoice
+   * leaves A/R at exactly 0. Rounding the write-off on its own missed by a
+   * cent: EUR 0.02 at 1.5 (0.03) paid 0.01 (0.02), written off 0.01 as 0.02.
    * @returns {number}
    */
   get writtenoffAmountLocal() {
-    return multiplyMoney(this.writtenoffAmount, this.exchangeRate);
+    const settled = sumMoney(this.paymentAmount || 0, this.creditedAmount || 0);
+    return subtractMoney(
+      multiplyMoney(
+        sumMoney(settled, this.writtenoffAmount || 0),
+        this.exchangeRate,
+      ),
+      multiplyMoney(settled, this.exchangeRate),
+    );
   }
 
   /**
