@@ -57,12 +57,18 @@ export function InventoryItemDetailsTable({
 }
 
 const InventoryItemDetailsDataTable = styled(ReportDataTable)`
-  --color-table-text: var(--color-light-gray1);
-  --color-table-total-text: var(--color-light-gray4);
+  --color-table-text: inherit;
+  --color-table-total-text: inherit;
   --color-table-border: #ececec;
-  --color-report-table-border: var(--color-dark-gray4);
+  --color-report-table-border: #ececec;
   --color-table-total-border: #ddd;
-  --color-table-total-border: var(--color-dark-gray4);
+
+  .bp4-dark & {
+    --color-table-text: var(--color-light-gray1);
+    --color-table-total-text: var(--color-light-gray4);
+    --color-report-table-border: var(--color-dark-gray4);
+    --color-table-total-border: var(--color-dark-gray4);
+  }
 
   .table {
     .tbody {
