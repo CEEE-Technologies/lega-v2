@@ -175,6 +175,21 @@
             "caseInsensitive": true
           }
         }
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          "selector": "CallExpression[callee.property.name='toFixed']",
+          "message": "toFixed() rounds the float error (1.005 -> '1.00'). For money use roundMoney / formattedAmount from @bigcapital/utils."
+        },
+        {
+          "selector": "CallExpression[callee.object.name='Math'][callee.property.name='round'] > BinaryExpression[operator='*'][right.value=100]",
+          "message": "Math.round(x * 100) is ad-hoc money rounding. Use roundMoney / toCents / moneyEq from @bigcapital/utils."
+        },
+        {
+          "selector": "CallExpression[callee.object.name='Math'][callee.property.name='round'] > BinaryExpression[operator='*'][right.value=1000]",
+          "message": "Math.round(x * 1000) is ad-hoc money rounding. Use roundMoney / toCents / moneyEq from @bigcapital/utils."
+        }
       ]
     }
   },

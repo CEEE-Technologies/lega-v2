@@ -52,6 +52,7 @@ export class VendorGLEntries {
       accountNormal: AccountNormal.DEBIT,
       debit: vendor.localOpeningBalance,
       credit: 0,
+      foreignDebit: vendor.openingBalance,
       index: 2,
     };
   };
@@ -73,6 +74,7 @@ export class VendorGLEntries {
       accountId: APAccountId,
       accountNormal: AccountNormal.CREDIT,
       credit: vendor.localOpeningBalance,
+      foreignCredit: vendor.openingBalance,
       index: 1,
     };
   };

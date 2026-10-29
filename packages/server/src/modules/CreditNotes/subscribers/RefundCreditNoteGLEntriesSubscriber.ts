@@ -55,6 +55,12 @@ export class RefundCreditNoteGLEntriesSubscriber {
       refundCreditNote.id,
       trx,
     );
+    // A back-dated refund changes the split of the later refunds.
+    await this.refundCreditGLEntries.rewriteLaterRefundsCashGLEntries(
+      refundCreditNote.creditNoteId,
+      { id: refundCreditNote.id, date: refundCreditNote.date },
+      trx,
+    );
   }
 
   /**
@@ -65,12 +71,20 @@ export class RefundCreditNoteGLEntriesSubscriber {
   async revertRefundCreditGLEntriesOnceDeleted({
     trx,
     refundCreditId,
-    oldRefundCredit: _oldRefundCredit,
+    oldRefundCredit,
   }: IRefundCreditNoteDeletedPayload) {
     await this.refundCreditGLEntries.revertRefundCreditGLEntries(
       refundCreditId,
       trx,
     );
+    // The later refunds of the credit note are rebuilt in order.
+    if (oldRefundCredit?.creditNoteId) {
+      await this.refundCreditGLEntries.rewriteLaterRefundsCashGLEntries(
+        oldRefundCredit.creditNoteId,
+        { id: refundCreditId, date: oldRefundCredit.date },
+        trx,
+      );
+    }
   }
 
   /**

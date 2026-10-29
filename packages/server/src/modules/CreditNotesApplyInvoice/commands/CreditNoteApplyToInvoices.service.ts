@@ -1,6 +1,6 @@
+import { moneyLt, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { sumBy } from 'lodash';
 import {
   ICreditNoteAppliedToInvoice,
   ICreditNoteAppliedToInvoiceModel,
@@ -146,7 +146,7 @@ export class CreditNoteApplyToInvoices {
       creditNoteId: creditNote.id,
     }));
     return {
-      amount: sumBy(entries, 'amount'),
+      amount: sumMoneyBy(entries, 'amount'),
       entries,
     };
   };
@@ -163,7 +163,7 @@ export class CreditNoteApplyToInvoices {
     const invoiceMap = new Map(invoices.map((inv) => [inv.id, inv]));
     const invalidEntries = entries.filter((entry) => {
       const invoice = invoiceMap.get(entry.invoiceId);
-      return invoice != null && invoice.dueAmount < entry.amount;
+      return invoice != null && moneyLt(invoice.dueAmount, entry.amount);
     });
     if (invalidEntries.length > 0) {
       throw new ServiceError(ERRORS.INVOICES_HAS_NO_REMAINING_AMOUNT);

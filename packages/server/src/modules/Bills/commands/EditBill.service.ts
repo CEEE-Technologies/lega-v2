@@ -135,9 +135,15 @@ export class EditBillService {
     );
     // Validate bill total amount should be bigger than paid amount
     // against the locked row.
+    // The payment can cover the whole total (tax, discount and adjustment
+    // included), not just the subtotal. Compared with everything already
+    // settled (payments and vendor credits), as the due amount is.
     this.validators.validateBillAmountBiggerPaidAmount(
-      billObj.amount,
-      oldBill.paymentAmount,
+      this.billModel().fromJson(
+        { ...billObj, entries: undefined },
+        { skipValidation: true },
+      ).total,
+      oldBill.balance,
     );
     return { oldBill, billObj };
   }

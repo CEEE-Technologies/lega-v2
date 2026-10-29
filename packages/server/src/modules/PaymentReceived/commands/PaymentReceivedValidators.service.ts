@@ -1,5 +1,6 @@
+import { moneyGt, moneyLt, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { difference, sumBy } from 'lodash';
+import { difference } from 'lodash';
 import { Knex } from 'knex';
 import { IPaymentReceivedEntryDTO } from '../types/PaymentReceived.types';
 import { ERRORS } from '../constants';
@@ -12,6 +13,7 @@ import { ACCOUNT_TYPE } from '@/constants/accounts';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditPaymentReceivedDto } from '../dtos/PaymentReceived.dto';
 import {
+  findDuplicateDocument,
   isDocumentEntry,
   isOpeningBalanceEntry,
 } from '@/modules/Contacts/ContactOpeningBalance.constants';
@@ -123,6 +125,39 @@ export class PaymentReceivedValidators {
   }
 
   /**
+   * Validates that no invoice is listed more than once in the payment. Each
+   * line of a payment converts and relieves its invoice from the amount paid
+   * before the payment, so two lines on the same invoice would both start from
+   * the same point and double count the currency rounding (EUR 0.02 at 1.5
+   * paid as 0.01 + 0.01 relieved 0.04 instead of 0.03).
+   * @param {{ invoiceId?: number | null; entryType?: string }[]} entries
+   * @param {{ id: number }[]} storedDocuments - To name the invoice in the error.
+   */
+  public validateNoDuplicateInvoices(
+    entries: {
+      invoiceId?: number | null;
+      entryType?: string;
+      paymentAmount?: number;
+    }[],
+    storedInvoices: SaleInvoice[] = [],
+  ) {
+    const duplicate = findDuplicateDocument(entries, 'invoiceId');
+    if (!duplicate) return;
+
+    const invoice = storedInvoices.find((row) => row.id === duplicate.id);
+    const name = invoice?.invoiceNo || `Invoice #${duplicate.id}`;
+    throw new ServiceError(
+      ERRORS.PAYMENT_DUPLICATE_INVOICE_ENTRIES,
+      `${name} is listed twice in this payment. Combine the amounts into one line.`,
+      {
+        invoiceId: duplicate.id,
+        invoiceNo: invoice?.invoiceNo,
+        indexes: duplicate.indexes,
+      },
+    );
+  }
+
+  /**
    * Validates the amounts applied to invoices don't add up to more than the
    * amount received; otherwise invoices get marked paid with money that was
    * never received and the accrual and cash ledgers disagree.
@@ -133,13 +168,10 @@ export class PaymentReceivedValidators {
     amount: number,
     entries: IPaymentReceivedEntryDTO[] = [],
   ) {
-    const totalApplied = sumBy(
-      entries,
-      (entry) => Number(entry.paymentAmount) || 0,
-    );
+    const totalApplied = sumMoneyBy(entries, 'paymentAmount');
 
     // Compare in cents to ignore floating point noise.
-    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+    if (moneyGt(totalApplied, amount)) {
       throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
     }
   }
@@ -177,11 +209,14 @@ export class PaymentReceivedValidators {
         const oldEntries = oldPaymentEntries.filter(
           (entry) => isDocumentEntry(entry) && entry.invoiceId === invoice.id,
         );
-        const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
+        const oldPaymentAmount = sumMoneyBy(oldEntries, 'paymentAmount');
 
         return [
           invoice.id,
-          { ...invoice, dueAmount: invoice.dueAmount + oldPaymentAmount },
+          {
+            ...invoice,
+            dueAmount: sumMoney(invoice.dueAmount, oldPaymentAmount),
+          },
         ];
       }),
     );
@@ -191,7 +226,7 @@ export class PaymentReceivedValidators {
       const entryInvoice = storedInvoicesMap.get(entry.invoiceId);
       const { dueAmount } = entryInvoice;
 
-      if (dueAmount < entry.paymentAmount) {
+      if (moneyLt(dueAmount, entry.paymentAmount)) {
         hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
       }
     });

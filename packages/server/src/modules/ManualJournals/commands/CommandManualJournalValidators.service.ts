@@ -1,5 +1,6 @@
+import { moneyEq, moneyGt, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { difference, isEmpty, round, sumBy } from 'lodash';
+import { difference, isEmpty } from 'lodash';
 import { ERRORS } from '../constants';
 import { ServiceError } from '@/modules/Items/ServiceError';
 import { Account } from '@/modules/Accounts/models/Account.model';
@@ -32,18 +33,13 @@ export class CommandManualJournalValidators {
   public valdiateCreditDebitTotalEquals(
     manualJournalDTO: CreateManualJournalDto | EditManualJournalDto,
   ) {
-    const totalCredit = round(
-      sumBy(manualJournalDTO.entries, (entry) => entry.credit || 0),
-      2,
-    );
-    const totalDebit = round(
-      sumBy(manualJournalDTO.entries, (entry) => entry.debit || 0),
-      2,
-    );
-    if (totalCredit <= 0 || totalDebit <= 0) {
+    const totalCredit = sumMoneyBy(manualJournalDTO.entries, 'credit');
+    const totalDebit = sumMoneyBy(manualJournalDTO.entries, 'debit');
+
+    if (!moneyGt(totalCredit, 0) || !moneyGt(totalDebit, 0)) {
       throw new ServiceError(ERRORS.CREDIT_DEBIT_NOT_EQUAL_ZERO);
     }
-    if (totalCredit !== totalDebit) {
+    if (!moneyEq(totalCredit, totalDebit)) {
       throw new ServiceError(ERRORS.CREDIT_DEBIT_NOT_EQUAL);
     }
   }

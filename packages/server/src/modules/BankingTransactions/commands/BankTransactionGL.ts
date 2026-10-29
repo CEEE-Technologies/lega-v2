@@ -55,6 +55,12 @@ export class BankTransactionGL {
       debit: this.bankTransactionModel.isCashDebit
         ? this.bankTransactionModel.localAmount
         : 0,
+      foreignCredit: this.bankTransactionModel.isCashCredit
+        ? this.bankTransactionModel.amount
+        : 0,
+      foreignDebit: this.bankTransactionModel.isCashDebit
+        ? this.bankTransactionModel.amount
+        : 0,
       accountNormal: this.bankTransactionModel?.cashflowAccount?.accountNormal,
       index: 1,
     };
@@ -72,6 +78,12 @@ export class BankTransactionGL {
         : 0,
       debit: this.bankTransactionModel.isCashCredit
         ? this.bankTransactionModel.localAmount
+        : 0,
+      foreignCredit: this.bankTransactionModel.isCashDebit
+        ? this.bankTransactionModel.amount
+        : 0,
+      foreignDebit: this.bankTransactionModel.isCashCredit
+        ? this.bankTransactionModel.amount
         : 0,
       accountId: this.bankTransactionModel.creditAccountId,
       accountNormal: this.bankTransactionModel.creditAccount.accountNormal,

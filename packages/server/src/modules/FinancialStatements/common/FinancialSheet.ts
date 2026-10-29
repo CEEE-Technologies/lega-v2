@@ -1,3 +1,4 @@
+import { roundHalfAwayFromZero, subtractMoney } from '@bigcapital/utils';
 import * as moment from 'moment';
 import {
   IFormatNumberSettings,
@@ -77,7 +78,7 @@ export class FinancialSheet {
     amount: number,
     overrideSettings: IFormatNumberSettings = {},
   ): string => {
-    const percentage = amount * 100;
+    const percentage = roundHalfAwayFromZero(amount * 100, 2);
     const settings = {
       excerptZero: true,
       ...overrideSettings,
@@ -159,14 +160,20 @@ export class FinancialSheet {
   };
 
   getAmountChange = (base, amount) => {
-    return base - amount;
+    return subtractMoney(base, amount);
   };
 
+  /**
+   * A report percentage is shown with 2 decimals (12.35%): its ratio is
+   * rounded to 4 decimals, halves away from zero, so the amount and the
+   * formatted text agree.
+   */
   protected getPercentageAmountMeta = (amount) => {
-    const formattedAmount = this.formatPercentage(amount);
+    const rounded = roundHalfAwayFromZero(amount, 4);
+    const formattedAmount = this.formatPercentage(rounded);
 
     return {
-      amount,
+      amount: rounded,
       formattedAmount,
     };
   };
@@ -177,8 +184,9 @@ export class FinancialSheet {
    * @returns
    */
   protected getPercentageTotalAmountMeta = (amount: number) => {
-    const formattedAmount = this.formatTotalPercentage(amount);
+    const rounded = roundHalfAwayFromZero(amount, 4);
+    const formattedAmount = this.formatTotalPercentage(rounded);
 
-    return { amount, formattedAmount };
+    return { amount: rounded, formattedAmount };
   };
 }

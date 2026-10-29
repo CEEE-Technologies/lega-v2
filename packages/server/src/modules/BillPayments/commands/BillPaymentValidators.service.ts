@@ -1,5 +1,6 @@
+import { moneyGt, moneyLt, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { sumBy, difference } from 'lodash';
+import { difference } from 'lodash';
 import { Knex } from 'knex';
 import { ERRORS } from '../constants';
 import { Bill } from '../../Bills/models/Bill';
@@ -13,7 +14,10 @@ import {
   BillPaymentEntryDto,
   EditBillPaymentDto,
 } from '../dtos/BillPayment.dto';
-import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import {
+  findDuplicateDocument,
+  isDocumentEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class BillPaymentValidators {
@@ -148,6 +152,39 @@ export class BillPaymentValidators {
   }
 
   /**
+   * Validates that no bill is listed more than once in the payment. Each
+   * line of a payment converts and relieves its bill from the amount paid
+   * before the payment, so two lines on the same bill would both start from
+   * the same point and double count the currency rounding (EUR 0.02 at 1.5
+   * paid as 0.01 + 0.01 relieved 0.04 instead of 0.03).
+   * @param {{ billId?: number | null; entryType?: string }[]} entries
+   * @param {{ id: number }[]} storedDocuments - To name the bill in the error.
+   */
+  public validateNoDuplicateBills(
+    entries: {
+      billId?: number | null;
+      entryType?: string;
+      paymentAmount?: number;
+    }[],
+    storedBills: Bill[] = [],
+  ) {
+    const duplicate = findDuplicateDocument(entries, 'billId');
+    if (!duplicate) return;
+
+    const bill = storedBills.find((row) => row.id === duplicate.id);
+    const name = bill?.billNumber || `Bill #${duplicate.id}`;
+    throw new ServiceError(
+      ERRORS.PAYMENT_DUPLICATE_BILL_ENTRIES,
+      `${name} is listed twice in this payment. Combine the amounts into one line.`,
+      {
+        billId: duplicate.id,
+        billNumber: bill?.billNumber,
+        indexes: duplicate.indexes,
+      },
+    );
+  }
+
+  /**
    * Validate wether the payment amount bigger than the payable amount.
    * @param {Request} req
    * @param {Response} res
@@ -178,11 +215,11 @@ export class BillPaymentValidators {
         const oldEntries = oldPaymentEntries.filter(
           (entry) => isDocumentEntry(entry) && entry.billId === bill.id,
         );
-        const oldPaymentAmount = sumBy(oldEntries, 'paymentAmount') || 0;
+        const oldPaymentAmount = sumMoneyBy(oldEntries, 'paymentAmount');
 
         return [
           bill.id,
-          { ...bill, dueAmount: bill.dueAmount + oldPaymentAmount },
+          { ...bill, dueAmount: sumMoney(bill.dueAmount, oldPaymentAmount) },
         ];
       }),
     );
@@ -196,7 +233,7 @@ export class BillPaymentValidators {
       const entryBill = storedBillsMap.get(entry.billId);
       const { dueAmount } = entryBill;
 
-      if (dueAmount < entry.paymentAmount) {
+      if (moneyLt(dueAmount, entry.paymentAmount)) {
         hasWrongPaymentAmount.push({ index, due_amount: dueAmount });
       }
     });
@@ -217,13 +254,10 @@ export class BillPaymentValidators {
     amount: number,
     entries: { paymentAmount: number }[] = [],
   ) {
-    const totalApplied = sumBy(
-      entries,
-      (entry) => Number(entry.paymentAmount) || 0,
-    );
+    const totalApplied = sumMoneyBy(entries, 'paymentAmount');
 
     // Compare in cents to ignore floating point noise.
-    if (Math.round(totalApplied * 100) > Math.round(Number(amount) * 100)) {
+    if (moneyGt(totalApplied, amount)) {
       throw new ServiceError(ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT);
     }
   }

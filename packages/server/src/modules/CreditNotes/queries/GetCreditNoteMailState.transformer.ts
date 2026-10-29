@@ -88,7 +88,7 @@ export class GetCreditNoteMailStateTransformer extends CreditNoteTransformer {
    * @returns {number}
    */
   protected total(creditNote) {
-    return creditNote.amount;
+    return creditNote.total;
   }
 
   /**

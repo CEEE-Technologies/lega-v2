@@ -2,7 +2,7 @@ import { css } from '@emotion/css';
 import { x } from '@xstyled/emotion';
 import clsx from 'classnames';
 import type { CSSProperties } from 'react';
-import { FFormGroup, FInputGroup, TotalLinePrimitive } from '@/components';
+import { FFormGroup, FMoneyInputGroup, TotalLinePrimitive } from '@/components';
 import { useIsDarkMode } from '@/hooks/useDarkMode';
 
 const borderColorStyle = (isDarkMode: boolean): CSSProperties =>
@@ -52,7 +52,8 @@ export function AdjustmentTotalLine({
             fastField
             className={formGroupCss}
           >
-            <FInputGroup
+            {/* A money input: at most 2 decimals, may be negative. */}
+            <FMoneyInputGroup
               name={'adjustment'}
               fastField
               className={clsx(

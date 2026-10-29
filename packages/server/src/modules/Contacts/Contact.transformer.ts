@@ -1,3 +1,4 @@
+import { subtractMoney } from '@bigcapital/utils';
 import { isNull } from 'lodash';
 import { Transformer } from '../Transformer/Transformer';
 import { Contact } from './models/Contact';
@@ -34,11 +35,10 @@ export class ContactTransfromer extends Transformer {
    */
   protected openingBalanceDueAmount = (contact: Contact): number => {
     return Math.max(
-      Math.round(
-        (Number(contact.openingBalance || 0) -
-          Number(contact.openingBalancePaymentAmount || 0)) *
-          1000,
-      ) / 1000,
+      subtractMoney(
+        contact.openingBalance,
+        contact.openingBalancePaymentAmount,
+      ),
       0,
     );
   };

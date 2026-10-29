@@ -1,3 +1,4 @@
+import { multiplyMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 import { BillPaymentEntry } from './BillPaymentEntry';
 import { Vendor } from '@/modules/Vendors/models/Vendor';
@@ -64,7 +65,7 @@ export class BillPayment extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**

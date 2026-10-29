@@ -1,8 +1,9 @@
+import { roundMoney } from '@bigcapital/utils';
 import { Button, ControlGroup, Position } from '@blueprintjs/core';
 import { css } from '@emotion/css';
 import { useTheme } from '@emotion/react';
 import { useFormikContext } from 'formik';
-import { isEmpty, toSafeInteger } from 'lodash';
+import { isEmpty } from 'lodash';
 import React, { useMemo } from 'react';
 import intl from 'react-intl-universal';
 import styled from 'styled-components';
@@ -92,7 +93,8 @@ function PaymentMadeFormHeaderFieldsInner() {
   };
 
   const onFullAmountBlur = (value: string | number) => {
-    const newEntries = amountPaymentEntries(toSafeInteger(value), entries);
+    // Keep the cents: 1,250.75 is spread as 1,250.75, not 1,250.
+    const newEntries = amountPaymentEntries(roundMoney(value), entries);
     setFieldValue('entries', newEntries);
   };
 

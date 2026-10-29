@@ -1,6 +1,7 @@
+import { roundMoney, sumMoneyBy } from '@bigcapital/utils';
 import * as R from 'ramda';
 import { Inject, Injectable } from '@nestjs/common';
-import { omit, sumBy } from 'lodash';
+import { omit } from 'lodash';
 import * as composeAsync from 'async/compose';
 import {
   IPaymentReceivedCreateDTO,
@@ -42,9 +43,11 @@ export class PaymentReceiveDTOTransformer {
     paymentReceiveDTO: IPaymentReceivedCreateDTO | IPaymentReceivedEditDTO,
     oldPaymentReceive?: PaymentReceived,
   ): Promise<PaymentReceived> {
-    const amount =
+    // Payment amounts are saved in whole cents.
+    const amount = roundMoney(
       paymentReceiveDTO.amount ??
-      sumBy(paymentReceiveDTO.entries, 'paymentAmount');
+        sumMoneyBy(paymentReceiveDTO.entries, 'paymentAmount'),
+    );
 
     this.validators.validateEntriesWithinAmount(
       amount,
@@ -67,7 +70,10 @@ export class PaymentReceiveDTOTransformer {
       assocItemEntriesDefaultIndex,
     )(
       paymentReceiveDTO.entries.map((entry) =>
-        normalizePaymentEntryType(entry, 'invoiceId'),
+        normalizePaymentEntryType(
+          { ...entry, paymentAmount: roundMoney(entry.paymentAmount) },
+          'invoiceId',
+        ),
       ),
     );
 

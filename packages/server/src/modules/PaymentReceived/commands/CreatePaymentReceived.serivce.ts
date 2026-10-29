@@ -118,10 +118,15 @@ export class CreatePaymentReceivedService {
       baseCurrency,
     );
     // Validate payment receive invoices IDs existance (locks the invoice rows).
-    await this.validators.validateInvoicesIDsExistance(
+    const storedInvoices = await this.validators.validateInvoicesIDsExistance(
       paymentReceiveDTO.customerId,
       paymentReceiveDTO.entries,
       trx,
+    );
+    // Each invoice once per payment.
+    this.validators.validateNoDuplicateInvoices(
+      paymentReceiveDTO.entries,
+      storedInvoices,
     );
     // Validate invoice payment amount against the locked rows.
     await this.validators.validateInvoicesPaymentsAmount(

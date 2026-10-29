@@ -1,11 +1,12 @@
 import { Knex } from 'knex';
+import { moneyEq, moneyGt, moneyIsZero, roundMoney } from '@bigcapital/utils';
 import { ACCOUNT_TYPE } from '@/constants/accounts';
 
 /**
- * Amount difference under which two ledger totals are considered equal
- * (the ledger stores 3 decimals).
+ * Amount difference under which two totals are considered equal: less than
+ * half a cent, so the totals are equal in whole cents.
  */
-const EPSILON = 0.0005;
+const EPSILON = 0.005 - 1e-9;
 
 export interface ICashBasisAccountDifference {
   accountId: number;
@@ -56,7 +57,7 @@ export interface ICashBasisCheckResult {
   openingBalanceCreditCandidates?: IOpeningBalanceCreditCandidate[];
 }
 
-const round3 = (value: any) => Math.round(Number(value || 0) * 1000) / 1000;
+const round2 = (value: any) => roundMoney(value);
 
 /**
  * Checks the cash basis ledger of a tenant database:
@@ -111,11 +112,11 @@ export const checkCashBasis = async (
     .map((row) => ({
       accountId: row.accountId,
       accountName: row.accountName,
-      cashBalance: round3(row.cashBalance),
-      accrualBalance: round3(row.accrualBalance),
-      difference: round3(row.cashBalance - row.accrualBalance),
+      cashBalance: round2(row.cashBalance),
+      accrualBalance: round2(row.accrualBalance),
+      difference: round2(row.cashBalance - row.accrualBalance),
     }))
-    .filter((row) => Math.abs(row.difference) > EPSILON);
+    .filter((row) => !moneyIsZero(row.difference));
 
   const setRows: any[] = await knex
     .queryBuilder()
@@ -132,9 +133,9 @@ export const checkCashBasis = async (
     referenceType: row.referenceType,
     referenceId: row.referenceId,
     basis: row.basis ?? null,
-    debit: round3(row.debit),
-    credit: round3(row.credit),
-    difference: round3(row.debit - row.credit),
+    debit: round2(row.debit),
+    credit: round2(row.credit),
+    difference: round2(row.debit - row.credit),
   }));
 
   const openingBalancePaidMismatches =
@@ -201,7 +202,7 @@ const getOpeningBalancePaidMismatches = async (
     rows.forEach((row) => {
       paidByContact.set(
         row.contactId,
-        round3(
+        round2(
           (paidByContact.get(row.contactId) || 0) + Number(row.paidAmount),
         ),
       );
@@ -228,14 +229,14 @@ const getOpeningBalancePaidMismatches = async (
     .map((contact) => ({
       contactId: contact.contactId,
       displayName: contact.displayName,
-      openingBalance: round3(contact.openingBalance),
-      storedPaidAmount: round3(contact.storedPaidAmount),
+      openingBalance: round2(contact.openingBalance),
+      storedPaidAmount: round2(contact.storedPaidAmount),
       entriesPaidAmount: paidByContact.get(contact.contactId) || 0,
     }))
     .filter(
       (row) =>
-        Math.abs(row.storedPaidAmount - row.entriesPaidAmount) > EPSILON ||
-        row.storedPaidAmount - row.openingBalance > EPSILON,
+        !moneyEq(row.storedPaidAmount, row.entriesPaidAmount) ||
+        moneyGt(row.storedPaidAmount, row.openingBalance),
     );
 };
 
@@ -296,14 +297,14 @@ const getOpeningBalanceCreditCandidates = async (
         contactId: row.contactId,
         contactService: kind.contactService,
         displayName: row.displayName,
-        openingBalanceDue: round3(row.openingBalance - row.openingBalancePaid),
+        openingBalanceDue: round2(row.openingBalance - row.openingBalancePaid),
         unappliedAmount: 0,
         payments: '',
       };
-      candidate.unappliedAmount = round3(
+      candidate.unappliedAmount = round2(
         candidate.unappliedAmount + Number(row.unappliedAmount),
       );
-      const label = `${row.paymentNumber || `#${row.paymentId}`} (${round3(row.unappliedAmount)})`;
+      const label = `${row.paymentNumber || `#${row.paymentId}`} (${round2(row.unappliedAmount)})`;
       candidate.payments = candidate.payments
         ? `${candidate.payments}, ${label}`
         : label;

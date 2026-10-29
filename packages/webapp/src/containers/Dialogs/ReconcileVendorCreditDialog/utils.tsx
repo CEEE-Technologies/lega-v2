@@ -1,3 +1,4 @@
+import { fromCents, toCents } from '@bigcapital/utils';
 import { Callout, Intent, Classes } from '@blueprintjs/core';
 import clsx from 'classnames';
 import React from 'react';
@@ -90,7 +91,12 @@ export const maxAmountCreditFromRemaining = (
   return entries.map((entry) => ({
     ...entry,
     amount: entry.amount
-      ? Math.min((entry.dueAmount ?? 0) as number, entry.amount as number)
+      ? fromCents(
+          Math.min(
+            toCents((entry.dueAmount ?? 0) as number),
+            toCents(entry.amount as number),
+          ),
+        )
       : '',
   }));
 };

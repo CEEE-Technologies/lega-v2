@@ -148,3 +148,98 @@ describe('PaymentReceivedValidators — opening balance lines', () => {
     ).toThrow();
   });
 });
+
+describe('PaymentReceivedValidators — comparisons in cents', () => {
+  it('accepts lines of 1.10 + 2.20 for an amount of 3.30', () => {
+    expect(() =>
+      makeValidators().validateEntriesWithinAmount(3.3, [
+        { invoiceId: 1, paymentAmount: 1.1 },
+        { invoiceId: 2, paymentAmount: 2.2 },
+      ] as any),
+    ).not.toThrow();
+  });
+
+  it('rejects lines one cent over the amount (100.005 rounds to 100.01)', () => {
+    expect(() =>
+      makeValidators().validateEntriesWithinAmount(100, [
+        { invoiceId: 1, paymentAmount: 100.005 },
+      ] as any),
+    ).toThrow(
+      expect.objectContaining({
+        errorType: ERRORS.PAYMENT_ENTRIES_EXCEED_AMOUNT,
+      }),
+    );
+  });
+
+  it('accepts paying a due of 1.10 + 2.20 with 3.30', async () => {
+    const validators = makeValidators([{ id: 1, dueAmount: 1.1 + 2.2 }]);
+    await expect(
+      validators.validateInvoicesPaymentsAmount([
+        { invoiceId: 1, paymentAmount: 3.3 },
+      ] as any),
+    ).resolves.toBeUndefined();
+  });
+
+  it('frees the old line in cents when editing (0.1 + 0.2 due)', async () => {
+    const validators = makeValidators([{ id: 1, dueAmount: 0.1 }]);
+    await expect(
+      validators.validateInvoicesPaymentsAmount(
+        [{ invoiceId: 1, paymentAmount: 0.3 }] as any,
+        [{ invoiceId: 1, paymentAmount: 0.2 }] as any,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects paying half a cent more than due (x.xx5)', async () => {
+    const validators = makeValidators([{ id: 1, dueAmount: 10 }]);
+    await expect(
+      validators.validateInvoicesPaymentsAmount([
+        { invoiceId: 1, paymentAmount: 10.005 },
+      ] as any),
+    ).rejects.toEqual(
+      expect.objectContaining({ errorType: ERRORS.INVALID_PAYMENT_AMOUNT }),
+    );
+  });
+});
+
+// Codex P2: two lines on the same invoice both relieved it from the same
+// "paid before" point, double counting the currency rounding.
+describe('PaymentReceivedValidators — each invoice once per payment', () => {
+  const validators = makeValidators([]);
+
+  it('rejects an invoice listed twice, naming it', () => {
+    let error: any;
+    try {
+      validators.validateNoDuplicateInvoices(
+        [
+          { invoiceId: 12, paymentAmount: 0.01 },
+          { invoiceId: 13, paymentAmount: 1 },
+          { invoiceId: 12, paymentAmount: 0.01 },
+        ],
+        [{ id: 12, invoiceNo: 'INV-12' }] as any,
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toEqual(
+      expect.objectContaining({
+        errorType: ERRORS.PAYMENT_DUPLICATE_INVOICE_ENTRIES,
+        message:
+          'INV-12 is listed twice in this payment. Combine the amounts into one line.',
+      }),
+    );
+    expect(error.payload).toEqual(
+      expect.objectContaining({ invoiceId: 12, indexes: [0, 2] }),
+    );
+  });
+
+  it('accepts different invoices and the opening balance line', () => {
+    expect(() =>
+      validators.validateNoDuplicateInvoices([
+        { invoiceId: 12, paymentAmount: 1 },
+        { invoiceId: 13, paymentAmount: 1 },
+        { entryType: 'opening_balance', invoiceId: null, paymentAmount: 1 },
+      ]),
+    ).not.toThrow();
+  });
+});

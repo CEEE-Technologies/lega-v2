@@ -129,6 +129,9 @@ export interface CreditNotePdfTemplateAttributes {
   companyAddress: string;
   billedToLabel: string;
 
+  discount?: string;
+  discountLabel?: string;
+  adjustment?: string;
   total: string;
   totalLabel: string;
   showTotal: boolean;

@@ -1,3 +1,4 @@
+import { roundMoney } from '@bigcapital/utils';
 import {
   Item as PlaidItem,
   Institution as PlaidInstitution,
@@ -66,7 +67,8 @@ export const transformPlaidTrxsToCashflowCreate = (
     // Plaid: Positive values when money moves out of the account; negative values
     // when money moves in. For example, debit card purchases are positive;
     // credit card payments, direct deposits, and refunds are negative.
-    amount: -1 * plaidTranasction.amount,
+    // Bank feed amounts are money: rounded to cents.
+    amount: roundMoney(-1 * plaidTranasction.amount),
 
     description: plaidTranasction.name,
     payee: plaidTranasction.payment_meta?.payee,

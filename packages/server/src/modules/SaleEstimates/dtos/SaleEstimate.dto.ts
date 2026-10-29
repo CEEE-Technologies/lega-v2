@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { IsOptional, ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, IsOptional, ToNumber } from '@/common/decorators/Validators';
 
 enum DiscountType {
   Percentage = 'percentage',
@@ -153,7 +153,7 @@ export class CommandSaleEstimateDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({
     description: 'The discount of the estimate',
     example: 1,
@@ -170,7 +170,7 @@ export class CommandSaleEstimateDto {
 
   @ToNumber()
   @IsOptional()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({
     description: 'The adjustment of the estimate',
     example: 1,

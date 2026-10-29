@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { ItemEntryDto } from '@/modules/TransactionItemEntry/dto/ItemEntry.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -10,7 +10,6 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPositive,
   IsString,
@@ -108,7 +107,7 @@ export class CommandCreditNoteDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({ example: 10, description: 'The discount amount' })
   discount?: number;
 
@@ -123,7 +122,7 @@ export class CommandCreditNoteDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   adjustment?: number;
 }
 

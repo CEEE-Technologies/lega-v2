@@ -26,7 +26,9 @@ describe('RefundVendorCreditGLEntries.rewriteVendorCreditRefundsCashGLEntries', 
   it('rewrites the cash set of every refund of the vendor credit', async () => {
     const trx = { trx: true } as any;
     const refundModel = () => ({
-      query: () => ({ where: async () => [{ id: 1 }, { id: 2 }] }),
+      query: () => ({
+        where: () => ({ orderBy: async () => [{ id: 1 }, { id: 2 }] }),
+      }),
     });
     const service = new RefundVendorCreditGLEntries(
       {} as any,

@@ -1,3 +1,10 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  subtractMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
@@ -40,6 +47,8 @@ export type InvoiceEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -89,6 +98,7 @@ export const defaultInvoiceEntry: InvoiceEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -129,6 +139,7 @@ export const defaultReqInvoiceEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   taxRateId: '',
@@ -410,9 +421,7 @@ export const useInvoiceDiscountAmount = () => {
   const subtotal = useInvoiceSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (subtotal * discount) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -434,7 +443,7 @@ export const useInvoiceDiscountAmountFormatted = () => {
  */
 export const useInvoiceAdjustmentAmount = () => {
   const { values } = useFormikContext<InvoiceFormValues>();
-  const adjustment = toSafeNumber(values.adjustment);
+  const adjustment = roundMoney(values.adjustment);
 
   return adjustment;
 };
@@ -529,7 +538,7 @@ export const useInvoiceTotalTaxAmount = () => {
 
   return React.useMemo(() => {
     const filteredEntries = values.entries.filter((entry) => entry.taxAmount);
-    return sumBy(filteredEntries, 'taxAmount');
+    return sumMoneyBy(filteredEntries, 'taxAmount');
   }, [values.entries]);
 };
 
@@ -544,8 +553,13 @@ export const useInvoiceTotal = () => {
   const discountAmount = useInvoiceDiscountAmount();
   const adjustmentAmount = useInvoiceAdjustmentAmount();
 
-  const total = subtotal + adjustmentAmount - discountAmount;
-  return isExclusiveTax ? total + totalTaxAmount : total;
+  // In whole cents; the tax is added only when it is exclusive.
+  return sumMoney(
+    subtotal,
+    adjustmentAmount,
+    -discountAmount,
+    isExclusiveTax ? totalTaxAmount : 0,
+  );
 };
 
 /**
@@ -581,14 +595,25 @@ export const useInvoicePaidAmountFormatted = () => {
 };
 
 /**
- * Retreives the invoice due amount.
+ * Retreives the invoice due amount: the total less what settled it, the
+ * payments, the applied credits and the written-off amount (as the server).
  * @returns {number}
  */
 export const useInvoiceDueAmount = () => {
   const total = useInvoiceTotal();
-  const paidAmount = useInvoicePaidAmount();
+  const { invoice } = useInvoiceFormContext();
 
-  return Math.max(total - paidAmount, 0);
+  // The write-off amount is returned by the API but not typed on the DTO.
+  const writtenoffAmount = (
+    invoice as { writtenoffAmount?: number | null } | undefined
+  )?.writtenoffAmount;
+
+  const settledAmount = sumMoney(
+    invoice?.paymentAmount,
+    invoice?.creditedAmount,
+    writtenoffAmount,
+  );
+  return Math.max(subtractMoney(total, settledAmount), 0);
 };
 
 /**

@@ -1,5 +1,10 @@
+import {
+  moneyIsZero,
+  subtractMoney,
+  sumMoneyBy,
+  toMoneyNumber,
+} from '@bigcapital/utils';
 import { useFormikContext } from 'formik';
-import { round } from 'lodash';
 import { useMemo } from 'react';
 import { useMatchingTransactionBoot } from './MatchingTransactionBoot';
 import { MatchingTransactionFormValues } from './types';
@@ -30,15 +35,13 @@ export const useGetPendingAmountMatched = () => {
         return values.matched[key];
       },
     );
-    const totalMatchedAmount = matchedItems.reduce(
-      (total, item) =>
-        total +
-        (item.transactionNormal === 'debit' ? 1 : -1) * parseFloat(item.amount),
-      0,
+    // Signed total in whole cents.
+    const totalMatchedAmount = sumMoneyBy(matchedItems, (item) =>
+      item.transactionNormal === 'debit'
+        ? toMoneyNumber(item.amount)
+        : -toMoneyNumber(item.amount),
     );
-    const pendingAmount = totalPending - totalMatchedAmount;
-
-    return round(pendingAmount, 2);
+    return subtractMoney(totalPending, totalMatchedAmount);
   }, [totalPending, perfectMatches, possibleMatches, values]);
 };
 
@@ -55,5 +58,5 @@ export const useIsShowReconcileTransactionLink = () => {
   const pendingAmount = useGetPendingAmountMatched();
   const atleastOneSelected = useAtleastOneMatchedSelected();
 
-  return atleastOneSelected && pendingAmount !== 0;
+  return atleastOneSelected && !moneyIsZero(pendingAmount);
 };

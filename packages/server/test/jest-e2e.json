@@ -4,12 +4,14 @@
   "testEnvironment": "node",
   "testRegex": "(^|/).*\\.e2e-spec\\.ts$",
   "setupFiles": ["<rootDir>/setup.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/setup-after-env.ts"],
   "testTimeout": 120000,
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^@/(.*)$": "<rootDir>/../src/$1"
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@bigcapital/utils$": "<rootDir>/../../../shared/bigcapital-utils/src/index.ts"
   },
   "maxWorkers": 1,
   "maxConcurrency": 1

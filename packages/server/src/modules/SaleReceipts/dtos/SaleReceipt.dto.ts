@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { ItemEntryDto } from '@/modules/TransactionItemEntry/dto/ItemEntry.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -150,7 +150,7 @@ export class CommandSaleReceiptDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({
     description: 'The discount of the sale receipt',
     example: 1,
@@ -167,7 +167,7 @@ export class CommandSaleReceiptDto {
 
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @ApiProperty({
     description: 'The adjustment of the sale receipt',
     example: 1,

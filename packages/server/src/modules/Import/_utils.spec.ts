@@ -1,4 +1,4 @@
-import { aggregate } from './_utils';
+import { aggregate, isMoneyImportField, valueParser } from './_utils';
 
 describe('aggregate', () => {
   describe('basic aggregation', () => {
@@ -282,5 +282,54 @@ describe('aggregate', () => {
       expect(result).toHaveLength(1);
       expect(result[0].entries).toEqual([]);
     });
+  });
+});
+
+describe('valueParser — money values', () => {
+  const fields: any = {
+    amount: { fieldType: 'number' },
+    quantity: { fieldType: 'number' },
+    entries: {
+      fieldType: 'collection',
+      fields: { paymentAmount: { fieldType: 'number' } },
+    },
+  };
+
+  it('rounds money to cents and reports each rounding', async () => {
+    const rounded: any[] = [];
+    const parse = valueParser(
+      fields,
+      () => null,
+      undefined,
+      (...args) => rounded.push(args),
+    );
+    expect(await parse('100.005', 'amount')).toBe(100.01);
+    expect(await parse('1,250.75', 'amount')).toBe(1250.75);
+    expect(rounded).toEqual([['amount', 100.005, 100.01]]);
+  });
+
+  it('leaves invalid numbers as NaN so validation rejects the row', async () => {
+    const rounded: any[] = [];
+    const parse = valueParser(
+      fields,
+      () => null,
+      undefined,
+      (...args) => rounded.push(args),
+    );
+    // Before the fix both became 0 and were imported silently.
+    expect(await parse('abc', 'amount')).toBeNaN();
+    expect(await parse('12,34,567.00', 'amount')).toBeNaN();
+    expect(rounded).toEqual([]);
+  });
+
+  it('keeps the decimals of quantities', async () => {
+    const parse = valueParser(fields, () => null);
+    expect(await parse('0.333', 'quantity')).toBe(0.333);
+  });
+
+  it('detects nested money fields', () => {
+    expect(isMoneyImportField('entries.paymentAmount')).toBe(true);
+    expect(isMoneyImportField('entries[0].paymentAmount')).toBe(true);
+    expect(isMoneyImportField('quantity')).toBe(false);
   });
 });

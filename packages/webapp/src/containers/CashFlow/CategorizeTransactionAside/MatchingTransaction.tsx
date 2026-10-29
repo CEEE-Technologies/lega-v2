@@ -1,3 +1,4 @@
+import { moneyIsZero } from '@bigcapital/utils';
 import { AnchorButton, Button, Intent, Tag, Text } from '@blueprintjs/core';
 import {
   FastField,
@@ -336,7 +337,7 @@ const MatchTransactionFooter = FF.pipe(
       useFormikContext<MatchingTransactionFormValues>();
     const totalPending = useGetPendingAmountMatched();
     const showReconcileLink = useIsShowReconcileTransactionLink();
-    const submitDisabled = totalPending !== 0;
+    const submitDisabled = !moneyIsZero(totalPending);
     const isDarkMode = useIsDarkMode();
 
     const handleCancelBtnClick = () => {

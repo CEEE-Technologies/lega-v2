@@ -1,5 +1,7 @@
 import type { StoreEnhancer, StoreEnhancerStoreCreator } from 'redux';
 
+// Timings (ms), not money.
+// eslint-disable-next-line no-restricted-syntax
 const round = (number: number) => Math.round(number * 100) / 100;
 
 type AnyReducer = (state: any, action: any) => any;

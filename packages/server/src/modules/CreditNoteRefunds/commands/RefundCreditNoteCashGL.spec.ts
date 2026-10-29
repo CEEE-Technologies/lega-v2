@@ -2,23 +2,33 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { sumBy } from 'lodash';
 import { RefundCreditNoteCashGL } from './RefundCreditNoteCashGL';
 
-const buildCreditNote = (overrides: Record<string, any> = {}) => ({
-  exchangeRate: 1,
-  totalLocal: 1000,
-  discountAmountLocal: null,
-  adjustmentLocal: null,
-  customerId: 50,
-  entries: [
-    {
-      itemId: 10,
-      totalExcludingTax: 1000,
-      sellAccountId: null,
-      description: 'Item description',
-      item: { sellAccountId: 500 },
-    },
-  ],
-  ...overrides,
-});
+const buildCreditNote = (overrides: Record<string, any> = {}) => {
+  const creditNote = {
+    exchangeRate: 1,
+    totalLocal: 1000,
+    discountAmountLocal: null,
+    adjustmentLocal: null,
+    customerId: 50,
+    entries: [
+      {
+        itemId: 10,
+        totalExcludingTax: 1000,
+        sellAccountId: null,
+        description: 'Item description',
+        item: { sellAccountId: 500 },
+      },
+    ],
+    ...overrides,
+  };
+  // The credit note currency figures the running-total split uses.
+  const rate = creditNote.exchangeRate || 1;
+  return {
+    ...creditNote,
+    total: creditNote.totalLocal / rate,
+    discountAmount: (creditNote.discountAmountLocal || 0) / rate,
+    adjustment: (creditNote.adjustmentLocal || 0) / rate,
+  };
+};
 
 const buildRefund = (overrides: Record<string, any> = {}) => ({
   id: 1,
@@ -162,26 +172,63 @@ describe('RefundCreditNoteCashGL', () => {
   });
 });
 
-describe('RefundCreditNoteCashGL — rounding', () => {
-  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
-    const refund = buildRefund({
-      amount: 100,
-      creditNote: buildCreditNote({
-        totalLocal: 3,
-        entries: [501, 502, 503].map((sellAccountId) => ({
-          itemId: sellAccountId,
-          totalExcludingTax: 1,
-          sellAccountId,
-          item: {},
-        })),
-      }),
+describe('RefundCreditNoteCashGL — running-total split', () => {
+  const creditNote3x100 = () =>
+    buildCreditNote({
+      totalLocal: 300,
+      entries: [501, 502, 503].map((sellAccountId) => ({
+        itemId: sellAccountId,
+        totalExcludingTax: 100,
+        sellAccountId,
+        item: {},
+      })),
     });
-    const entries = buildLedger(refund).getEntries();
+  const debitsOf = (refundedBefore: number) => {
+    const entries = new RefundCreditNoteCashGL(
+      buildRefund({ amount: 100, creditNote: creditNote3x100() }) as any,
+    )
+      .setDiscountAccountId(2)
+      .setAdjustmentAccountId(3)
+      .setRefundedBefore(refundedBefore)
+      .getLedger()
+      .getEntries();
+    return [501, 502, 503].map(
+      (id) => entries.find((e) => e.accountId === id).debit,
+    );
+  };
 
-    expect(entries.find((e) => e.accountId === 501).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 502).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 503).debit).toBe(33.334);
-    expect(sumBy(entries, 'debit')).toBe(100);
-    expect(sumBy(entries, 'credit')).toBe(100);
+  it('ends every line at exactly 100: 3 x 100 refunded in three refunds', () => {
+    expect([debitsOf(0), debitsOf(100), debitsOf(200)]).toEqual([
+      [33.34, 33.33, 33.33],
+      [33.33, 33.34, 33.33],
+      [33.33, 33.33, 33.34],
+    ]);
+  });
+
+  it('takes a refund above the credit note total from unearned revenue', () => {
+    const entries = new RefundCreditNoteCashGL(
+      buildRefund({
+        amount: 150,
+        creditNote: buildCreditNote({
+          totalLocal: 100,
+          entries: [
+            {
+              itemId: 10,
+              totalExcludingTax: 100,
+              sellAccountId: 500,
+              item: {},
+            },
+          ],
+        }),
+      }) as any,
+    )
+      .setDiscountAccountId(2)
+      .setAdjustmentAccountId(3)
+      .setUnearnedRevenueAccountId(4)
+      .getLedger()
+      .getEntries();
+    expect(entries.find((e) => e.accountId === 500).debit).toBe(100);
+    expect(entries.find((e) => e.accountId === 4).debit).toBe(50);
+    expect(sumBy(entries, 'debit')).toBe(sumBy(entries, 'credit'));
   });
 });

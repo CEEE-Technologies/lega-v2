@@ -1,6 +1,7 @@
+import { allocateMoney } from '@bigcapital/utils';
 import * as FF from 'fp-ts/function';
 import * as FO from 'fp-ts/Option';
-import { sumBy, round } from 'lodash';
+import { sumBy } from 'lodash';
 import React from 'react';
 import intl from 'react-intl-universal';
 import type {
@@ -99,9 +100,14 @@ export function allocateCostByValue(
     percentageOfValue: Number(entry.amount ?? 0) / totalAmount,
   }));
 
-  return entriesMapped.map((entry) => ({
+  // Largest remainder split in whole cents: the parts add up to the total.
+  const costs = allocateMoney(
+    total,
+    entries.map((e) => Number(e.amount ?? 0)),
+  );
+  return entriesMapped.map((entry, index) => ({
     ...entry,
-    cost: round(entry.percentageOfValue * Number(total), 2),
+    cost: costs[index],
   }));
 }
 
@@ -122,9 +128,14 @@ export function allocateCostByQuantity(
     percentageOfQuantity: Number(entry.quantity ?? 0) / totalQuantity,
   }));
 
-  return _entries.map((entry) => ({
+  // Largest remainder split in whole cents: the parts add up to the total.
+  const costs = allocateMoney(
+    total,
+    entries.map((e) => Number(e.quantity ?? 0)),
+  );
+  return _entries.map((entry, index) => ({
     ...entry,
-    cost: round(entry.percentageOfQuantity * Number(total), 2),
+    cost: costs[index],
   }));
 }
 

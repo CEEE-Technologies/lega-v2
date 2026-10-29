@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ERRORS, getUnmappedSheetColumns, readImportFile } from './_utils';
 import { ImportFileCommon } from './ImportFileCommon';
 import { ImportFileDataTransformer } from './ImportFileDataTransformer';
-import { ImportFilePreviewPOJO } from './interfaces';
+import { ImportFilePreviewPOJO, ImportRoundedMoneyWarning } from './interfaces';
 import { parseSheetData } from './sheet_utils';
 import { ResourceService } from '../Resource/ResourceService';
 import { UnitOfWork } from '../Tenancy/TenancyDB/UnitOfWork.service';
@@ -55,6 +55,9 @@ export class ImportFileProcess {
     const resource = importFile.resource;
     const resourceFields = await this.resource.getResourceFields2(resource);
 
+    // Money values rounded to cents while parsing the sheet.
+    const warnings: ImportRoundedMoneyWarning[] = [];
+
     // Runs the importing operation with ability to return errors that will happen.
     const [successedImport, failedImport, allData] =
       await this.uow.withTransaction(async (trx: Knex.Transaction) => {
@@ -64,6 +67,7 @@ export class ImportFileProcess {
           resourceFields,
           sheetData,
           trx,
+          warnings,
         );
         const [successedImport, failedImport] = await this.importCommon.import(
           importFile,
@@ -94,6 +98,8 @@ export class ImportFileProcess {
       errors,
       unmappedColumns: unmappedColumns,
       unmappedColumnsCount: unmappedColumns.length,
+      warnings,
+      warningsCount: warnings.length,
     };
   }
 }

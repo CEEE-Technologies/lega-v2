@@ -102,7 +102,7 @@ export function CreditNoteUniversalSearchItem(
       }
       labelElement={
         <>
-          <div className="amount">{item.reference.formattedAmount}</div>
+          <div className="amount">{item.reference.totalFormatted}</div>
           <CreditNoteUniversalSearchStatus receipt={item.reference} />
         </>
       }
@@ -120,7 +120,7 @@ const transformReceiptsToSearch = (
 ): CreditNoteUniversalSearchItemType => ({
   id: creditNote.id,
   text: creditNote.customer?.displayName ?? '',
-  label: creditNote.formattedAmount ?? '',
+  label: creditNote.totalFormatted ?? '',
   reference: creditNote,
 });
 

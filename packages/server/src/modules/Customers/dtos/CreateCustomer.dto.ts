@@ -7,7 +7,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, IsOptional, ToNumber } from '@/common/decorators/Validators';
 import { ContactAddressDto } from './ContactAddress.dto';
 
 export class CreateCustomerDto extends ContactAddressDto {
@@ -35,7 +35,7 @@ export class CreateCustomerDto extends ContactAddressDto {
     example: 5000.0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsMoney()
   @ToNumber()
   openingBalance?: number;
 

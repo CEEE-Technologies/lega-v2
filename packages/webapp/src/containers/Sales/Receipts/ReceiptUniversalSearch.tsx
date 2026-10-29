@@ -92,7 +92,7 @@ export function ReceiptUniversalSearchItem(
       }
       labelElement={
         <>
-          <div className="amount">{item.reference.formattedAmount}</div>
+          <div className="amount">{item.reference.totalFormatted}</div>
           <ReceiptStatus receipt={item.reference} />
         </>
       }
@@ -108,7 +108,7 @@ export function ReceiptUniversalSearchItem(
 const transformReceiptsToSearch = (receipt: any) => ({
   id: receipt.id,
   text: receipt.customer?.displayName ?? '',
-  label: receipt.formattedAmount ?? '',
+  label: receipt.totalFormatted ?? '',
   reference: receipt,
 });
 

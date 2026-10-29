@@ -285,4 +285,11 @@ export interface EstimatePdfBrandingAttributes {
   expirationDateLabel: string;
   showExpirationDate: boolean;
   expirationDate: string;
+
+  // Discount
+  discount?: string;
+  discountLabel?: string;
+
+  // Adjustment
+  adjustment?: string;
 }

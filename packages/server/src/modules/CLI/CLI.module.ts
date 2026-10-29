@@ -16,6 +16,8 @@ import { OpenApiExportCommand } from './commands/OpenApiExport.command';
 import { AnalyticsBackfillCommand } from './commands/AnalyticsBackfill.command';
 import { AnalyticsCoreModule } from '../Analytics/AnalyticsCore.module';
 import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBasis.command';
+import { TenantsMoneyHealthCheckCommand } from './commands/TenantsMoneyHealthCheck.command';
+import { TenantsMoneyRepairCommand } from './commands/TenantsMoneyRepair.command';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBas
     OpenApiExportCommand,
     AnalyticsBackfillCommand,
     TenantsRebuildCashBasisCommand,
+    TenantsMoneyHealthCheckCommand,
+    TenantsMoneyRepairCommand,
   ],
 })
 export class CLIModule {}

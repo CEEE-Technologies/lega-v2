@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { omit } from 'lodash';
+import { sumMoney } from '@bigcapital/utils';
 import { IPaymentReceivePageEntry } from '../types/PaymentReceived.types';
 import { ERRORS } from '../constants';
 import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
@@ -39,7 +40,7 @@ export class PaymentsReceivedPagesService {
       entryType: PaymentEntryTypes.Invoice,
       invoiceId: invoice.id,
       invoiceNo: invoice.invoiceNo,
-      amount: invoice.balance,
+      amount: invoice.total,
       dueAmount: invoice.dueAmount,
       paymentAmount: invoice.paymentAmount,
       totalPaymentAmount: invoice.paymentAmount,
@@ -64,7 +65,7 @@ export class PaymentsReceivedPagesService {
       invoiceId: null,
       invoiceNo: null,
       amount: customer.openingBalance,
-      dueAmount: customer.openingBalanceDueAmount + thisPaymentAmount,
+      dueAmount: sumMoney(customer.openingBalanceDueAmount, thisPaymentAmount),
       paymentAmount: thisPaymentAmount,
       totalPaymentAmount: customer.openingBalancePaymentAmount,
       currencyCode: customer.currencyCode,
@@ -148,7 +149,7 @@ export class PaymentsReceivedPagesService {
 
     const paymentEntries = invoiceEntries.map((entry) => ({
       ...this.invoiceToPageEntry(entry.invoice),
-      dueAmount: entry.invoice.dueAmount + entry.paymentAmount,
+      dueAmount: sumMoney(entry.invoice.dueAmount, entry.paymentAmount),
       paymentAmount: entry.paymentAmount,
       index: entry.index,
     }));

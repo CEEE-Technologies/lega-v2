@@ -1,5 +1,6 @@
+import { sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { ModelObject } from 'objection';
-import { defaultTo, sumBy, get } from 'lodash';
+import { defaultTo, get } from 'lodash';
 import {
   IAgingPeriod,
   IAgingPeriodTotal,
@@ -80,7 +81,7 @@ export abstract class AgingSummaryReport extends AgingReport {
         (!agingPeriod.toDays || overdueDays <= agingPeriod.toDays);
 
       const total: number = isInAgingPeriod
-        ? agingPeriod.total.amount + dueAmount
+        ? sumMoney(agingPeriod.total.amount, dueAmount)
         : agingPeriod.total.amount;
 
       return {
@@ -162,7 +163,8 @@ export abstract class AgingSummaryReport extends AgingReport {
     contactsAgingPeriods: IARAgingSummaryCustomer[],
   ): IAgingPeriodTotal[] {
     return this.agingPeriods.map((agingPeriod, index) => {
-      const total = sumBy(
+      // In whole cents, so the totals equal the sum of the rows shown.
+      const total = sumMoneyBy(
         contactsAgingPeriods,
         (summary: IARAgingSummaryCustomer) => {
           const aging = summary.aging[index];
@@ -199,7 +201,7 @@ export abstract class AgingSummaryReport extends AgingReport {
    */
   protected getContactCurrentTotal(contactId: number): number {
     const currentInvoices = this.getCurrentInvoicesByContactId(contactId);
-    return sumBy(currentInvoices, (invoice) => invoice.dueAmountLocal);
+    return sumMoneyBy(currentInvoices, (invoice) => invoice.dueAmountLocal);
   }
 
   /**
@@ -208,7 +210,7 @@ export abstract class AgingSummaryReport extends AgingReport {
    * @return {number}
    */
   protected getTotalCurrent(contactsSummaries: IAgingSummaryContact[]): number {
-    return sumBy(contactsSummaries, (summary) => summary.current.amount);
+    return sumMoneyBy(contactsSummaries, (summary) => summary.current.amount);
   }
 
   /**
@@ -217,7 +219,7 @@ export abstract class AgingSummaryReport extends AgingReport {
    * @return {number}
    */
   protected getAgingPeriodsTotal(agingPeriods: IAgingPeriodTotal[]): number {
-    return sumBy(agingPeriods, (period) => period.total.amount);
+    return sumMoneyBy(agingPeriods, (period) => period.total.amount);
   }
 
   /**
@@ -227,6 +229,6 @@ export abstract class AgingSummaryReport extends AgingReport {
   protected getTotalContactsTotals(
     contactsSummaries: IAgingSummaryContact[],
   ): number {
-    return sumBy(contactsSummaries, (summary) => summary.total.amount);
+    return sumMoneyBy(contactsSummaries, (summary) => summary.total.amount);
   }
 }

@@ -1,3 +1,4 @@
+import { moneyEq } from '@bigcapital/utils';
 import { castArray } from 'lodash';
 import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
@@ -109,12 +110,8 @@ export class MatchBankTransactions {
     );
     // Validates the total given matching transcations whether is not equal
     // uncategorized transaction amount.
-    // Use tolerance-based comparison to handle floating-point precision issues
-    const tolerance = 0.01; // Allow 0.01 difference for floating-point precision
-    const difference = Math.abs(
-      totalUncategorizedTransactions - totalMatchedTranasctions,
-    );
-    if (difference > tolerance) {
+    // Both totals are whole cents: they must be equal to the cent.
+    if (!moneyEq(totalUncategorizedTransactions, totalMatchedTranasctions)) {
       throw new ServiceError(ERRORS.TOTAL_MATCHING_TRANSACTIONS_INVALID);
     }
   }

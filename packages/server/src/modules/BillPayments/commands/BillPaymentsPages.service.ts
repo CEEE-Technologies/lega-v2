@@ -1,4 +1,5 @@
 import { omit } from 'lodash';
+import { sumMoney } from '@bigcapital/utils';
 import { ERRORS } from '../constants';
 import { Inject, Injectable } from '@nestjs/common';
 import { Bill } from '../../Bills/models/Bill';
@@ -62,7 +63,7 @@ export class BillPaymentsPages {
     );
     const paymentEntries = billEntries.map((entry) => ({
       ...this.mapBillToPageEntry(entry.bill),
-      dueAmount: entry.bill.dueAmount + entry.paymentAmount,
+      dueAmount: sumMoney(entry.bill.dueAmount, entry.paymentAmount),
       paymentAmount: entry.paymentAmount,
     }));
 
@@ -137,7 +138,7 @@ export class BillPaymentsPages {
       billId: null,
       billNo: null,
       amount: vendor.openingBalance,
-      dueAmount: vendor.openingBalanceDueAmount + thisPaymentAmount,
+      dueAmount: sumMoney(vendor.openingBalanceDueAmount, thisPaymentAmount),
       totalPaymentAmount: vendor.openingBalancePaymentAmount,
       paymentAmount: thisPaymentAmount,
       currencyCode: vendor.currencyCode,
@@ -156,7 +157,7 @@ export class BillPaymentsPages {
       entryType: PaymentEntryTypes.Invoice,
       billId: bill.id,
       billNo: bill.billNumber,
-      amount: bill.amount,
+      amount: bill.total,
       dueAmount: bill.dueAmount,
       totalPaymentAmount: bill.paymentAmount,
       paymentAmount: bill.paymentAmount,

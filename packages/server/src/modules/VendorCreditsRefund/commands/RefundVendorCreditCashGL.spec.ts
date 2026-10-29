@@ -2,23 +2,33 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { sumBy } from 'lodash';
 import { RefundVendorCreditCashGL } from './RefundVendorCreditCashGL';
 
-const buildVendorCredit = (overrides: Record<string, any> = {}) => ({
-  exchangeRate: 1,
-  totalLocal: 1000,
-  discountAmountLocal: null,
-  adjustmentLocal: null,
-  vendorId: 50,
-  entries: [
-    {
-      itemId: 10,
-      totalExcludingTax: 1000,
-      costAccountId: null,
-      description: 'Item description',
-      item: { type: 'service', costAccountId: 500 },
-    },
-  ],
-  ...overrides,
-});
+const buildVendorCredit = (overrides: Record<string, any> = {}) => {
+  const vendorCredit = {
+    exchangeRate: 1,
+    totalLocal: 1000,
+    discountAmountLocal: null,
+    adjustmentLocal: null,
+    vendorId: 50,
+    entries: [
+      {
+        itemId: 10,
+        totalExcludingTax: 1000,
+        costAccountId: null,
+        description: 'Item description',
+        item: { type: 'service', costAccountId: 500 },
+      },
+    ],
+    ...overrides,
+  };
+  // The vendor credit currency figures the running-total split uses.
+  const rate = vendorCredit.exchangeRate || 1;
+  return {
+    ...vendorCredit,
+    total: vendorCredit.totalLocal / rate,
+    discountAmount: (vendorCredit.discountAmountLocal || 0) / rate,
+    adjustment: (vendorCredit.adjustmentLocal || 0) / rate,
+  };
+};
 
 const buildRefund = (overrides: Record<string, any> = {}) => ({
   id: 1,
@@ -208,26 +218,37 @@ describe('RefundVendorCreditCashGL', () => {
   });
 });
 
-describe('RefundVendorCreditCashGL — rounding', () => {
-  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+describe('RefundVendorCreditCashGL — running-total split', () => {
+  const creditsOf = (refundedBefore: number) => {
     const refund = buildRefund({
       amount: 100,
       vendorCredit: buildVendorCredit({
-        totalLocal: 3,
+        totalLocal: 300,
         entries: [501, 502, 503].map((costAccountId) => ({
           itemId: costAccountId,
-          totalExcludingTax: 1,
+          totalExcludingTax: 100,
           costAccountId,
           item: { type: 'service' },
         })),
       }),
     });
-    const entries = buildLedger(refund).getEntries();
+    const entries = new RefundVendorCreditCashGL(refund as any)
+      .setPurchaseDiscountAccountId(2)
+      .setOtherExpensesAccountId(3)
+      .setRefundedBefore(refundedBefore)
+      .getLedger()
+      .getEntries();
+    expect(sumBy(entries, 'debit')).toBe(sumBy(entries, 'credit'));
+    return [501, 502, 503].map(
+      (id) => entries.find((e) => e.accountId === id).credit,
+    );
+  };
 
-    expect(entries.find((e) => e.accountId === 501).credit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 502).credit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 503).credit).toBe(33.334);
-    expect(sumBy(entries, 'debit')).toBe(100);
-    expect(sumBy(entries, 'credit')).toBe(100);
+  it('ends every line at exactly 100: 3 x 100 refunded in three refunds', () => {
+    expect([creditsOf(0), creditsOf(100), creditsOf(200)]).toEqual([
+      [33.34, 33.33, 33.33],
+      [33.33, 33.34, 33.33],
+      [33.33, 33.33, 33.34],
+    ]);
   });
 });

@@ -5,7 +5,18 @@ import { AccountNormal } from '@/interfaces/Account';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { RefundCreditNote } from '../models/RefundCreditNote';
-import { roundLedgerAmount, roundLedgerEntries } from '@/utils/ledger-rounding';
+import {
+  allocateCumulativeShare,
+  balanceEntries,
+  moneyGt,
+  roundMoney,
+  subtractMoney,
+} from '@bigcapital/utils';
+import {
+  creditSide,
+  debitSide,
+  roundLedgerAmount,
+} from '@/utils/ledger-rounding';
 
 /**
  * Records the cash basis journal entries of the credit note refund.
@@ -28,11 +39,27 @@ export class RefundCreditNoteCashGL {
   private unearnedRevenueAccountId: number;
 
   /**
+   * Amount refunded of the credit note by the earlier refunds: the
+   * running-total split starts from there.
+   */
+  private refundedBefore = 0;
+
+  /**
    * Constructor method.
    * @param {RefundCreditNote} refundCreditNote - Refund credit note.
    */
   constructor(refundCreditNote: RefundCreditNote) {
     this.refundCreditNote = refundCreditNote;
+  }
+
+  /**
+   * Sets the amount refunded of the credit note by the earlier refunds.
+   * @param {number} refundedBefore
+   * @returns {RefundCreditNoteCashGL}
+   */
+  setRefundedBefore(refundedBefore: number) {
+    this.refundedBefore = refundedBefore || 0;
+    return this;
   }
 
   /**
@@ -71,7 +98,11 @@ export class RefundCreditNoteCashGL {
    * @returns {boolean}
    */
   public isIncomeReversible(): boolean {
-    return !!this.refundCreditNote.creditNote && this.refundRatio > 0;
+    return (
+      !!this.refundCreditNote.creditNote &&
+      moneyGt(this.refundCreditNote.creditNote.total, 0) &&
+      moneyGt(this.recognizedAmount, 0)
+    );
   }
 
   /**
@@ -103,21 +134,46 @@ export class RefundCreditNoteCashGL {
   }
 
   /**
-   * Retrieves the refunded proportion of the credit note.
-   * The refund amount over the credit note total in local currency keeps
-   * the cash basis entries balanced for partial refunds.
+   * Retrieves the part of the refund that reverses the credit note income:
+   * no more than what the earlier refunds left of the credit note total.
+   * Anything above it comes from the customer's unearned revenue.
    * @returns {number}
    */
-  private get refundRatio(): number {
-    const creditNoteTotalLocal = defaultTo(
-      this.refundCreditNote.creditNote?.totalLocal,
+  private get recognizedAmount(): number {
+    const remaining = Math.max(
+      subtractMoney(
+        defaultTo(this.refundCreditNote.creditNote?.total, 0),
+        this.refundedBefore,
+      ),
       0,
     );
+    return Math.min(roundMoney(this.refundCreditNote.amount), remaining);
+  }
 
-    if (creditNoteTotalLocal <= 0) {
-      return 0;
-    }
-    return this.refundCreditNote.amount / creditNoteTotalLocal;
+  /**
+   * Splits the refund over the credit note lines with the running-total
+   * method (the lines reversed after this refund minus those reversed
+   * before it), so once the credit note is fully refunded every line ends
+   * exactly at its amount.
+   */
+  private get shares() {
+    const creditNote = this.refundCreditNote.creditNote;
+    const items = creditNote.entries || [];
+    const parts = allocateCumulativeShare(
+      this.refundedBefore,
+      this.recognizedAmount,
+      creditNote.total,
+      [
+        ...items.map((item) => item.totalExcludingTax),
+        -defaultTo(creditNote.discountAmount, 0),
+        defaultTo(creditNote.adjustment, 0),
+      ],
+    );
+    return {
+      items: parts.slice(0, items.length),
+      discount: -parts[items.length],
+      adjustment: parts[items.length + 1],
+    };
   }
 
   /**
@@ -140,16 +196,16 @@ export class RefundCreditNoteCashGL {
    * @param {number} index - Item entry index.
    * @returns {ILedgerEntry}
    */
-  private getCreditNoteItemEntry(item: ItemEntry, index: number): ILedgerEntry {
+  private getCreditNoteItemEntry(
+    item: ItemEntry,
+    index: number,
+    share: number,
+  ): ILedgerEntry {
     const commonEntry = this.cashEntriesCommonEntry;
-    const exchangeRate = defaultTo(
-      this.refundCreditNote.creditNote?.exchangeRate,
-      1,
-    );
 
     return {
       ...commonEntry,
-      debit: item.totalExcludingTax * exchangeRate * this.refundRatio,
+      ...debitSide(share),
       accountId: item.sellAccountId || item.item.sellAccountId,
       note: item.description,
       index: index + 2,
@@ -163,16 +219,15 @@ export class RefundCreditNoteCashGL {
    * @returns {ILedgerEntry[]}
    */
   private get discountEntry(): ILedgerEntry[] {
-    const discountAmountLocal =
-      this.refundCreditNote.creditNote?.discountAmountLocal;
+    const share = this.shares.discount;
 
-    if (!discountAmountLocal) {
+    if (!share) {
       return [];
     }
     return [
       {
         ...this.cashEntriesCommonEntry,
-        credit: discountAmountLocal * this.refundRatio,
+        ...creditSide(share),
         accountId: this.discountAccountId,
         accountNormal: AccountNormal.CREDIT,
         index: 1,
@@ -185,18 +240,15 @@ export class RefundCreditNoteCashGL {
    * @returns {ILedgerEntry[]}
    */
   private get adjustmentEntry(): ILedgerEntry[] {
-    const adjustmentLocal = this.refundCreditNote.creditNote?.adjustmentLocal;
+    const share = this.shares.adjustment;
 
-    if (!adjustmentLocal) {
+    if (!share) {
       return [];
     }
-    const adjustmentAmount = Math.abs(adjustmentLocal) * this.refundRatio;
-
     return [
       {
         ...this.cashEntriesCommonEntry,
-        credit: adjustmentLocal < 0 ? adjustmentAmount : 0,
-        debit: adjustmentLocal > 0 ? adjustmentAmount : 0,
+        ...debitSide(share),
         accountId: this.adjustmentAccountId,
         accountNormal: AccountNormal.CREDIT,
         index: 1,
@@ -216,16 +268,30 @@ export class RefundCreditNoteCashGL {
       return [this.refundEntry, this.unearnedRevenueEntry];
     }
     const creditNote = this.refundCreditNote.creditNote;
+    const shares = this.shares;
     const itemsEntries = (creditNote.entries || []).map((item, index) =>
-      this.getCreditNoteItemEntry(item, index),
+      this.getCreditNoteItemEntry(item, index, shares.items[index]),
     );
+    // A refund above what is left of the credit note total comes from the
+    // customer's unearned revenue.
+    const overAmount = subtractMoney(
+      this.refundCreditNote.amount,
+      this.recognizedAmount,
+    );
+    const overEntries = moneyGt(overAmount, 0)
+      ? [{ ...this.unearnedRevenueEntry, debit: overAmount }]
+      : [];
 
-    return roundLedgerEntries([
-      this.refundEntry,
-      ...this.discountEntry,
-      ...this.adjustmentEntry,
-      ...itemsEntries,
-    ]);
+    return balanceEntries(
+      [
+        this.refundEntry,
+        ...this.discountEntry,
+        ...this.adjustmentEntry,
+        ...itemsEntries,
+        ...overEntries,
+      ],
+      { canAbsorb: (e) => e.itemId !== undefined && e.itemId !== null },
+    ).entries;
   }
 
   /**

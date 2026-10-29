@@ -1,3 +1,4 @@
+import { multiplyMoney } from '@bigcapital/utils';
 import { Model } from 'objection';
 import { PaymentReceivedEntry } from './PaymentReceivedEntry';
 import { Customer } from '@/modules/Customers/models/Customer';
@@ -64,7 +65,7 @@ export class PaymentReceived extends TenantBaseModel {
    * @returns {number}
    */
   get localAmount() {
-    return this.amount * this.exchangeRate;
+    return multiplyMoney(this.amount, this.exchangeRate);
   }
 
   /**

@@ -1,15 +1,23 @@
+import {
+  multiplyMoney,
+  roundMoney,
+  subtractMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { PaymentReceived } from '../models/PaymentReceived';
-import { sumBy } from 'lodash';
 import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
 
 export class PaymentReceivedAccrualGL {
   private readonly paymentReceived: PaymentReceived;
   private ARAccountId: number;
   private exchangeGainOrLossAccountId: number;
   private baseCurrencyCode: string;
+  private paidBefore: Record<number, number> = {};
 
   /**
    * Constructor method.
@@ -17,6 +25,16 @@ export class PaymentReceivedAccrualGL {
    */
   constructor(paymentReceived: PaymentReceived) {
     this.paymentReceived = paymentReceived;
+  }
+
+  /**
+   * Sets what the earlier payments paid on each invoice (invoice currency),
+   * for the running-total A/R relief.
+   * @param {Record<number, number>} paidBefore - By invoice id.
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore || {};
+    return this;
   }
 
   /**
@@ -55,17 +73,37 @@ export class PaymentReceivedAccrualGL {
    * @returns {number}
    */
   private paymentExGainOrLoss = (): number => {
-    return sumBy(this.paymentReceived.entries, (entry) => {
-      const paymentLocalAmount =
-        entry.paymentAmount * this.paymentReceived.exchangeRate;
+    const entries = this.paymentReceived.entries || [];
+
+    // Difference method: the paid amount at the payment rate and at the
+    // invoices' rates are each rounded to cents, and the gain/loss is
+    // what is left, so nothing is lost to rounding.
+    const paidAtPaymentRate = multiplyMoney(
+      sumMoneyBy(entries, 'paymentAmount'),
+      this.paymentReceived.exchangeRate,
+    );
+    const paidAtInvoiceRates = sumMoneyBy(entries, (entry) => {
       // Opening balance lines have no invoice: no exchange difference
       // (foreign currency opening balances are not handled here).
-      const invoiceExchangeRate =
-        entry.invoice?.exchangeRate ?? this.paymentReceived.exchangeRate;
-      const invoicePayment = entry.paymentAmount * invoiceExchangeRate;
-
-      return paymentLocalAmount - invoicePayment;
+      if (!entry.invoice) {
+        return multiplyMoney(
+          entry.paymentAmount,
+          this.paymentReceived.exchangeRate,
+        );
+      }
+      // The A/R relief at the invoice rate is a running total: (paid so
+      // far, this payment included) at the rate less (paid before) at the
+      // rate. Rounding each payment alone left a cent on A/R once a
+      // foreign currency invoice was paid in parts.
+      const rate =
+        entry.invoice.exchangeRate ?? this.paymentReceived.exchangeRate;
+      const before = this.paidBefore[entry.invoiceId] ?? 0;
+      return subtractMoney(
+        multiplyMoney(sumMoney(before, entry.paymentAmount), rate),
+        multiplyMoney(before, rate),
+      );
     });
+    return subtractMoney(paidAtPaymentRate, paidAtInvoiceRates);
   };
 
   /**
@@ -116,6 +154,7 @@ export class PaymentReceivedAccrualGL {
             exchangeRate: 1,
             debit: gainOrLoss > 0 ? absGainOrLoss : 0,
             credit: gainOrLoss < 0 ? absGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.ARAccountId,
             contactId: this.paymentReceived.customerId,
             index: 3,
@@ -127,6 +166,7 @@ export class PaymentReceivedAccrualGL {
             exchangeRate: 1,
             credit: gainOrLoss > 0 ? absGainOrLoss : 0,
             debit: gainOrLoss < 0 ? absGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.exchangeGainOrLossAccountId,
             index: 3,
             accountNormal: AccountNormal.DEBIT,
@@ -145,7 +185,8 @@ export class PaymentReceivedAccrualGL {
 
     return {
       ...commonJournal,
-      debit: this.paymentReceived.localAmount,
+      debit: roundMoney(this.paymentReceived.localAmount),
+      foreignDebit: this.paymentReceived.amount,
       accountId: this.paymentReceived.depositAccountId,
       index: 2,
       accountNormal: AccountNormal.DEBIT,
@@ -163,7 +204,8 @@ export class PaymentReceivedAccrualGL {
 
     return {
       ...commonJournal,
-      credit: this.paymentReceived.localAmount,
+      credit: roundMoney(this.paymentReceived.localAmount),
+      foreignCredit: this.paymentReceived.amount,
       contactId: this.paymentReceived.customerId,
       accountId: this.ARAccountId,
       index: 1,

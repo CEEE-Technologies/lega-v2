@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { ItemEntryDto } from '@/modules/TransactionItemEntry/dto/ItemEntry.dto';
 import { Type, Transform } from 'class-transformer';
 import { parseBoolean } from '@/utils/parse-boolean';
@@ -197,7 +197,7 @@ export class CommandBillDto {
   })
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsPositive()
   discount?: number;
 
@@ -208,7 +208,7 @@ export class CommandBillDto {
   })
   @IsOptional()
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   adjustment?: number;
 }
 

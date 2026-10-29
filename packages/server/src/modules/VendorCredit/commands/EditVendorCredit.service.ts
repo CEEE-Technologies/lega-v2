@@ -1,3 +1,4 @@
+import { calcDocumentMoney } from '@bigcapital/utils';
 import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import {
@@ -134,9 +135,15 @@ export class EditVendorCreditService {
       );
     // Validate the new amount is not smaller than the already refunded
     // and applied-to-bills amounts against the locked row.
+    // The new total (after discount and adjustment) is what can be used.
     this.vendorCreditDTOTransform.validateCreditAmountNotBelowUsed(
       oldVendorCredit,
-      vendorCreditModel.amount,
+      calcDocumentMoney({
+        subtotal: vendorCreditModel.amount,
+        discount: vendorCreditModel.discount,
+        discountType: vendorCreditModel.discountType,
+        adjustment: vendorCreditModel.adjustment,
+      }).total,
     );
     return { oldVendorCredit, vendorCreditModel };
   };

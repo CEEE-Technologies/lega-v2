@@ -13,6 +13,14 @@ import { Account } from '@/modules/Accounts/models/Account.model';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ContactOpeningBalanceAccount } from '@/modules/Contacts/ContactOpeningBalanceAccount.service';
+import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import {
+  getDocumentsAccrualLines,
+  getDocumentsPaidBefore,
+  getLaterPayments,
+  rewritePaymentsInOrder,
+  PAYMENT_RECEIVED_PAID_BEFORE,
+} from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
 @Injectable()
 export class PaymentReceivedGLEntries {
@@ -149,9 +157,16 @@ export class PaymentReceivedGLEntries {
       'exchange-grain-loss',
     )) as Account;
 
+    // What the earlier payments paid on each invoice: the A/R relief at
+    // the invoice rate is a running total from there.
+    const paidBefore = await this.getPaymentInvoicesPaidBefore(
+      paymentReceive,
+      trx,
+    );
     const paymentReceivedAccrualGL = new PaymentReceivedAccrualGL(
       paymentReceive,
     )
+      .setPaidBefore(paidBefore)
       .setARAccountId(receivableAccount.id)
       .setExchangeGainOrLossAccountId(exGainLossAccount.id)
       .setBaseCurrencyCode(baseCurrencyCode);
@@ -168,6 +183,7 @@ export class PaymentReceivedGLEntries {
   public getPaymentReceiveCashLedger = async (
     paymentReceive: PaymentReceived,
     trx?: Knex.Transaction,
+    paidBefore: Record<number, number> = {},
   ): Promise<Ledger> => {
     // Find or create the tax payable account.
     const taxPayableAccount =
@@ -179,10 +195,27 @@ export class PaymentReceivedGLEntries {
     const otherChargesAccount =
       await this.accountRepository.findOrCreateOtherChargesAccount({}, trx);
 
+    // Exchange gain/loss account: the currency rounding cent of a foreign
+    // currency payment.
+    const exGainLossAccount = (await this.accountRepository.findBySlug(
+      'exchange-grain-loss',
+    )) as Account;
     const paymentReceivedCashGL = new PaymentReceivedCashGL(paymentReceive)
+      .setExchangeGainOrLossAccountId(exGainLossAccount?.id ?? null)
+      .setAccrualLines(
+        await getDocumentsAccrualLines(
+          trx ?? this.paymentReceivedModel().knex(),
+          'SaleInvoice',
+          (paymentReceive.entries || [])
+            .filter(isDocumentEntry)
+            .map((entry) => entry.invoiceId),
+          1,
+        ),
+      )
       .setTaxPayableAccountId(taxPayableAccount.id)
       .setDiscountAccountId(discountAccount.id)
-      .setOtherChargesAccountId(otherChargesAccount.id);
+      .setOtherChargesAccountId(otherChargesAccount.id)
+      .setPaidBefore(paidBefore);
 
     // Opening balance lines post to the account the opening balance used.
     if (paymentReceivedCashGL.hasOpeningBalanceEntries()) {
@@ -206,6 +239,28 @@ export class PaymentReceivedGLEntries {
   };
 
   /**
+   * Retrieves the amount paid on each invoice of the payment by the payments
+   * before it (by date, then id). Locks the invoices in a transaction.
+   * @param {PaymentReceived} paymentReceive - Payment received.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<Record<number, number>>}
+   */
+  public getPaymentInvoicesPaidBefore = (
+    paymentReceive: PaymentReceived,
+    trx?: Knex.Transaction,
+  ): Promise<Record<number, number>> => {
+    return getDocumentsPaidBefore(
+      trx ?? this.paymentReceivedModel().knex(),
+      PAYMENT_RECEIVED_PAID_BEFORE,
+      { id: paymentReceive.id, date: paymentReceive.paymentDate },
+      (paymentReceive.entries || [])
+        .filter(isDocumentEntry)
+        .map((entry) => entry.invoiceId),
+      !!trx,
+    );
+  };
+
+  /**
    * Retrieves the whole cash basis ledger of the payment: the income
    * entries and the cost (COGS) entries.
    * @param {PaymentReceived} paymentReceive - Payment received.
@@ -216,14 +271,22 @@ export class PaymentReceivedGLEntries {
     paymentReceive: PaymentReceived,
     trx?: Knex.Transaction,
   ): Promise<Ledger> => {
+    // What the earlier payments paid on each invoice: the running-total
+    // split of this payment starts from there.
+    const paidBefore = await this.getPaymentInvoicesPaidBefore(
+      paymentReceive,
+      trx,
+    );
     const cashLedger = await this.getPaymentReceiveCashLedger(
       paymentReceive,
       trx,
+      paidBefore,
     );
     const costLedger =
       await this.paymentReceivedCostGLEntries.getPaymentCostLedger(
         paymentReceive,
         trx,
+        paidBefore,
       );
     return new Ledger([...cashLedger.getEntries(), ...costLedger.getEntries()]);
   };
@@ -258,5 +321,59 @@ export class PaymentReceivedGLEntries {
       ...accrualLedger.getEntries(),
       ...cashBasisLedger.getEntries(),
     ]);
+  };
+  /**
+   * Rebuilds the cash basis entries of the payments of the given invoices
+   * that come after the given position (date, then id), one at a time and
+   * in order: their running-total split depends on the payments before
+   * them. Payments in a locked period are skipped (and logged).
+   * @param {number[]} invoiceIds - The invoices.
+   * @param {{ id: number; date: any }} after - The position to start after.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteLaterPaymentsCashGLEntries = async (
+    invoiceIds: number[],
+    after: { id: number; date: any },
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const knex = trx ?? this.paymentReceivedModel().knex();
+    const laterPayments = await getLaterPayments(
+      knex,
+      PAYMENT_RECEIVED_PAID_BEFORE,
+      invoiceIds,
+      after,
+    );
+    await rewritePaymentsInOrder(
+      knex,
+      laterPayments.filter((payment) => payment.id !== after.id),
+      'PaymentReceive',
+      (paymentId) => this.rewriteLaterPayment(paymentId, trx),
+    );
+  };
+
+  /**
+   * Rewrites a later payment: its cash basis entries, and its accrual ones
+   * too when it pays a foreign currency invoice (their A/R relief is a
+   * running total at the invoice rate, so it moves with the payments
+   * before it). In the base currency the accrual entries never move.
+   * @param {number} paymentReceiveId - Payment received id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  private rewriteLaterPayment = async (
+    paymentReceiveId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const payment = await this.paymentReceivedModel()
+      .query(trx)
+      .findById(paymentReceiveId)
+      .withGraphFetched('entries.invoice');
+    if (!payment) return;
+
+    const paysForeignInvoice = (payment.entries || []).some(
+      (entry) => entry.invoice && Number(entry.invoice.exchangeRate ?? 1) !== 1,
+    );
+    return paysForeignInvoice
+      ? this.rewritePaymentGLEntries(paymentReceiveId, trx)
+      : this.rewritePaymentCashGLEntries(paymentReceiveId, trx);
   };
 }

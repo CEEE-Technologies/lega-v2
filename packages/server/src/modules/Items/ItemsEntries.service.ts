@@ -1,5 +1,6 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Knex } from 'knex';
-import { sumBy, difference, map } from 'lodash';
+import { difference, map } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
 import { Item } from './models/Item';
 import { ItemEntry } from '../TransactionItemEntry/models/ItemEntry';
@@ -245,7 +246,7 @@ export class ItemsEntriesService {
    * @returns {number}
    */
   public getTotalItemsEntries(entries: ItemEntryDto[]): number {
-    return sumBy(entries, (e) => ItemEntry.calcAmount(e));
+    return sumMoneyBy(entries, (e) => ItemEntry.calcAmount(e));
   }
 
   /**

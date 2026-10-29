@@ -1,15 +1,18 @@
 import * as moment from 'moment';
 import { AccountTransaction } from '../Accounts/models/AccountTransaction.model';
 import { ILedgerEntry } from './types/Ledger.types';
+import { resolveForeignAmounts } from '@/utils/ledger-rounding';
 
 export const transformLedgerEntryToTransaction = (
   entry: ILedgerEntry,
+  baseCurrency?: string | null,
 ): Partial<AccountTransaction> => {
   return {
     date: moment(entry.date).toDate(),
 
     credit: entry.credit,
     debit: entry.debit,
+    ...resolveForeignAmounts(entry, baseCurrency),
 
     currencyCode: entry.currencyCode,
     exchangeRate: entry.exchangeRate,

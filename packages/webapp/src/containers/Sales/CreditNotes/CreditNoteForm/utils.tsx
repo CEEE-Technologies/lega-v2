@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
 import { first } from 'lodash';
@@ -32,6 +38,8 @@ export type CreditNoteEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -64,6 +72,7 @@ export const defaultCreditNoteEntry: CreditNoteEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -133,6 +142,7 @@ const defaultReqCreditNoteEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
 };
@@ -269,9 +279,7 @@ export const useCreditNoteDiscountAmount = () => {
   const subtotal = useCreditNoteSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (discount * subtotal) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -292,7 +300,7 @@ export const useCreditNoteDiscountAmountFormatted = () => {
 export const useCreditNoteAdjustmentAmount = () => {
   const { values } = useFormikContext<CreditNoteFormValues>();
 
-  return toSafeNumber(values.adjustment);
+  return roundMoney(values.adjustment);
 };
 
 /**
@@ -315,7 +323,7 @@ export const useCreditNoteTotal = () => {
   const discountAmount = useCreditNoteDiscountAmount();
   const adjustmentAmount = useCreditNoteAdjustmentAmount();
 
-  return subtotal + adjustmentAmount - discountAmount;
+  return sumMoney(subtotal, adjustmentAmount, -discountAmount);
 };
 
 /**

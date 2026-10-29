@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ToNumber, IsOptional } from '@/common/decorators/Validators';
+import { IsMoney, IsOptional, ToNumber } from '@/common/decorators/Validators';
 import {
   IsDateString,
   IsNotEmpty,
@@ -22,7 +22,7 @@ export class CreditNoteRefundDto {
   fromAccountId: number;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsPositive()
   @IsNotEmpty()
   @ApiProperty({

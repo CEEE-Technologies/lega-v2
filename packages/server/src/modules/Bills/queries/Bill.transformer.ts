@@ -228,6 +228,8 @@ export class BillTransformer extends Transformer {
     return this.item(bill.taxes, new SaleInvoiceTaxEntryTransformer(), {
       subtotal: bill.subtotal,
       isInclusiveTax: bill.isInclusiveTax,
+      // The tax line is the sum of its lines' rounded taxes.
+      entries: bill.entries,
       currencyCode: bill.currencyCode,
     });
   };

@@ -1,3 +1,4 @@
+import { moneyGt } from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import { css } from '@emotion/css';
 import { Formik, Form, type FormikHelpers } from 'formik';
@@ -119,7 +120,7 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
     setSubmitting(true);
     const exceededAmount = getExceededAmountFromValues(values);
 
-    if (Number(values.amount) <= 0) {
+    if (!moneyGt(values.amount, 0)) {
       AppToaster.show({
         message: intl.get('you_cannot_make_payment_with_zero_total_amount'),
         intent: Intent.DANGER,
@@ -136,7 +137,7 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
       return;
     }
     // A customer payment must pay an invoice or the opening balance.
-    if (!values.entries.some((entry) => Number(entry.paymentAmount) > 0)) {
+    if (!values.entries.some((entry) => moneyGt(entry.paymentAmount, 0))) {
       AppToaster.show({
         message: NO_INVOICE_SELECTED_MESSAGE,
         intent: Intent.DANGER,

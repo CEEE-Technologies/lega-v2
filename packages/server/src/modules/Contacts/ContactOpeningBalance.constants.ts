@@ -1,3 +1,4 @@
+import { moneyGt, moneyLt, roundMoney } from '@bigcapital/utils';
 import { ServiceError } from '@/modules/Items/ServiceError';
 
 /**
@@ -26,6 +27,29 @@ export const isOpeningBalanceEntry = (entry: {
 export const isDocumentEntry = (entry: {
   entryType?: string | null;
 }): boolean => !isOpeningBalanceEntry(entry);
+
+/**
+ * Finds the first document (invoice or bill) listed on more than one
+ * document line of a payment, with the indexes of those lines.
+ * @param {T[]} entries - Payment entries.
+ * @param {string} documentIdKey - `invoiceId` or `billId`.
+ * @returns {{ id: number; indexes: number[] } | null}
+ */
+export const findDuplicateDocument = <T extends { entryType?: string | null }>(
+  entries: T[],
+  documentIdKey: keyof T & string,
+): { id: number; indexes: number[] } | null => {
+  const linesById = new Map<number, number[]>();
+  (entries || []).forEach((entry, index) => {
+    const id = entry[documentIdKey] as unknown as number | null | undefined;
+    if (!isDocumentEntry(entry) || id === null || id === undefined) return;
+    linesById.set(Number(id), [...(linesById.get(Number(id)) || []), index]);
+  });
+  for (const [id, indexes] of linesById) {
+    if (indexes.length > 1) return { id, indexes };
+  }
+  return null;
+};
 
 /**
  * Stores the entry type explicitly and clears the document id of opening
@@ -69,10 +93,10 @@ export const validateOpeningBalanceNotBelowPaid = (
   openingBalance: number,
   paidAmount: number,
 ) => {
-  const paid = Math.round(Number(paidAmount || 0) * 1000) / 1000;
-  const balance = Math.round(Number(openingBalance || 0) * 1000) / 1000;
+  const paid = roundMoney(paidAmount);
+  const balance = roundMoney(openingBalance);
 
-  if (paid > 0 && balance < paid) {
+  if (moneyGt(paid, 0) && moneyLt(balance, paid)) {
     throw new ServiceError(
       OPENING_BALANCE_ERRORS.OPENING_BALANCE_BELOW_PAID,
       `Payments already paid ${paid} of the opening balance; it can't be set to ${balance}.`,

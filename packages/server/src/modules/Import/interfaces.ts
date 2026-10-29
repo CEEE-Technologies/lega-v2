@@ -43,6 +43,17 @@ export interface ImportFileMapPOJO {
   };
 }
 
+/**
+ * A money value of the imported file rounded to cents.
+ */
+export interface ImportRoundedMoneyWarning {
+  rowNumber: number;
+  field: string;
+  value: number;
+  roundedValue: number;
+  message: string;
+}
+
 export interface ImportFilePreviewPOJO {
   resource: string;
   createdCount: number;
@@ -52,6 +63,9 @@ export interface ImportFilePreviewPOJO {
   errors: ImportInsertError[];
   unmappedColumns: string[];
   unmappedColumnsCount: number;
+  /** Money values rounded to cents (they had more than 2 decimals). */
+  warnings?: ImportRoundedMoneyWarning[];
+  warningsCount?: number;
 }
 
 export interface ImportOperSuccess {

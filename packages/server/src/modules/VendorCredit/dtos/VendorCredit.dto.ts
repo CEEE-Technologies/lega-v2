@@ -12,7 +12,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { ItemEntryDto } from '@/modules/TransactionItemEntry/dto/ItemEntry.dto';
 
 enum DiscountType {
@@ -132,7 +132,7 @@ export class CommandVendorCreditDto {
   attachments?: AttachmentDto[];
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsOptional()
   @ApiProperty({
     description: 'The discount of the vendor credit',
@@ -149,7 +149,7 @@ export class CommandVendorCreditDto {
   discountType?: DiscountType;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsOptional()
   @ApiProperty({
     description: 'The adjustment of the vendor credit',

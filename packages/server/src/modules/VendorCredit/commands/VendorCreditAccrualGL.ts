@@ -4,6 +4,7 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { foreignCreditSide } from '@/utils/ledger-rounding';
 
 export class VendorCreditAccrualGL {
   private APAccountId: number;
@@ -76,6 +77,7 @@ export class VendorCreditAccrualGL {
     return {
       ...commonEntity,
       debit: this.vendorCredit.totalLocal,
+      foreignDebit: this.vendorCredit.total,
       accountId: this.APAccountId,
       contactId: this.vendorCredit.vendorId,
       accountNormal: AccountNormal.CREDIT,
@@ -97,6 +99,7 @@ export class VendorCreditAccrualGL {
     return {
       ...commonEntity,
       credit: totalLocal,
+      foreignCredit: entry.totalExcludingTax,
       index: index + 2,
       itemId: entry.itemId,
       // itemQuantity: entry.quantity,
@@ -118,6 +121,7 @@ export class VendorCreditAccrualGL {
     return {
       ...commonEntry,
       debit: this.vendorCredit.discountAmountLocal,
+      foreignDebit: this.vendorCredit.discountAmount,
       accountId: this.purchaseDiscountAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,
@@ -137,6 +141,7 @@ export class VendorCreditAccrualGL {
       ...commonEntry,
       credit: this.vendorCredit.adjustmentLocal > 0 ? adjustmentAmount : 0,
       debit: this.vendorCredit.adjustmentLocal < 0 ? adjustmentAmount : 0,
+      ...foreignCreditSide(this.vendorCredit.adjustment || 0),
       accountId: this.otherExpensesAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,

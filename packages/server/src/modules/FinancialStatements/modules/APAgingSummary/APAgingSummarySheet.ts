@@ -1,4 +1,5 @@
-import { sum, isEmpty } from 'lodash';
+import { sumMoney } from '@bigcapital/utils';
+import { isEmpty } from 'lodash';
 import { flow } from 'fp-ts/function';
 import { when } from '@/common/fp';
 import {
@@ -86,7 +87,7 @@ export class APAgingSummarySheet extends AgingSummaryReport {
     const currentTotal = this.getContactCurrentTotal(vendor.id);
     const agingPeriodsTotal = this.getAgingPeriodsTotal(agingPeriods);
 
-    const amount = sum([agingPeriodsTotal, currentTotal]);
+    const amount = sumMoney(agingPeriodsTotal, currentTotal);
 
     return {
       vendorName: vendor.displayName,

@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
 import { first } from 'lodash';
@@ -32,6 +38,8 @@ export type VendorCreditEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -62,6 +70,7 @@ export const defaultVendorCreditEntry: VendorCreditEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -129,6 +138,7 @@ const defaultReqVendorCreditEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
 };
@@ -281,9 +291,7 @@ export const useVendorCreditDiscountAmount = () => {
   const subtotal = useVendorCreditSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (discount * subtotal) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -304,7 +312,7 @@ export const useVendorCreditDiscountAmountFormatted = () => {
 export const useVendorCreditAdjustmentAmount = () => {
   const { values } = useFormikContext<VendorCreditFormValues>();
 
-  return toSafeNumber(values.adjustment);
+  return roundMoney(values.adjustment);
 };
 
 /**
@@ -327,7 +335,7 @@ export const useVendorCreditTotal = () => {
   const discountAmount = useVendorCreditDiscountAmount();
   const adjustmentAmount = useVendorCreditAdjustmentAmount();
 
-  return subtotal + adjustmentAmount - discountAmount;
+  return sumMoney(subtotal, adjustmentAmount, -discountAmount);
 };
 
 /**

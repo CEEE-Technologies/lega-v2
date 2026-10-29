@@ -9,6 +9,7 @@ interface TestInvoice {
   id: number;
   exchangeRate: number;
   totalLocal: number;
+  total?: number;
 }
 
 interface TestPaymentEntry {
@@ -17,12 +18,14 @@ interface TestPaymentEntry {
   invoice?: TestInvoice;
 }
 
-const buildInvoice = (overrides: Partial<TestInvoice> = {}): TestInvoice => ({
-  id: 10,
-  exchangeRate: 1,
-  totalLocal: 1000,
-  ...overrides,
-});
+const buildInvoice = (overrides: Partial<TestInvoice> = {}): TestInvoice => {
+  const invoice = { id: 10, exchangeRate: 1, totalLocal: 1000, ...overrides };
+  // The invoice currency total the running-total split uses.
+  return {
+    ...invoice,
+    total: invoice.totalLocal / (invoice.exchangeRate || 1),
+  };
+};
 
 const buildPayment = (
   entries: TestPaymentEntry[],
@@ -221,7 +224,7 @@ describe('PaymentReceivedCostCashGL', () => {
 });
 
 describe('PaymentReceivedCostCashGL — rounding', () => {
-  it('rounds the pro-rata cost to the ledger precision on both sides', () => {
+  it('rounds the pro-rata cost to cents on both sides', () => {
     const invoice = buildInvoice({ totalLocal: 3 });
     const payment = buildPayment([buildPaymentEntry(invoice, 1)]);
     const entries = buildGL(payment, {
@@ -231,7 +234,23 @@ describe('PaymentReceivedCostCashGL — rounding', () => {
     const costEntry = entries.find((e) => e.accountId === 600);
     const inventoryEntry = entries.find((e) => e.accountId === 700);
 
-    expect(costEntry.debit).toBe(33.333);
-    expect(inventoryEntry.credit).toBe(33.333);
+    expect(costEntry.debit).toBe(33.33);
+    expect(inventoryEntry.credit).toBe(33.33);
+  });
+});
+
+describe('PaymentReceivedCostCashGL — running-total split (cumulative)', () => {
+  it('ends the cost exactly once the invoice is fully paid in three payments', () => {
+    const invoice = buildInvoice({ totalLocal: 300 });
+    const costs = { [invoice.id]: [buildItemCost({ cost: 100 })] };
+    const costOf = (amount: number, paidBefore: number) =>
+      buildGL(buildPayment([buildPaymentEntry(invoice, amount)]), costs)
+        .setPaidBefore({ [invoice.id]: paidBefore })
+        .GLEntries()
+        .find((e) => e.accountId === 600).debit;
+
+    const parts = [costOf(100, 0), costOf(100, 100), costOf(100, 200)];
+    expect(parts).toEqual([33.33, 33.34, 33.33]);
+    expect(Math.round(parts.reduce((a, b) => a + b, 0) * 100) / 100).toBe(100);
   });
 });

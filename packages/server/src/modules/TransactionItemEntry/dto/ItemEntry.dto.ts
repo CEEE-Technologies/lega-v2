@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { DiscountType } from '@/common/types/Discount';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -56,7 +56,7 @@ export class ItemEntryDto {
 
   @IsOptional()
   @IsNotEmpty()
-  @IsNumber()
+  @IsMoney()
   @ToNumber()
   @ApiProperty({
     description: 'The discount of the item entry',

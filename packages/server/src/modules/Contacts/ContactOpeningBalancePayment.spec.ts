@@ -43,10 +43,10 @@ const buildService = (contact: Record<string, any> | null) => {
 };
 
 describe('getOpeningBalancePaidAmount', () => {
-  it('sums only the opening balance lines, rounded to 3 decimals', () => {
+  it('sums only the opening balance lines, rounded to cents', () => {
     expect(
       getOpeningBalancePaidAmount([ob(100.1115), inv(50), ob(0.2)] as any),
-    ).toBe(100.312);
+    ).toBe(100.31);
     expect(getOpeningBalancePaidAmount(null)).toBe(0);
   });
 });
@@ -83,7 +83,7 @@ describe('ContactOpeningBalancePayment.validateOpeningBalanceEntries', () => {
 
     await expect(
       service.validateOpeningBalanceEntries(
-        { contactId: 1, entries: [ob(200.001)] as any },
+        { contactId: 1, entries: [ob(200.01)] as any },
         null,
         trx,
       ),

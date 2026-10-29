@@ -1,3 +1,9 @@
+import {
+  calcDiscountMoney,
+  roundMoney,
+  sumMoney,
+  sumMoneyBy,
+} from '@bigcapital/utils';
 import { useFormikContext } from 'formik';
 import { omit, first } from 'lodash';
 import moment from 'moment';
@@ -31,6 +37,8 @@ export type ReceiptEntry = {
   itemId: string | number;
   rate: string | number;
   discount: string | number;
+  /** Line discount type: 'percentage' (default) or a fixed 'amount'. */
+  discountType?: 'percentage' | 'amount' | string;
   quantity: string | number;
   description: string;
   amount: string | number;
@@ -64,6 +72,7 @@ export const defaultReceiptEntry: ReceiptEntry = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
   amount: '',
@@ -74,6 +83,7 @@ const defaultReceiptEntryReq = {
   itemId: '',
   rate: '',
   discount: '',
+  discountType: 'percentage',
   quantity: '',
   description: '',
 };
@@ -299,9 +309,7 @@ export const useReceiptDiscountAmount = () => {
   const subtotal = useReceiptSubtotal();
   const discount = toSafeNumber(values.discount);
 
-  return values?.discountType === 'percentage'
-    ? (subtotal * discount) / 100
-    : discount;
+  return calcDiscountMoney(subtotal, discount, values?.discountType);
 };
 
 /**
@@ -321,7 +329,7 @@ export const useReceiptDiscountAmountFormatted = () => {
  */
 export const useReceiptAdjustmentAmount = () => {
   const { values } = useFormikContext<ReceiptFormValues>();
-  const adjustment = toSafeNumber(values.adjustment);
+  const adjustment = roundMoney(values.adjustment);
 
   return adjustment;
 };
@@ -346,7 +354,7 @@ export const useReceiptTotal = () => {
   const adjustmentAmount = useReceiptAdjustmentAmount();
   const discountAmount = useReceiptDiscountAmount();
 
-  return subtotal - discountAmount + adjustmentAmount;
+  return sumMoney(subtotal, -discountAmount, adjustmentAmount);
 };
 
 /**

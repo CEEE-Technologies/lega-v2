@@ -90,6 +90,7 @@ export class LandedCostGLEntriesService extends BaseLandedCostService {
     return {
       ...commonEntry,
       debit: localAmount,
+      foreignDebit: allocatedEntry.cost,
       accountId,
       index: index + 1,
       indexGroup: 10,
@@ -113,6 +114,7 @@ export class LandedCostGLEntriesService extends BaseLandedCostService {
     return {
       ...commonEntry,
       credit: allocatedLandedCost.localAmount,
+      foreignCredit: allocatedLandedCost.amount,
       accountId: allocatedLandedCost.costAccountId,
       index: 1,
       indexGroup: 20,

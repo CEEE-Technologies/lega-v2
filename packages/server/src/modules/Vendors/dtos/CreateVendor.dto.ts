@@ -11,14 +11,14 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ContactAddressDto } from '@/modules/Customers/dtos/ContactAddress.dto';
-import { IsOptional, ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, IsOptional, ToNumber } from '@/common/decorators/Validators';
 
 export class CreateVendorDto extends ContactAddressDto {
   @ApiProperty({ required: false, description: 'Vendor opening balance' })
   @IsOptional()
-  @IsInt()
   @Min(0)
   @ToNumber()
+  @IsMoney()
   openingBalance?: number;
 
   @ApiProperty({

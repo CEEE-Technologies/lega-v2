@@ -1,3 +1,4 @@
+import { roundHalfAwayFromZero } from '@bigcapital/utils';
 import { get } from 'lodash';
 import * as accounting from 'accounting';
 import * as Currencies from 'js-money/lib/currency';
@@ -52,6 +53,10 @@ export const formatNumber = (
   if (divideOn1000) {
     formattedBalance /= 1000;
   }
+  // Rounded halves away from zero first (1.005 shows as 1.01, not 1.00):
+  // accounting.js rounds the float as it is.
+  formattedBalance = roundHalfAwayFromZero(formattedBalance, precision);
+
   return accounting.formatMoney(
     formattedBalance,
     money ? formattedSymbol : symbol ? symbol : '',

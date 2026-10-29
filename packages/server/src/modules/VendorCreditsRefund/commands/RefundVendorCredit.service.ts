@@ -1,3 +1,4 @@
+import { moneyLt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { ERRORS } from '../constants';
 import { Account } from '@/modules/Accounts/models/Account.model';
@@ -59,7 +60,7 @@ export class RefundVendorCreditService {
     vendorCredit: VendorCredit,
     amount: number,
   ) => {
-    if (vendorCredit.creditsRemaining < amount) {
+    if (moneyLt(vendorCredit.creditsRemaining, amount)) {
       throw new ServiceError(ERRORS.VENDOR_CREDIT_HAS_NO_CREDITS_REMAINING);
     }
   };

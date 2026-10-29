@@ -9,6 +9,7 @@ import {
   IBillLandedCostLedgerEntry,
 } from '../integrations/BillLandedCostsBridge';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { foreignDebitSide, NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
 
 export class BillGL {
   private bill: Bill;
@@ -94,6 +95,8 @@ export class BillGL {
     return {
       ...commonJournalMeta,
       debit: totalLocal + landedCostAmount,
+      // The landed cost part is base currency (see the landed cost line).
+      foreignDebit: entry.totalExcludingTax,
       accountId:
         ['inventory'].indexOf(entry.item.type) !== -1
           ? entry.item.inventoryAccountId
@@ -119,6 +122,7 @@ export class BillGL {
     return {
       ...commonJournalMeta,
       credit: landedCost.amount,
+      ...NO_FOREIGN_AMOUNT,
       accountId: landedCost.costAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,
@@ -136,6 +140,7 @@ export class BillGL {
     return {
       ...commonJournalMeta,
       credit: this.bill.totalLocal,
+      foreignCredit: this.bill.total,
       accountId: this.payableAccountId,
       contactId: this.bill.vendorId,
       accountNormal: AccountNormal.CREDIT,
@@ -158,6 +163,7 @@ export class BillGL {
     return {
       ...commonJournalMeta,
       debit: entry.taxAmount * (this.bill.exchangeRate || 1),
+      foreignDebit: entry.taxAmount,
       index,
       indexGroup: 30,
       accountId: this.taxPayableAccountId,
@@ -187,6 +193,7 @@ export class BillGL {
     return {
       ...commonEntry,
       credit: this.bill.discountAmountLocal,
+      foreignCredit: this.bill.discountAmount,
       accountId: this.purchaseDiscountAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,
@@ -206,6 +213,7 @@ export class BillGL {
       ...commonEntry,
       debit: this.bill.adjustmentLocal > 0 ? adjustmentAmount : 0,
       credit: this.bill.adjustmentLocal < 0 ? adjustmentAmount : 0,
+      ...foreignDebitSide(this.bill.adjustment || 0),
       accountId: this.otherExpensesAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,

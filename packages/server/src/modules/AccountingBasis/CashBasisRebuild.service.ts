@@ -13,6 +13,7 @@ import {
   ICashBasisRebuildResult,
 } from './AccountingBasis.constants';
 import { checkCashBasis, ICashBasisCheckResult } from './CashBasisCheck';
+import { getLockedPeriodChecker } from './MoneyHealthCheck';
 
 /**
  * Rebuilds the cash basis entries of the current tenant from the documents.
@@ -89,12 +90,25 @@ export class CashBasisRebuildService {
       failures: [],
     };
 
-    for (const { referenceType, table } of CASH_BASIS_DOCUMENTS) {
-      const rows: { id: number }[] = await knex(table)
-        .select('id')
-        .orderBy('id');
+    const isLocked = await getLockedPeriodChecker(knex);
+    result.lockedSkipped = [];
 
-      for (const { id } of rows) {
+    for (const { referenceType, table, dateColumn } of CASH_BASIS_DOCUMENTS) {
+      // In date, then id order: each document's running-total split starts
+      // from the earlier ones.
+      const rows: { id: number; date: any }[] = await knex(table)
+        .select('id', `${dateColumn} as date`)
+        .orderBy([
+          { column: dateColumn, order: 'asc' },
+          { column: 'id', order: 'asc' },
+        ]);
+
+      for (const { id, date } of rows) {
+        // Locked periods stay as they are.
+        if (isLocked(date, referenceType)) {
+          result.lockedSkipped.push({ referenceType, referenceId: id });
+          continue;
+        }
         try {
           await knex.transaction((trx) =>
             this.rewriteDocument(referenceType, id, trx),

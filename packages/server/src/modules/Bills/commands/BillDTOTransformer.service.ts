@@ -1,5 +1,6 @@
+import { sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { omit, sumBy } from 'lodash';
+import { omit } from 'lodash';
 import * as moment from 'moment';
 import * as R from 'ramda';
 import * as composeAsync from 'async/compose';
@@ -36,7 +37,7 @@ export class BillDTOTransformer {
    * @returns {number}
    */
   private getBillEntriesTotal(entries: ItemEntry[]): number {
-    return sumBy(entries, (e) => this.itemEntryModel().calcAmount(e));
+    return sumMoneyBy(entries, (e) => this.itemEntryModel().calcAmount(e));
   }
 
   /**
@@ -50,7 +51,7 @@ export class BillDTOTransformer {
     vendor: Vendor,
     oldBill?: Bill,
   ): Promise<Bill> {
-    const amount = sumBy(billDTO.entries, (e) =>
+    const amount = sumMoneyBy(billDTO.entries, (e) =>
       this.itemEntryModel().calcAmount(e),
     );
 

@@ -4,7 +4,7 @@ import { x } from '@xstyled/emotion';
 import type { CSSProperties } from 'react';
 import {
   FFormGroup,
-  FInputGroup,
+  FMoneyInputGroup,
   FSelect,
   TotalLinePrimitive,
 } from '@/components';
@@ -75,8 +75,10 @@ export function DiscountTotalLine({
             inline
             fastField
           >
-            <FInputGroup
+            {/* A money input: at most 2 decimals, never negative. */}
+            <FMoneyInputGroup
               name={'discount'}
+              allowNegativeValue={false}
               rightElement={
                 <FSelect
                   name={'discountType'}

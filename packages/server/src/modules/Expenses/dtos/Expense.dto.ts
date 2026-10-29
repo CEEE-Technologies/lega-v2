@@ -1,4 +1,4 @@
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { parseBoolean } from '@/utils/parse-boolean';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
@@ -37,7 +37,7 @@ export class ExpenseCategoryDto {
   expenseAccountId: number;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsOptional()
   @ApiProperty({
     example: 100,

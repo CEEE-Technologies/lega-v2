@@ -1,5 +1,6 @@
 import { Knex } from 'knex';
-import * as async from 'async';
+import * as moment from 'moment';
+import { sortBy, uniq } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
 import { PaymentReceivedGLEntries } from '../PaymentReceived/commands/PaymentReceivedGLEntries';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
@@ -35,14 +36,10 @@ export class InvoicePaymentsGLEntriesRewrite {
     paymentsIds: number[],
     trx?: Knex.Transaction,
   ) => {
-    // Initiate a new queue for accounts balance mutation.
-    const rewritePaymentGL = async.queue(this.rewritePaymentsGLEntriesTask, 10);
-
-    paymentsIds.forEach((paymentId: number) => {
-      rewritePaymentGL.push({ paymentId, trx });
-    });
-    if (paymentsIds.length > 0) {
-      await rewritePaymentGL.drain();
+    // One at a time and in the given (date, then id) order: each payment's
+    // cash basis split starts from what the earlier payments paid.
+    for (const paymentId of paymentsIds) {
+      await this.rewritePaymentsGLEntriesTask({ paymentId, trx });
     }
   };
 
@@ -82,9 +79,19 @@ export class InvoicePaymentsGLEntriesRewrite {
   ) => {
     const invoicePaymentEntries = await this.paymentReceivedEntryModel()
       .query(trx)
-      .where('invoiceId', invoiceId);
+      .where('invoiceId', invoiceId)
+      .withGraphFetched('payment');
 
-    const paymentsIds = invoicePaymentEntries.map((e) => e.paymentReceiveId);
+    // The payments in date, then id order.
+    const paymentsIds = uniq(
+      sortBy(
+        invoicePaymentEntries.filter((entry) => entry.payment),
+        [
+          (entry) => moment(entry.payment.paymentDate).format('YYYY-MM-DD'),
+          (entry) => entry.payment.id,
+        ],
+      ).map((entry) => entry.paymentReceiveId),
+    );
 
     await this.rewritePaymentsGLEntriesQueue(paymentsIds, trx);
   };

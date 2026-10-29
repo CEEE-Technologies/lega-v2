@@ -1,3 +1,8 @@
+import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import {
+  getDocumentsPaidBefore,
+  PAYMENT_RECEIVED_PAID_BEFORE,
+} from '@/modules/AccountingBasis/CashBasisPaidBefore';
 import * as moment from 'moment';
 import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
@@ -138,6 +143,7 @@ export class PaymentReceivedCostGLEntries {
   public getPaymentCostLedger = async (
     paymentReceive: PaymentReceived,
     trx?: Knex.Transaction,
+    paidBefore?: Record<number, number>,
   ): Promise<Ledger> => {
     const invoicesIds = (paymentReceive.entries || [])
       .map((entry) => entry.invoiceId)
@@ -149,8 +155,31 @@ export class PaymentReceivedCostGLEntries {
     const invoicesItemCosts = await this.getInvoicesItemCosts(invoicesIds, trx);
     return new PaymentReceivedCostCashGL(paymentReceive)
       .setInvoicesItemCosts(invoicesItemCosts)
+      .setPaidBefore(
+        paidBefore ?? (await this.getPaidBefore(paymentReceive, trx)),
+      )
       .getLedger();
   };
+
+  /**
+   * Retrieves the amount paid on each invoice by the payments before the
+   * given one (the running-total split starts from there).
+   * @param {PaymentReceived} payment
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<Record<number, number>>}
+   */
+  private getPaidBefore = (
+    payment: PaymentReceived,
+    trx?: Knex.Transaction,
+  ): Promise<Record<number, number>> =>
+    getDocumentsPaidBefore(
+      trx ?? this.paymentReceivedModel().knex(),
+      PAYMENT_RECEIVED_PAID_BEFORE,
+      { id: payment.id, date: payment.paymentDate },
+      (payment.entries || [])
+        .filter(isDocumentEntry)
+        .map((entry) => entry.invoiceId),
+    );
 
   /**
    * Writes the cash basis cost entries of the payments received from the
@@ -181,11 +210,16 @@ export class PaymentReceivedCostGLEntries {
     }
     const invoicesItemCosts = await this.getInvoicesItemCosts(invoicesIds, trx);
 
-    const entries = payments.flatMap((payment) =>
-      new PaymentReceivedCostCashGL(payment)
-        .setInvoicesItemCosts(invoicesItemCosts)
-        .GLEntries(),
-    );
+    const entries = [];
+    for (const payment of payments) {
+      const paidBefore = await this.getPaidBefore(payment, trx);
+      entries.push(
+        ...new PaymentReceivedCostCashGL(payment)
+          .setInvoicesItemCosts(invoicesItemCosts)
+          .setPaidBefore(paidBefore)
+          .GLEntries(),
+      );
+    }
     if (entries.length === 0) {
       return;
     }

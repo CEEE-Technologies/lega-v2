@@ -102,6 +102,8 @@ export class GetInvoicePaymentLinkMetaTransformer extends SaleInvoiceTransformer
       {
         subtotal: invoice.subtotal,
         isInclusiveTax: invoice.isInclusiveTax,
+        // The tax line is the sum of its lines' rounded taxes.
+        entries: invoice.entries,
         currencyCode: invoice.currencyCode,
       },
     );

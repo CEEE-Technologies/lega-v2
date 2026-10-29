@@ -40,7 +40,7 @@ export class VendorCreditToApplyBillTransformer extends Transformer {
    * @returns {string}
    */
   protected formattedAmount = (bill: Bill): string => {
-    return this.formatNumber(bill.amount, {
+    return this.formatNumber(bill.total, {
       currencyCode: bill.currencyCode,
     });
   };

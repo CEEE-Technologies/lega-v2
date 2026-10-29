@@ -142,6 +142,8 @@ export const TransactionTypes = {
   VendorCredit: 'transaction_type.vendor_credit',
   RefundCreditNote: 'transaction_type.refund_credit_note',
   RefundVendorCredit: 'transaction_type.refund_vendor_credit',
+  CreditNoteApplyInvoice: 'transaction_type.credit_note_applied',
+  VendorCreditApplyBill: 'transaction_type.vendor_credit_applied',
   LandedCost: 'transaction_type.landed_cost',
   WarehouseTransfer: 'transaction_type.warehouse_transfer',
   CashflowTransaction: CashflowTransactionTypes,

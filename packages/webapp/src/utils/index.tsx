@@ -1,4 +1,11 @@
 // @ts-nocheck
+import {
+  MONEY_PRECISION,
+  fromCents,
+  roundHalfAwayFromZero,
+  subtractMoney,
+  toCents,
+} from '@bigcapital/utils';
 import { Intent } from '@blueprintjs/core';
 import accounting from 'accounting';
 import clsx from 'classnames';
@@ -202,9 +209,10 @@ export const defaultExpanderReducer = (tableRows, level) => {
 export function formattedAmount(cents, currencyCode = '', props = {}) {
   const currency = Currency[currencyCode];
 
+  // An unknown currency shows 2 decimals (money is whole cents), not 0.
   const parsedCurrency = {
     symbol: '',
-    decimal_digits: 0,
+    decimal_digits: MONEY_PRECISION,
     ...currency,
   };
   const parsedProps = {
@@ -221,7 +229,12 @@ export function formattedAmount(cents, currencyCode = '', props = {}) {
     },
   };
 
-  return accounting.formatMoney(cents, formatOptions);
+  // Rounded halves away from zero first (1.005 shows as 1.01, not 1.00):
+  // accounting.js rounds the float as it is.
+  return accounting.formatMoney(
+    roundHalfAwayFromZero(cents, parsedCurrency.decimal_digits),
+    formatOptions,
+  );
 }
 
 export function formattedNumber(amount, props) {
@@ -239,7 +252,10 @@ export function formattedNumber(amount, props) {
     },
     ...props,
   };
-  return accounting.formatMoney(amount, formatOptions);
+  return accounting.formatMoney(
+    roundHalfAwayFromZero(amount, formatOptions.precision),
+    formatOptions,
+  );
 }
 
 export function formattedExchangeRate(amount, currency) {
@@ -654,14 +670,10 @@ export function safeSumBy(entries, getter) {
 /**
  * Subtracts one money amount from another in whole cents, so float error
  * (1.10 + 2.20 = 3.3000000000000003) can't make equal amounts look different.
- * Matches the server, which compares amounts rounded to cents.
+ * Same helper as the server (`@bigcapital/utils`).
  */
 export function subtractAmounts(amount: number, other: number): number {
-  return (
-    (Math.round(toSafeNumber(amount) * 100) -
-      Math.round(toSafeNumber(other) * 100)) /
-    100
-  );
+  return subtractMoney(amount, other);
 }
 
 export const fullAmountPaymentEntries = (entries) => {
@@ -671,16 +683,25 @@ export const fullAmountPaymentEntries = (entries) => {
   }));
 };
 
-export const amountPaymentEntries = (amount, entries) => {
-  let total = amount;
+/**
+ * Fills the given amount over the entries in order (oldest first), each up
+ * to its due amount, in whole cents: 1,250.75 over dues of 1,000 and 500
+ * fills 1,000 and 250.75.
+ */
+export const amountPaymentEntries = <T extends { dueAmount?: unknown }>(
+  amount: unknown,
+  entries: T[],
+): Array<T & { paymentAmount: number }> => {
+  let remainingCents = Math.max(toCents(amount as number), 0);
 
   return entries.map((item) => {
-    const diff = Math.min(item.dueAmount, total);
-    total -= Math.max(diff, 0);
+    const dueCents = Math.max(toCents(item.dueAmount as number), 0);
+    const paidCents = Math.min(dueCents, remainingCents);
+    remainingCents -= paidCents;
 
     return {
       ...item,
-      paymentAmount: diff,
+      paymentAmount: fromCents(paidCents),
     };
   });
 };

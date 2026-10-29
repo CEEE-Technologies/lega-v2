@@ -9,10 +9,15 @@ import {
 import { ILedger } from './types/Ledger.types';
 import { AccountTransaction } from '../Accounts/models/AccountTransaction.model';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
+import { TenancyContext } from '../Tenancy/TenancyContext.service';
 
 // Filter the blank entries.
+// A line can be 0.00 in the base currency but not in the transaction
+// currency (LKR 1 at 0.0033 USD): it is kept for the foreign balance.
 const filterBlankEntry = (entry: ILedgerEntry) =>
-  Boolean(entry.credit || entry.debit);
+  Boolean(
+    entry.credit || entry.debit || entry.foreignCredit || entry.foreignDebit,
+  );
 
 @Injectable()
 export class LedgerEntriesStorageService {
@@ -24,6 +29,7 @@ export class LedgerEntriesStorageService {
     private readonly accountTransactionModel: TenantModelProxy<
       typeof AccountTransaction
     >,
+    private readonly tenancyContext: TenancyContext,
   ) {}
 
   /**
@@ -35,9 +41,12 @@ export class LedgerEntriesStorageService {
   public saveEntries = async (ledger: ILedger, trx?: Knex.Transaction) => {
     const saveEntryQueue = async.queue(this.saveEntryTask.bind(this), 10);
     const entries = ledger.filter(filterBlankEntry).getEntries();
+    // A base currency line without foreign amounts stores its base amounts.
+    const baseCurrency =
+      entries.length > 0 ? await this.getBaseCurrency() : null;
 
     entries.forEach((entry) => {
-      saveEntryQueue.push({ entry, trx });
+      saveEntryQueue.push({ entry, trx, baseCurrency });
     });
     if (entries.length > 0) await saveEntryQueue.drain();
   };
@@ -68,8 +77,9 @@ export class LedgerEntriesStorageService {
   private saveEntry = async (
     entry: ILedgerEntry,
     trx?: Knex.Transaction,
+    baseCurrency?: string | null,
   ): Promise<void> => {
-    const transaction = transformLedgerEntryToTransaction(entry);
+    const transaction = transformLedgerEntryToTransaction(entry, baseCurrency);
 
     await this.accountTransactionModel().query(trx).insert(transaction);
   };
@@ -82,8 +92,17 @@ export class LedgerEntriesStorageService {
   private saveEntryTask = async (
     task: ISaveLedgerEntryQueuePayload,
   ): Promise<void> => {
-    const { entry, trx } = task;
+    const { entry, trx, baseCurrency } = task;
 
-    await this.saveEntry(entry, trx);
+    await this.saveEntry(entry, trx, baseCurrency);
+  };
+
+  /**
+   * The tenant base currency (null when there is no tenant context).
+   * @returns {Promise<string | null>}
+   */
+  private getBaseCurrency = async (): Promise<string | null> => {
+    const tenant = await this.tenancyContext.getTenant(true);
+    return tenant?.metadata?.baseCurrency ?? null;
   };
 }

@@ -48,6 +48,7 @@ export class ExpenseGL {
     return {
       ...commonEntry,
       credit: this.expense.localAmount,
+      foreignCredit: this.expense.totalAmount,
       accountId: this.expense.paymentAccountId,
       accountNormal:
         this.expense?.paymentAccount?.accountNormal === 'debit'
@@ -73,6 +74,7 @@ export class ExpenseGL {
         accountId: category.expenseAccountId,
         accountNormal: AccountNormal.DEBIT,
         debit: localAmount,
+        foreignDebit: category.amount,
         note: category.description,
         index: index + 2,
         projectId: category.projectId,

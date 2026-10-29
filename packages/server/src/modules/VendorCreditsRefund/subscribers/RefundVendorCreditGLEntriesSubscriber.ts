@@ -56,6 +56,12 @@ export class RefundVendorCreditGLEntriesSubscriber {
       refundVendorCredit.id,
       trx,
     );
+    // A back-dated refund changes the split of the later refunds.
+    await this.refundVendorCreditGLEntries.rewriteLaterRefundsCashGLEntries(
+      refundVendorCredit.vendorCreditId,
+      { id: refundVendorCredit.id, date: refundVendorCredit.date },
+      trx,
+    );
   }
 
   /**
@@ -66,12 +72,20 @@ export class RefundVendorCreditGLEntriesSubscriber {
   async revertRefundVendorCreditGLEntriesOnceDeleted({
     trx,
     refundCreditId,
-    oldRefundCredit: _oldRefundCredit,
+    oldRefundCredit,
   }: IRefundVendorCreditDeletedPayload) {
     await this.refundVendorCreditGLEntries.revertRefundVendorCreditGLEntries(
       refundCreditId,
       trx,
     );
+    // The later refunds of the vendor credit are rebuilt in order.
+    if (oldRefundCredit?.vendorCreditId) {
+      await this.refundVendorCreditGLEntries.rewriteLaterRefundsCashGLEntries(
+        oldRefundCredit.vendorCreditId,
+        { id: refundCreditId, date: oldRefundCredit.date },
+        trx,
+      );
+    }
   }
 
   /**

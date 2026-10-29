@@ -22,5 +22,7 @@
   "refund_vendor_credit": "Refund Vendor Credit",
   "landed_cost": "Landed Cost",
   "warehouse_transfer": "Warehouse transfer",
-  "payment_made": "Payment made"
+  "payment_made": "Payment made",
+  "credit_note_applied": "Credit Note Applied",
+  "vendor_credit_applied": "Vendor Credit Applied"
 }

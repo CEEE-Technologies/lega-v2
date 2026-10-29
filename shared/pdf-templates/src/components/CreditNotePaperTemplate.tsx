@@ -1,19 +1,20 @@
+import isEmpty from "lodash/isEmpty";
 import {
   PaperTemplate,
   PaperTemplateProps,
   PaperTemplateTotalBorder,
-} from './PaperTemplate';
-import { Box } from '../lib/layout/Box';
-import { Text } from '../lib/text/Text';
-import { Stack } from '../lib/layout/Stack';
-import { Group } from '../lib/layout/Group';
+} from "./PaperTemplate";
+import { Box } from "../lib/layout/Box";
+import { Text } from "../lib/text/Text";
+import { Stack } from "../lib/layout/Stack";
+import { Group } from "../lib/layout/Group";
 import {
   DefaultPdfTemplateTerms,
   DefaultPdfTemplateItemDescription,
   DefaultPdfTemplateItemName,
   DefaultPdfTemplateAddressBilledTo,
   DefaultPdfTemplateAddressBilledFrom,
-} from './_constants';
+} from "./_constants";
 
 interface CreditNoteLine {
   item?: string;
@@ -63,6 +64,16 @@ export interface CreditNotePaperTemplateProps extends PaperTemplateProps {
   subtotalLabel?: string;
   subtotal?: string;
 
+  // Discount (after the subtotal, before the total)
+  discount?: string;
+  showDiscount?: boolean;
+  discountLabel?: string;
+
+  // Adjustment
+  adjustment?: string;
+  showAdjustment?: boolean;
+  adjustmentLabel?: string;
+
   // Total
   showTotal?: boolean;
   totalLabel?: string;
@@ -87,16 +98,16 @@ export function CreditNotePaperTemplate({
   secondaryColor,
 
   showCompanyLogo = true,
-  companyLogoUri = '',
+  companyLogoUri = "",
 
   // # Credit Note number
-  creditNoteNumberLabel = 'Credit Note Number',
-  creditNoteNumebr = '346D3D40-0001',
+  creditNoteNumberLabel = "Credit Note Number",
+  creditNoteNumebr = "346D3D40-0001",
   showCreditNoteNumber = true,
 
   // # Credit Note date
-  creditNoteDate = 'September 3, 2024',
-  creditNoteDateLabel = 'Credit Note Date',
+  creditNoteDate = "September 3, 2024",
+  creditNoteDateLabel = "Credit Note Date",
   showCreditNoteDate = true,
 
   // Address
@@ -106,31 +117,41 @@ export function CreditNotePaperTemplate({
   showCompanyAddress = true,
   companyAddress = DefaultPdfTemplateAddressBilledFrom,
 
-  billedToLabel = 'Billed To',
+  billedToLabel = "Billed To",
 
   // Entries
-  lineItemLabel = 'Item',
-  lineQuantityLabel = 'Qty',
-  lineRateLabel = 'Rate',
-  lineTotalLabel = 'Total',
+  lineItemLabel = "Item",
+  lineQuantityLabel = "Qty",
+  lineRateLabel = "Rate",
+  lineTotalLabel = "Total",
 
   // Subtotal
-  subtotalLabel = 'Subtotal',
+  subtotalLabel = "Subtotal",
   showSubtotal = true,
-  subtotal = '1000.00',
+  subtotal = "1000.00",
+
+  // Discount
+  discount = "",
+  discountLabel = "Discount",
+  showDiscount = true,
+
+  // Adjustment
+  adjustment = "",
+  adjustmentLabel = "Adjustment",
+  showAdjustment = true,
 
   // Total
-  totalLabel = 'Total',
+  totalLabel = "Total",
   showTotal = true,
-  total = '$1000.00',
+  total = "$1000.00",
 
   // Customer Note
   showCustomerNote = true,
-  customerNote = '',
-  customerNoteLabel = 'Customer Note',
+  customerNote = "",
+  customerNoteLabel = "Customer Note",
 
   // Terms & Conditions
-  termsConditionsLabel = 'Terms & Conditions',
+  termsConditionsLabel = "Terms & Conditions",
   showTermsConditions = true,
   termsConditions = DefaultPdfTemplateTerms,
 
@@ -138,9 +159,9 @@ export function CreditNotePaperTemplate({
     {
       item: DefaultPdfTemplateItemName,
       description: DefaultPdfTemplateItemDescription,
-      rate: '1',
-      quantity: '1000',
-      total: '$1000.00',
+      rate: "1",
+      quantity: "1000",
+      total: "$1000.00",
     },
   ],
   ...props
@@ -154,7 +175,7 @@ export function CreditNotePaperTemplate({
       <Stack spacing={24}>
         <Group align="start" spacing={10}>
           <Stack flex={1}>
-            <PaperTemplate.BigTitle title={'Credit Note'} />
+            <PaperTemplate.BigTitle title={"Credit Note"} />
 
             <PaperTemplate.TermsList>
               {showCreditNoteNumber && (
@@ -198,21 +219,21 @@ export function CreditNotePaperTemplate({
                   <Stack spacing={2}>
                     <Text>{data.item}</Text>
                     {data.description && (
-                      <Text color={'#5f6b7c'} fontSize={12}>
+                      <Text color={"#5f6b7c"} fontSize={12}>
                         {data.description}
                       </Text>
                     )}
                   </Stack>
                 ),
-                thStyle: { width: '60%' },
+                thStyle: { width: "60%" },
               },
               {
                 label: lineQuantityLabel,
-                accessor: 'quantity',
-                align: 'right',
+                accessor: "quantity",
+                align: "right",
               },
-              { label: lineRateLabel, accessor: 'rate', align: 'right' },
-              { label: lineTotalLabel, accessor: 'total', align: 'right' },
+              { label: lineRateLabel, accessor: "rate", align: "right" },
+              { label: lineTotalLabel, accessor: "total", align: "right" },
             ]}
             data={lines}
           />
@@ -222,6 +243,18 @@ export function CreditNotePaperTemplate({
                 label={subtotalLabel}
                 amount={subtotal}
                 border={PaperTemplateTotalBorder.Gray}
+              />
+            )}
+            {showDiscount && !isEmpty(discount) && (
+              <PaperTemplate.TotalLine
+                label={discountLabel}
+                amount={discount}
+              />
+            )}
+            {showAdjustment && !isEmpty(adjustment) && (
+              <PaperTemplate.TotalLine
+                label={adjustmentLabel}
+                amount={adjustment}
               />
             )}
             {showTotal && (

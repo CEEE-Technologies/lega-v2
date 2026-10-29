@@ -6,7 +6,13 @@ import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { PaymentReceived } from '../models/PaymentReceived';
 import { PaymentReceivedEntry } from '../models/PaymentReceivedEntry';
 import { increment } from '@/utils/increment';
-import { roundLedgerAmount } from '@/utils/ledger-rounding';
+import {
+  allocateCumulativeShare,
+  moneyGt,
+  roundMoney,
+  subtractMoney,
+} from '@bigcapital/utils';
+import { creditSide, debitSide } from '@/utils/ledger-rounding';
 
 /**
  * Aggregated cost of a single invoice item retrieved from the inventory
@@ -32,6 +38,21 @@ export interface IInvoiceItemCost {
 export class PaymentReceivedCostCashGL {
   private readonly paymentReceived: PaymentReceived;
   private invoicesItemCosts: Record<number, IInvoiceItemCost[]> = {};
+
+  /**
+   * Amount paid on each invoice by the earlier payments (invoice currency).
+   */
+  private paidBefore: Record<number, number> = {};
+
+  /**
+   * Sets the amount paid on each invoice by the earlier payments.
+   * @param {Record<number, number>} paidBefore - By invoice id.
+   * @returns {PaymentReceivedCostCashGL}
+   */
+  setPaidBefore(paidBefore: Record<number, number>) {
+    this.paidBefore = paidBefore ?? {};
+    return this;
+  }
 
   /**
    * Constructor method.
@@ -81,42 +102,32 @@ export class PaymentReceivedCostCashGL {
   }
 
   /**
-   * Retrieves the paid amount of the given payment entry in local currency.
+   * Retrieves the part of the payment entry that pays the invoice (invoice
+   * currency): no more than what the earlier payments left to pay.
    * @param {PaymentReceivedEntry} entry - Payment received entry.
    * @returns {number}
    */
-  private getPaymentEntryLocalAmount = (
+  private getPaymentEntryRecognizedAmount = (
     entry: PaymentReceivedEntry,
   ): number => {
-    return (
-      entry.paymentAmount * defaultTo(this.paymentReceived.exchangeRate, 1)
+    const remaining = Math.max(
+      subtractMoney(
+        defaultTo(entry.invoice?.total, 0),
+        this.paidBefore[entry.invoiceId] || 0,
+      ),
+      0,
     );
+    return Math.min(roundMoney(entry.paymentAmount), remaining);
   };
 
   /**
-   * Retrieves the paid proportion of the associated invoice.
-   * The paid amount in local currency over the invoice total in local
-   * currency keeps the cash basis cost entries aligned with the cash basis
-   * income entries for partial payments.
-   * @param {PaymentReceivedEntry} entry - Payment received entry.
-   * @returns {number}
-   */
-  private getPaymentEntryRatio = (entry: PaymentReceivedEntry): number => {
-    const invoiceTotalLocal = defaultTo(entry.invoice?.totalLocal, 0);
-    const paidLocalAmount = this.getPaymentEntryLocalAmount(entry);
-
-    if (invoiceTotalLocal <= 0) {
-      return 0;
-    }
-    return paidLocalAmount / invoiceTotalLocal;
-  };
-
-  /**
-   * Retrieves the cash basis cost entries of the given payment entry
-   * (invoice allocation).
+   * Retrieves the cash basis cost entries of the given payment entry: the
+   * invoice item costs recognized with the running-total method (the cost
+   * recognized after this payment minus the cost recognized before it), so
+   * once the invoice is fully paid every cost line ends exactly at its cost.
    * -----
-   * - Cost of goods sold -> Debit -> YYYY
-   *    - Inventory assets -> Credit -> YYYY
+   * - Cost of goods sold -> Debit -> cost part
+   *    - Inventory -> Credit -> cost part
    * -----
    * @param {PaymentReceivedEntry} entry - Payment received entry.
    * @returns {ILedgerEntry[]}
@@ -126,22 +137,28 @@ export class PaymentReceivedCostCashGL {
   ): ILedgerEntry[] => {
     const invoice = entry.invoice;
     const itemCosts = this.invoicesItemCosts[entry.invoiceId] || [];
-    const ratio = this.getPaymentEntryRatio(entry);
+    const recognized = this.getPaymentEntryRecognizedAmount(entry);
 
-    if (!invoice || ratio <= 0 || itemCosts.length === 0) {
+    if (!invoice || !moneyGt(recognized, 0) || itemCosts.length === 0) {
       return [];
     }
+    const costs = allocateCumulativeShare(
+      this.paidBefore[entry.invoiceId] || 0,
+      recognized,
+      invoice.total,
+      itemCosts.map((itemCost) => itemCost.cost),
+    );
     const commonEntry = this.costEntriesCommonEntry;
     const getIndexIncrement = increment(0);
 
-    return itemCosts.flatMap((itemCost) => {
-      // Both sides share the same rounded amount, so the pair balances.
-      const cost = roundLedgerAmount(itemCost.cost * ratio);
+    return itemCosts.flatMap((itemCost, index) => {
+      // Both sides share the same amount, so the pair balances.
+      const cost = costs[index];
 
       // XXX Debit - Cost account.
       const costEntry = {
         ...commonEntry,
-        debit: cost,
+        ...debitSide(cost),
         accountId: itemCost.costAccountId,
         accountNormal: AccountNormal.DEBIT,
         itemId: itemCost.itemId,
@@ -151,7 +168,7 @@ export class PaymentReceivedCostCashGL {
       // XXX Credit - Inventory account.
       const inventoryEntry = {
         ...commonEntry,
-        credit: cost,
+        ...creditSide(cost),
         accountId: itemCost.inventoryAccountId,
         accountNormal: AccountNormal.DEBIT,
         itemId: itemCost.itemId,

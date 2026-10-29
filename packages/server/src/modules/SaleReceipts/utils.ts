@@ -33,6 +33,6 @@ export const transformReceiptToMailDataArgs = (
     'Customer Name': saleReceipt.customer.displayName,
     'Receipt Number': saleReceipt.receiptNumber,
     'Receipt Date': saleReceipt.formattedReceiptDate,
-    'Receipt Amount': saleReceipt.formattedAmount,
+    'Receipt Amount': saleReceipt.totalFormatted,
   };
 };

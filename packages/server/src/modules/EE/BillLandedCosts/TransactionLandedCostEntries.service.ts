@@ -1,3 +1,4 @@
+import { moneyGt } from '@bigcapital/utils';
 import { Injectable } from '@nestjs/common';
 import { ServiceError } from '../../Items/ServiceError';
 import { transformToMap } from '@/utils/transform-to-key';
@@ -65,7 +66,7 @@ export class TransactionLandedCostEntriesService {
     newCommonEntriesDTO.forEach((entry) => {
       const oldEntry = oldBillEntriesById.get(entry.id);
 
-      if (oldEntry && oldEntry.allocatedCostAmount > entry.amount) {
+      if (oldEntry && moneyGt(oldEntry.allocatedCostAmount, entry.amount)) {
         throw new ServiceError(
           ERRORS.LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES,
         );

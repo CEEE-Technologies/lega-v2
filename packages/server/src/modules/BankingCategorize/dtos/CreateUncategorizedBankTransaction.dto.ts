@@ -1,3 +1,4 @@
+import { IsMoney } from '@/common/decorators/Validators';
 import { IsBoolean, IsDateString, IsNumber, IsString } from 'class-validator';
 
 export class UncategorizedBankTransactionDto {
@@ -7,7 +8,7 @@ export class UncategorizedBankTransactionDto {
   @IsNumber()
   accountId: number;
 
-  @IsNumber()
+  @IsMoney()
   amount: number;
 
   @IsString()

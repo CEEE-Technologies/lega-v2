@@ -12,7 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
-import { ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import {
   PaymentEntryType,
   PaymentEntryTypes,
@@ -39,7 +39,7 @@ export class BillPaymentEntryDto {
   billId?: number;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsNotEmpty()
   @ApiProperty({
     description: 'The payment amount of the bill payment',
@@ -56,7 +56,7 @@ export class CommandBillPaymentDTO {
   vendorId: number;
 
   @ToNumber()
-  @IsNumber()
+  @IsMoney()
   @IsOptional()
   @ApiProperty({
     description: 'The amount of the bill payment',

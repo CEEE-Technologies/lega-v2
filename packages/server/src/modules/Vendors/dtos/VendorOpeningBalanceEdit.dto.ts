@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, ToNumber } from '@/common/decorators/Validators';
+import { IsMoney, IsOptional, ToNumber } from '@/common/decorators/Validators';
 
 export class VendorOpeningBalanceEditDto {
   @ApiProperty({
@@ -8,7 +8,7 @@ export class VendorOpeningBalanceEditDto {
     description: 'Opening balance',
     example: 5000.0,
   })
-  @IsNumber()
+  @IsMoney()
   @IsNotEmpty()
   @ToNumber()
   openingBalance: number;

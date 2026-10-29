@@ -58,6 +58,8 @@ export class ManualJournalGL {
       ...commonEntry,
       debit: (entry.debit || 0) * exchangeRate,
       credit: (entry.credit || 0) * exchangeRate,
+      foreignDebit: entry.debit || 0,
+      foreignCredit: entry.credit || 0,
       accountId: entry.accountId,
 
       contactId: entry.contactId,

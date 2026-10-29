@@ -1,3 +1,4 @@
+import { roundMoney } from '@bigcapital/utils';
 import * as Yup from 'yup';
 import * as moment from 'moment';
 import * as R from 'ramda';
@@ -286,12 +287,46 @@ export const getResourceColumns = (resourceColumns: {
 
 export type ModelResolver = (modelName: string) => any;
 
+/**
+ * The imported number fields that are money: their values are rounded to
+ * cents on import (each rounding is reported as a warning).
+ */
+export const MONEY_IMPORT_FIELD_KEYS = [
+  'amount',
+  'paymentAmount',
+  'debit',
+  'credit',
+  'discount',
+  'adjustment',
+  'openingBalance',
+  'cost',
+];
+
+/**
+ * Whether the given (possibly nested, e.g. `entries.paymentAmount`) import
+ * field key is a money field.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export const isMoneyImportField = (key: string) =>
+  MONEY_IMPORT_FIELD_KEYS.includes(last(split(key, '.')).split('[')[0]);
+
+/**
+ * Called when an imported money value is rounded to cents.
+ */
+export type OnMoneyRounded = (
+  key: string,
+  value: number,
+  roundedValue: number,
+) => void;
+
 // Prases the given object value based on the field key type.
 export const valueParser =
   (
     fields: ResourceMetaFieldsMap,
     modelResolver: ModelResolver,
     trx?: Knex.Transaction,
+    onMoneyRounded?: OnMoneyRounded,
   ) =>
   async (value: any, key: string, group = '') => {
     let _value = value;
@@ -312,6 +347,18 @@ export const valueParser =
       // Parses the numeric value.
     } else if (field.fieldType === 'number') {
       _value = multiNumberParse(value);
+
+      // Money is whole cents: round it, and report the rounding. Only a
+      // finite number is rounded: "abc" or "12,34,567.00" parse to NaN,
+      // which must reach the validation unchanged so the row is rejected
+      // (rounding NaN would turn it into a silent 0).
+      if (Number.isFinite(_value) && isMoneyImportField(key)) {
+        const roundedValue = roundMoney(_value);
+        if (roundedValue !== _value) {
+          onMoneyRounded?.(key, _value, roundedValue);
+        }
+        _value = roundedValue;
+      }
       // Parses the relation value.
     } else if (field.fieldType === 'relation') {
       const RelationModel = modelResolver(field.relationModel);
@@ -331,7 +378,12 @@ export const valueParser =
       _value = get(result, 'id');
     } else if (field.fieldType === 'collection') {
       const ObjectFieldKey = key.includes('.') ? key.split('.')[1] : key;
-      const _valueParser = valueParser(fields, modelResolver);
+      const _valueParser = valueParser(
+        fields,
+        modelResolver,
+        trx,
+        onMoneyRounded,
+      );
       _value = await _valueParser(value, ObjectFieldKey, fieldKey);
     }
     return _value;

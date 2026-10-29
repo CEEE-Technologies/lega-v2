@@ -2,22 +2,33 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { sumBy } from 'lodash';
 import { BillPaymentCashGL } from './BillPaymentCashGL';
 
-const buildBill = (overrides: Record<string, any> = {}) => ({
-  exchangeRate: 1,
-  totalLocal: 1000,
-  discountAmountLocal: null,
-  adjustmentLocal: null,
-  entries: [
-    {
-      itemId: 10,
-      totalExcludingTax: 1000,
-      taxAmount: 0,
-      costAccountId: 200,
-      item: { type: 'service' },
-    },
-  ],
-  ...overrides,
-});
+const buildBill = (overrides: Record<string, any> = {}) => {
+  const bill = {
+    id: 1,
+    exchangeRate: 1,
+    totalLocal: 1000,
+    discountAmountLocal: null,
+    adjustmentLocal: null,
+    entries: [
+      {
+        itemId: 10,
+        totalExcludingTax: 1000,
+        taxAmount: 0,
+        costAccountId: 200,
+        item: { type: 'service' },
+      },
+    ],
+    ...overrides,
+  };
+  // The bill currency figures the running-total split uses.
+  const rate = bill.exchangeRate || 1;
+  return {
+    ...bill,
+    total: bill.totalLocal / rate,
+    discountAmount: (bill.discountAmountLocal || 0) / rate,
+    adjustment: (bill.adjustmentLocal || 0) / rate,
+  };
+};
 
 const buildBillPayment = (overrides: Record<string, any> = {}) => ({
   id: 1,
@@ -188,7 +199,7 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
       .setPrepaidExpensesAccountId(PREPAID_EXPENSES);
 
   const sum = (entries: any[], key: 'debit' | 'credit') =>
-    Math.round(sumBy(entries, key) * 1000) / 1000;
+    Math.round(sumBy(entries, key) * 100) / 100;
 
   const sumAccount = (
     entries: any[],
@@ -299,12 +310,12 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     expect(sumAccount(entries, PREPAID_EXPENSES, 'debit')).toBe(400);
   });
 
-  it('rounds pro-rata lines and puts the remainder on the last line (100 over 3)', () => {
+  it('splits a full payment of 100 over 3 lines with the largest remainder', () => {
     const bill = buildBill({
-      totalLocal: 3,
-      entries: [201, 202, 203].map((costAccountId) => ({
+      totalLocal: 100,
+      entries: [201, 202, 203].map((costAccountId, index) => ({
         itemId: costAccountId,
-        totalExcludingTax: 1,
+        totalExcludingTax: index === 2 ? 33.34 : 33.33,
         taxAmount: 0,
         costAccountId,
         item: { type: 'service' },
@@ -313,14 +324,195 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     const entries = buildExcessGL(
       buildBillPayment({
         amount: 100,
-        entries: [{ paymentAmount: 100, bill }],
+        entries: [{ billId: 1, paymentAmount: 100, bill }],
       }),
     ).GLEntries();
 
-    expect(entries.find((e) => e.accountId === 201).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 202).debit).toBe(33.333);
-    expect(entries.find((e) => e.accountId === 203).debit).toBe(33.334);
+    expect(entries.find((e) => e.accountId === 201).debit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 202).debit).toBe(33.33);
+    expect(entries.find((e) => e.accountId === 203).debit).toBe(33.34);
     expect(sum(entries, 'debit')).toBe(100);
     expect(sum(entries, 'credit')).toBe(100);
+  });
+
+  it('ends every line at exactly 100: 3 x 100 paid in three payments of 100', () => {
+    const bill = buildBill({
+      totalLocal: 300,
+      entries: [201, 202, 203].map((costAccountId) => ({
+        itemId: costAccountId,
+        totalExcludingTax: 100,
+        taxAmount: 0,
+        costAccountId,
+        item: { type: 'service' },
+      })),
+    });
+    const debitsOf = (paidBefore: number) => {
+      const entries = new BillPaymentCashGL(
+        buildBillPayment({
+          amount: 100,
+          entries: [{ billId: 1, paymentAmount: 100, bill }],
+        }) as any,
+      )
+        .setTaxPayableAccountId(1)
+        .setPurchaseDiscountAccountId(2)
+        .setOtherExpensesAccountId(3)
+        .setPaidBefore({ 1: paidBefore })
+        .GLEntries();
+      return [201, 202, 203].map(
+        (id) => entries.find((e) => e.accountId === id).debit,
+      );
+    };
+    const parts = [debitsOf(0), debitsOf(100), debitsOf(200)];
+    expect(parts).toEqual([
+      [33.34, 33.33, 33.33],
+      [33.33, 33.34, 33.33],
+      [33.33, 33.33, 33.34],
+    ]);
+  });
+});
+
+// Codex: converting each bill's share on its own made the payment account
+// lines add up to a cent more or less than the accrual line,
+// round(amount x rate).
+describe('BillPaymentCashGL — payment account lines add up to the accrual line', () => {
+  const cents = (value: number) => Math.round((value || 0) * 100);
+  const sumCents = (entries: any[], accountId: number, side: string) =>
+    entries
+      .filter((entry) => entry.accountId === accountId)
+      .reduce((total, entry) => total + cents(entry[side]), 0);
+  const expectBalanced = (entries: any[]) =>
+    expect(entries.reduce((t, e) => t + cents(e.debit), 0)).toBe(
+      entries.reduce((t, e) => t + cents(e.credit), 0),
+    );
+
+  const foreignBill = (id: number, total: number, rate: number) =>
+    buildBill({
+      id,
+      exchangeRate: rate,
+      totalLocal: total * rate,
+      entries: [
+        {
+          itemId: 10,
+          totalExcludingTax: total,
+          taxAmount: 0,
+          costAccountId: 200,
+          item: { type: 'service' },
+        },
+      ],
+    });
+
+  const glOf = (rate: number, amount: number, entries: any[]) =>
+    new BillPaymentCashGL(
+      buildBillPayment({ exchangeRate: rate, amount, entries }) as any,
+    )
+      .setTaxPayableAccountId(1)
+      .setPurchaseDiscountAccountId(2)
+      .setOtherExpensesAccountId(3)
+      .setPrepaidExpensesAccountId(4)
+      .setExchangeGainOrLossAccountId(5)
+      .setOpeningBalanceAccountId(6);
+
+  it('0.02 at 1.5 split 0.01 + 0.01 credits 0.03, not 0.04', () => {
+    const gl = glOf(1.5, 0.02, [
+      { billId: 11, paymentAmount: 0.01, bill: foreignBill(11, 0.01, 1.5) },
+      { billId: 12, paymentAmount: 0.01, bill: foreignBill(12, 0.01, 1.5) },
+    ]);
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3);
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(entries.find((e) => e.accountId === 4)).toBeUndefined();
+    expectBalanced(entries);
+  });
+
+  it('USD 100.02 at 300.005 over 3 bills of 33.34 credits 30,006.50', () => {
+    const gl = glOf(
+      300.005,
+      100.02,
+      [21, 22, 23].map((id) => ({
+        billId: id,
+        paymentAmount: 33.34,
+        bill: foreignBill(id, 33.34, 300.005),
+      })),
+    );
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3000650);
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(sumCents(entries, 200, 'debit')).toBe(3 * 1000217);
+    expectBalanced(entries);
+  });
+
+  it('includes the opening balance and the excess in the split', () => {
+    const gl = glOf(300.005, 100.03, [
+      ...[31, 32].map((id) => ({
+        billId: id,
+        paymentAmount: 33.34,
+        bill: foreignBill(id, 33.34, 300.005),
+      })),
+      { entryType: 'opening_balance', billId: null, paymentAmount: 0.01 },
+    ]);
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3000950);
+    expect(gl.getExcessAmount()).toBeGreaterThan(0);
+    expect(sumCents(entries, 4, 'debit')).toBe(cents(gl.getExcessAmount()));
+    expectBalanced(entries);
+  });
+});
+
+// Codex: a payment that converts to 0.00 (EUR 0.01 at 0.4) was not
+// recognized, so a bill paid as 3 x EUR 0.01 never had its expense
+// (EUR 0.03 = USD 0.01) recognized in cash basis.
+describe('BillPaymentCashGL — payments that convert to zero', () => {
+  const cents = (value: number) => Math.round((value || 0) * 100);
+
+  it('recognizes EUR 0.03 at 0.4 paid as 3 x 0.01 on the payment where the cent crosses', () => {
+    const bill = buildBill({
+      id: 51,
+      exchangeRate: 0.4,
+      totalLocal: 0.012,
+      entries: [
+        {
+          itemId: 10,
+          totalExcludingTax: 0.03,
+          taxAmount: 0,
+          costAccountId: 200,
+          item: { type: 'service' },
+        },
+      ],
+    });
+    let paid = 0;
+    let expense = 0;
+    let bank = 0;
+    let exchange = 0;
+    for (let i = 0; i < 3; i += 1) {
+      const entries = new BillPaymentCashGL(
+        buildBillPayment({
+          exchangeRate: 0.4,
+          amount: 0.01,
+          entries: [{ billId: 51, paymentAmount: 0.01, bill }],
+        }) as any,
+      )
+        .setTaxPayableAccountId(1)
+        .setPurchaseDiscountAccountId(2)
+        .setOtherExpensesAccountId(3)
+        .setPrepaidExpensesAccountId(4)
+        .setExchangeGainOrLossAccountId(5)
+        .setPaidBefore({ 51: paid })
+        .GLEntries();
+      const sum = (accountId: number, side: string) =>
+        entries
+          .filter((e) => e.accountId === accountId)
+          .reduce((t, e) => t + cents(e[side]), 0);
+      expect(entries.reduce((t, e) => t + cents(e.debit), 0)).toBe(
+        entries.reduce((t, e) => t + cents(e.credit), 0),
+      );
+      expect(sum(4, 'debit')).toBe(0);
+      expense += sum(200, 'debit') - sum(200, 'credit');
+      bank += sum(900, 'credit') - sum(900, 'debit');
+      exchange += sum(5, 'credit') - sum(5, 'debit');
+      paid = Math.round((paid + 0.01) * 100) / 100;
+    }
+    expect(expense).toBe(1);
+    expect(bank).toBe(0);
+    expect(exchange).toBe(1);
   });
 });

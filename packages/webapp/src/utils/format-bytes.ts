@@ -24,5 +24,7 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
   ];
   const i: number = Math.floor(Math.log(bytes) / Math.log(k));
 
+  // A file size, not money.
+  // eslint-disable-next-line no-restricted-syntax
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }

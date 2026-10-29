@@ -819,10 +819,10 @@ describe('Accounting basis — unapplied amounts and document edits (e2e)', () =
         await fetchLegs('PaymentReceive', paymentId, 'cash')
       ).filter((leg) => leg.basis === 'cash');
       expect(sumAccount(after, INCOME_ACCOUNT_CODE, 'credit')).toBeCloseTo(
-        555.556,
-        2,
+        555.56,
+        5,
       );
-      expect(sumAccount(after, DISCOUNT_CODE, 'debit')).toBeCloseTo(55.556, 2);
+      expect(sumAccount(after, DISCOUNT_CODE, 'debit')).toBeCloseTo(55.56, 5);
       expectBalanced(after);
     });
   });
@@ -868,12 +868,12 @@ describe('Accounting basis — unapplied amounts and document edits (e2e)', () =
         (leg) => leg.basis === 'cash',
       );
       expect(sumAccount(after, expenseAccountCode, 'debit')).toBeCloseTo(
-        555.556,
-        2,
+        555.56,
+        5,
       );
       expect(sumAccount(after, PURCHASE_DISCOUNT_CODE, 'credit')).toBeCloseTo(
-        55.556,
-        2,
+        55.56,
+        5,
       );
       expectBalanced(after);
     });
@@ -990,8 +990,9 @@ describe('Accounting basis — unapplied amounts and document edits (e2e)', () =
             billPayload(vendorId, 1000, {
               billDate: day(8),
               dueDate: day(8),
-              discount: 100,
-              discountType: 'amount',
+              // Still covers the 1,000 paid (a lower total is refused
+              // before the lock check).
+              adjustment: 100,
             }),
           )
           .expect(400);
