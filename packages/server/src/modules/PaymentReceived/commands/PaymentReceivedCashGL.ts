@@ -8,10 +8,12 @@ import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import {
   allocateCumulativeShare,
+  allocateMoney,
   balanceEntries,
   fromCents,
   moneyGt,
   moneyGte,
+  moneyLt,
   multiplyMoney,
   roundMoney,
   subtractMoney,
@@ -311,7 +313,7 @@ export class PaymentReceivedCashGL {
   ): ILedgerEntry => {
     return {
       ...this.cashEntriesCommonEntry,
-      debit: this.getPaymentEntryRecognizedLocalAmount(entry),
+      debit: this.getBankSplit().entries[this.indexOfEntry(entry)],
       accountId: this.paymentReceived.depositAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -563,7 +565,7 @@ export class PaymentReceivedCashGL {
     if (!this.isOpeningBalanceRecognizable(entry)) {
       return [];
     }
-    const amount = this.getPaymentEntryLocalAmount(entry);
+    const amount = this.getBankSplit().entries[this.indexOfEntry(entry)];
     const commonEntry = {
       ...this.cashEntriesCommonEntry,
       contactId: this.paymentReceived.customerId,
@@ -588,29 +590,87 @@ export class PaymentReceivedCashGL {
   };
 
   /**
-   * Retrieves the payment amount in local currency. Falls back to the sum of
+   * Retrieves the payment amount (payment currency). Falls back to the sum of
    * the applied amounts when the payment amount is not set.
    * @returns {number}
    */
-  private get paymentLocalAmount(): number {
-    const amount = defaultTo(
-      this.paymentReceived.amount,
-      sumBy(this.paymentReceived.entries || [], 'paymentAmount'),
-    );
-    return roundLedgerAmount(
-      amount * defaultTo(this.paymentReceived.exchangeRate, 1),
+  private get paymentAmount(): number {
+    return roundMoney(
+      defaultTo(
+        this.paymentReceived.amount,
+        sumBy(this.paymentReceived.entries || [], 'paymentAmount'),
+      ),
     );
   }
+
+  /**
+   * Retrieves the payment amount in local currency, converted once like the
+   * accrual bank line.
+   * @returns {number}
+   */
+  private get paymentLocalAmount(): number {
+    return multiplyMoney(
+      this.paymentAmount,
+      defaultTo(this.paymentReceived.exchangeRate, 1),
+    );
+  }
+
+  private indexOfEntry = (entry: PaymentReceivedEntry): number =>
+    (this.paymentReceived.entries || []).indexOf(entry);
+
+  /**
+   * Splits the bank amount of the payment (the payment converted once, as
+   * on the accrual side) over its invoice lines, opening balance lines and
+   * the excess, in proportion to their payment currency amounts (largest
+   * remainder). So the cash basis bank lines add up exactly to the accrual
+   * bank line. Converting each part on its own could add up to a cent more
+   * or less: USD 0.02 at 1.5 split 0.01 + 0.01 gave 0.02 + 0.02 = 0.04
+   * instead of 0.03.
+   *
+   * A part that is not recognized (zero-total invoice, no opening balance
+   * account) is in the excess. When the applied amounts add up to more than
+   * the payment (old data), each part keeps its own conversion.
+   * @returns {{ entries: number[]; excess: number }} Local amounts, by entry index.
+   */
+  private getBankSplit = (): { entries: number[]; excess: number } => {
+    const entries = this.paymentReceived.entries || [];
+    const parts = entries.map((entry) =>
+      this.isOpeningBalanceRecognizable(entry)
+        ? roundMoney(entry.paymentAmount)
+        : this.isIncomeRecognizable(entry)
+          ? this.getPaymentEntryRecognizedAmount(entry)
+          : 0,
+    );
+    const excess = subtractMoney(this.paymentAmount, sumMoney(...parts));
+
+    if (moneyLt(excess, 0)) {
+      return {
+        entries: entries.map((entry, index) =>
+          parts[index] === 0
+            ? 0
+            : isOpeningBalanceEntry(entry)
+              ? this.getPaymentEntryLocalAmount(entry)
+              : this.getPaymentEntryRecognizedLocalAmount(entry),
+        ),
+        excess: 0,
+      };
+    }
+    const split = allocateMoney(this.paymentLocalAmount, [...parts, excess]);
+    return {
+      entries: split.slice(0, entries.length),
+      excess: split[entries.length],
+    };
+  };
 
   /**
    * Retrieves the deposit amount already posted against invoices.
    * @returns {number}
    */
   public getInvoicesDepositAmount(): number {
-    return roundLedgerAmount(
-      sumBy(
-        (this.paymentReceived.entries || []).filter(this.isIncomeRecognizable),
-        this.getPaymentEntryRecognizedLocalAmount,
+    const split = this.getBankSplit();
+    return sumMoney(
+      ...(this.paymentReceived.entries || []).map((entry, index) =>
+        this.isIncomeRecognizable(entry) ? split.entries[index] : 0,
       ),
     );
   }
@@ -620,31 +680,21 @@ export class PaymentReceivedCashGL {
    * @returns {number}
    */
   public getOpeningBalanceDepositAmount(): number {
-    return roundLedgerAmount(
-      sumBy(
-        (this.paymentReceived.entries || []).filter(
-          this.isOpeningBalanceRecognizable,
-        ),
-        this.getPaymentEntryLocalAmount,
+    const split = this.getBankSplit();
+    return sumMoney(
+      ...(this.paymentReceived.entries || []).map((entry, index) =>
+        this.isOpeningBalanceRecognizable(entry) ? split.entries[index] : 0,
       ),
     );
   }
 
   /**
-   * Retrieves the payment excess in local currency: the amount received
-   * less the deposit amount already posted against invoices and the
-   * opening balance.
+   * Retrieves the payment excess in local currency: its part of the bank
+   * amount (see getBankSplit).
    * @returns {number}
    */
   public getExcessAmount(): number {
-    return Math.max(
-      roundLedgerAmount(
-        this.paymentLocalAmount -
-          this.getInvoicesDepositAmount() -
-          this.getOpeningBalanceDepositAmount(),
-      ),
-      0,
-    );
+    return this.getBankSplit().excess;
   }
 
   /**

@@ -10,10 +10,12 @@ import { BillPayment } from '../models/BillPayment';
 import { BillPaymentEntry } from '../models/BillPaymentEntry';
 import {
   allocateCumulativeShare,
+  allocateMoney,
   balanceEntries,
   fromCents,
   moneyGt,
   moneyGte,
+  moneyLt,
   multiplyMoney,
   roundMoney,
   subtractMoney,
@@ -313,7 +315,7 @@ export class BillPaymentCashGL {
   ): ILedgerEntry => {
     return {
       ...this.cashEntriesCommonEntry,
-      credit: this.getPaymentEntryRecognizedLocalAmount(entry),
+      credit: this.getBankSplit().entries[this.indexOfEntry(entry)],
       accountId: this.billPayment.paymentAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -551,7 +553,7 @@ export class BillPaymentCashGL {
     if (!this.isOpeningBalanceRecognizable(entry)) {
       return [];
     }
-    const amount = this.getPaymentEntryLocalAmount(entry);
+    const amount = this.getBankSplit().entries[this.indexOfEntry(entry)];
     const commonEntry = {
       ...this.cashEntriesCommonEntry,
       contactId: this.billPayment.vendorId,
@@ -576,29 +578,87 @@ export class BillPaymentCashGL {
   };
 
   /**
-   * Retrieves the payment amount in local currency. Falls back to the sum of
+   * Retrieves the payment amount (payment currency). Falls back to the sum of
    * the applied amounts when the payment amount is not set.
    * @returns {number}
    */
-  private get paymentLocalAmount(): number {
-    const amount = defaultTo(
-      this.billPayment.amount,
-      sumBy(this.billPayment.entries || [], 'paymentAmount'),
-    );
-    return roundLedgerAmount(
-      amount * defaultTo(this.billPayment.exchangeRate, 1),
+  private get paymentAmount(): number {
+    return roundMoney(
+      defaultTo(
+        this.billPayment.amount,
+        sumBy(this.billPayment.entries || [], 'paymentAmount'),
+      ),
     );
   }
+
+  /**
+   * Retrieves the payment amount in local currency, converted once like the
+   * accrual payment account line.
+   * @returns {number}
+   */
+  private get paymentLocalAmount(): number {
+    return multiplyMoney(
+      this.paymentAmount,
+      defaultTo(this.billPayment.exchangeRate, 1),
+    );
+  }
+
+  private indexOfEntry = (entry: BillPaymentEntry): number =>
+    (this.billPayment.entries || []).indexOf(entry);
+
+  /**
+   * Splits the payment account amount (the payment converted once, as on
+   * the accrual side) over the bill lines, opening balance lines and the
+   * excess, in proportion to their payment currency amounts (largest
+   * remainder). So the cash basis payment account lines add up exactly to
+   * the accrual one. Converting each part on its own could add up to a cent
+   * more or less: USD 0.02 at 1.5 split 0.01 + 0.01 gave 0.02 + 0.02 = 0.04
+   * instead of 0.03.
+   *
+   * A part that is not recognized (zero-total bill, no opening balance
+   * account) is in the excess. When the applied amounts add up to more than
+   * the payment (old data), each part keeps its own conversion.
+   * @returns {{ entries: number[]; excess: number }} Local amounts, by entry index.
+   */
+  private getBankSplit = (): { entries: number[]; excess: number } => {
+    const entries = this.billPayment.entries || [];
+    const parts = entries.map((entry) =>
+      this.isOpeningBalanceRecognizable(entry)
+        ? roundMoney(entry.paymentAmount)
+        : this.isExpenseRecognizable(entry)
+          ? this.getPaymentEntryRecognizedAmount(entry)
+          : 0,
+    );
+    const excess = subtractMoney(this.paymentAmount, sumMoney(...parts));
+
+    if (moneyLt(excess, 0)) {
+      return {
+        entries: entries.map((entry, index) =>
+          parts[index] === 0
+            ? 0
+            : isOpeningBalanceEntry(entry)
+              ? this.getPaymentEntryLocalAmount(entry)
+              : this.getPaymentEntryRecognizedLocalAmount(entry),
+        ),
+        excess: 0,
+      };
+    }
+    const split = allocateMoney(this.paymentLocalAmount, [...parts, excess]);
+    return {
+      entries: split.slice(0, entries.length),
+      excess: split[entries.length],
+    };
+  };
 
   /**
    * Retrieves the payment amount already posted against bills.
    * @returns {number}
    */
   public getBillsPaidAmount(): number {
-    return roundLedgerAmount(
-      sumBy(
-        (this.billPayment.entries || []).filter(this.isExpenseRecognizable),
-        this.getPaymentEntryRecognizedLocalAmount,
+    const split = this.getBankSplit();
+    return sumMoney(
+      ...(this.billPayment.entries || []).map((entry, index) =>
+        this.isExpenseRecognizable(entry) ? split.entries[index] : 0,
       ),
     );
   }
@@ -608,30 +668,21 @@ export class BillPaymentCashGL {
    * @returns {number}
    */
   public getOpeningBalancePaidAmount(): number {
-    return roundLedgerAmount(
-      sumBy(
-        (this.billPayment.entries || []).filter(
-          this.isOpeningBalanceRecognizable,
-        ),
-        this.getPaymentEntryLocalAmount,
+    const split = this.getBankSplit();
+    return sumMoney(
+      ...(this.billPayment.entries || []).map((entry, index) =>
+        this.isOpeningBalanceRecognizable(entry) ? split.entries[index] : 0,
       ),
     );
   }
 
   /**
-   * Retrieves the payment excess in local currency: the amount paid less
-   * the amount already posted against bills and the opening balance.
+   * Retrieves the payment excess in local currency: its part of the
+   * payment account amount (see getBankSplit).
    * @returns {number}
    */
   public getExcessAmount(): number {
-    return Math.max(
-      roundLedgerAmount(
-        this.paymentLocalAmount -
-          this.getBillsPaidAmount() -
-          this.getOpeningBalancePaidAmount(),
-      ),
-      0,
-    );
+    return this.getBankSplit().excess;
   }
 
   /**

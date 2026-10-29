@@ -370,3 +370,90 @@ describe('BillPaymentCashGL — unapplied amount (excess)', () => {
     ]);
   });
 });
+
+// Codex: converting each bill's share on its own made the payment account
+// lines add up to a cent more or less than the accrual line,
+// round(amount x rate).
+describe('BillPaymentCashGL — payment account lines add up to the accrual line', () => {
+  const cents = (value: number) => Math.round((value || 0) * 100);
+  const sumCents = (entries: any[], accountId: number, side: string) =>
+    entries
+      .filter((entry) => entry.accountId === accountId)
+      .reduce((total, entry) => total + cents(entry[side]), 0);
+  const expectBalanced = (entries: any[]) =>
+    expect(entries.reduce((t, e) => t + cents(e.debit), 0)).toBe(
+      entries.reduce((t, e) => t + cents(e.credit), 0),
+    );
+
+  const foreignBill = (id: number, total: number, rate: number) =>
+    buildBill({
+      id,
+      exchangeRate: rate,
+      totalLocal: total * rate,
+      entries: [
+        {
+          itemId: 10,
+          totalExcludingTax: total,
+          taxAmount: 0,
+          costAccountId: 200,
+          item: { type: 'service' },
+        },
+      ],
+    });
+
+  const glOf = (rate: number, amount: number, entries: any[]) =>
+    new BillPaymentCashGL(
+      buildBillPayment({ exchangeRate: rate, amount, entries }) as any,
+    )
+      .setTaxPayableAccountId(1)
+      .setPurchaseDiscountAccountId(2)
+      .setOtherExpensesAccountId(3)
+      .setPrepaidExpensesAccountId(4)
+      .setExchangeGainOrLossAccountId(5)
+      .setOpeningBalanceAccountId(6);
+
+  it('0.02 at 1.5 split 0.01 + 0.01 credits 0.03, not 0.04', () => {
+    const gl = glOf(1.5, 0.02, [
+      { billId: 11, paymentAmount: 0.01, bill: foreignBill(11, 0.01, 1.5) },
+      { billId: 12, paymentAmount: 0.01, bill: foreignBill(12, 0.01, 1.5) },
+    ]);
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3);
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(entries.find((e) => e.accountId === 4)).toBeUndefined();
+    expectBalanced(entries);
+  });
+
+  it('USD 100.02 at 300.005 over 3 bills of 33.34 credits 30,006.50', () => {
+    const gl = glOf(
+      300.005,
+      100.02,
+      [21, 22, 23].map((id) => ({
+        billId: id,
+        paymentAmount: 33.34,
+        bill: foreignBill(id, 33.34, 300.005),
+      })),
+    );
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3000650);
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(sumCents(entries, 200, 'debit')).toBe(3 * 1000217);
+    expectBalanced(entries);
+  });
+
+  it('includes the opening balance and the excess in the split', () => {
+    const gl = glOf(300.005, 100.03, [
+      ...[31, 32].map((id) => ({
+        billId: id,
+        paymentAmount: 33.34,
+        bill: foreignBill(id, 33.34, 300.005),
+      })),
+      { entryType: 'opening_balance', billId: null, paymentAmount: 0.01 },
+    ]);
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 900, 'credit')).toBe(3000950);
+    expect(gl.getExcessAmount()).toBeGreaterThan(0);
+    expect(sumCents(entries, 4, 'debit')).toBe(cents(gl.getExcessAmount()));
+    expectBalanced(entries);
+  });
+});

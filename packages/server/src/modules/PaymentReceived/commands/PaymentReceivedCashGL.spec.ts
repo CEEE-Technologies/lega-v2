@@ -658,3 +658,107 @@ describe('PaymentReceivedCashGL — running-total split (cumulative)', () => {
     });
   });
 });
+
+// Codex: converting each invoice's share on its own made the bank lines add
+// up to a cent more or less than the accrual bank line, round(amount x rate).
+describe('PaymentReceivedCashGL — bank lines add up to the accrual bank line', () => {
+  const sumCents = (entries: any[], accountId: number, side: string) =>
+    entries
+      .filter((entry) => entry.accountId === accountId)
+      .reduce(
+        (total, entry) => total + Math.round((entry[side] || 0) * 100),
+        0,
+      );
+
+  const foreignInvoice = (id: number, total: number, rate: number) =>
+    buildInvoice([buildItemEntry({ totalExcludingTax: total })], {
+      id,
+      exchangeRate: rate,
+      totalLocal: Math.round(total * rate * 100) / 100,
+    });
+
+  const glOf = (rate: number, amount: number, entries: any[]) =>
+    buildGL({
+      ...buildPayment(),
+      exchangeRate: rate,
+      amount,
+      entries,
+    } as unknown as PaymentReceived)
+      .setUnearnedRevenueAccountId(600)
+      .setExchangeGainOrLossAccountId(700)
+      .setOpeningBalanceAccountId(800);
+
+  const expectBalanced = (entries: any[]) =>
+    expect(entries.reduce((t, e) => t + Math.round(e.debit * 100), 0)).toBe(
+      entries.reduce((t, e) => t + Math.round(e.credit * 100), 0),
+    );
+
+  it('0.02 at 1.5 split 0.01 + 0.01 posts 0.03 to the bank, not 0.04', () => {
+    const a = foreignInvoice(11, 0.01, 1.5);
+    const b = foreignInvoice(12, 0.01, 1.5);
+    const gl = glOf(1.5, 0.02, [
+      buildPaymentEntry(a, 0.01),
+      buildPaymentEntry(b, 0.01),
+    ]);
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 100, 'debit')).toBe(3);
+    expect(gl.getExcessAmount()).toBe(0);
+    expect(findEntry(entries, 600)).toBeUndefined();
+    expectBalanced(entries);
+  });
+
+  it('USD 100.02 at 300.005 over 3 invoices of 33.34 posts 30,006.50', () => {
+    const invoices = [21, 22, 23].map((id) =>
+      foreignInvoice(id, 33.34, 300.005),
+    );
+    const gl = glOf(
+      300.005,
+      100.02,
+      invoices.map((invoice) => buildPaymentEntry(invoice, 33.34)),
+    );
+    const entries = gl.GLEntries();
+    expect(sumCents(entries, 100, 'debit')).toBe(3000650);
+    expect(gl.getExcessAmount()).toBe(0);
+    expectBalanced(entries);
+    // Income ends at the converted invoices; the cent is exchange gain/loss.
+    expect(sumCents(entries, 500, 'credit')).toBe(3 * 1000217);
+  });
+
+  it('includes the opening balance and the excess in the split', () => {
+    const invoices = [31, 32].map((id) => foreignInvoice(id, 33.34, 300.005));
+    const gl = glOf(300.005, 100.03, [
+      ...invoices.map((invoice) => buildPaymentEntry(invoice, 33.34)),
+      {
+        entryType: 'opening_balance',
+        invoiceId: null,
+        paymentAmount: 0.01,
+        invoice: null,
+      },
+    ]);
+    const entries = gl.GLEntries();
+    // round(100.03 x 300.005) = 30,009.50
+    expect(sumCents(entries, 100, 'debit')).toBe(3000950);
+    expect(gl.getExcessAmount()).toBeGreaterThan(0);
+    expect(sumCents(entries, 600, 'credit')).toBe(
+      Math.round(gl.getExcessAmount() * 100),
+    );
+    expectBalanced(entries);
+  });
+
+  it('keeps the base currency split exact', () => {
+    const a = buildInvoice([buildItemEntry({ totalExcludingTax: 33.33 })], {
+      id: 41,
+      totalLocal: 33.33,
+    });
+    const b = buildInvoice([buildItemEntry({ totalExcludingTax: 66.67 })], {
+      id: 42,
+      totalLocal: 66.67,
+    });
+    const entries = glOf(1, 100.5, [
+      buildPaymentEntry(a, 33.33),
+      buildPaymentEntry(b, 66.67),
+    ]).GLEntries();
+    const bank = entries.filter((e) => e.accountId === 100).map((e) => e.debit);
+    expect(bank).toEqual([33.33, 66.67, 0.5]);
+  });
+});

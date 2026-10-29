@@ -54,6 +54,29 @@ describeDocumentParity({
     }
     return res.body.id;
   },
+  payMany: async (customerId, entries, amount, exchangeRate) => {
+    const res = await request(app.getHttpServer())
+      .post('/payments-received')
+      .set(authHeaders())
+      .send({
+        customerId,
+        paymentDate: '2025-03-05',
+        exchangeRate,
+        depositAccountId: 1000,
+        paymentReceiveNo: faker.string.uuid(),
+        amount,
+        entries: entries.map((entry, index) => ({
+          index: index + 1,
+          invoiceId: entry.documentId,
+          paymentAmount: entry.amount,
+        })),
+        branchId: 1,
+      });
+    if (res.status !== 201) {
+      throw new Error(`payment of many ${amount}: ${JSON.stringify(res.body)}`);
+    }
+    return res.body.id;
+  },
   dueInPaymentForm: async (customerId, invoiceId) => {
     const res = await request(app.getHttpServer())
       .get('/payments-received/new-page/entries')

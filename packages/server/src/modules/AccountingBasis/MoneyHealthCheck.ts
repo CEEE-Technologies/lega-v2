@@ -30,7 +30,9 @@ import {
  *   the document's accrual lines,
  * - (e) documents whose total or amount left (due / credit remaining) is
  *   not the same in the SQL the lists, due lists and aging reports use and
- *   in the app getters (the "one answer" parity of the money SQL).
+ *   in the app getters (the "one answer" parity of the money SQL),
+ * - (f) payments (received and made) whose cash basis bank lines don't add
+ *   up to the accrual bank line.
  *
  * Plain queries on the given tenant connection (snake case mappers), so the
  * CLI can run it without the application context. Nothing is written.
@@ -87,6 +89,17 @@ export interface IMoneyHealthDocumentDifference {
   app: number;
 }
 
+export interface IMoneyHealthPaymentBankDifference {
+  paymentType: 'PaymentReceive' | 'BillPayment';
+  paymentId: number;
+  paymentNo: string;
+  accountId: number;
+  accrual: number;
+  cash: number;
+  difference: number;
+  locked: boolean;
+}
+
 export interface IMoneyHealthResult {
   unbalancedSets: IMoneyHealthUnbalancedSet[];
   nonCentRows: IMoneyHealthNonCentRow[];
@@ -100,6 +113,12 @@ export interface IMoneyHealthResult {
   documentDifferences: IMoneyHealthDocumentDifference[];
   /** Documents checked by (e). */
   documentsChecked: number;
+  /** (f) Payments whose cash bank lines differ from the accrual bank line. */
+  paymentBankDifferences?: IMoneyHealthPaymentBankDifference[];
+  /** Payments checked by (f). */
+  paymentsChecked?: number;
+  /** Payments skipped from (f): no cash basis lines yet. */
+  paymentsSkipped?: number;
 }
 
 /**
@@ -722,6 +741,102 @@ const getCashDocumentDifferences = async (knex: Knex, isLocked: IsLockedFn) => {
   return { differences, skipped, checked };
 };
 
+const PAYMENT_KINDS = [
+  {
+    paymentType: 'PaymentReceive' as const,
+    table: 'payment_receives',
+    numberColumn: 'payment_receive_no',
+    accountColumn: 'deposit_account_id',
+  },
+  {
+    paymentType: 'BillPayment' as const,
+    table: 'bills_payments',
+    numberColumn: 'payment_number',
+    accountColumn: 'payment_account_id',
+  },
+];
+
+/**
+ * (f) Payments whose cash basis lines on the bank (deposit / payment
+ * account) don't add up to the accrual line on it, round(amount x rate).
+ * Converting each document's share of a foreign payment on its own could
+ * add up to a cent more or less. A payment without any cash basis line
+ * (not built yet) is skipped.
+ */
+const getPaymentBankDifferences = async (knex: Knex, isLocked: IsLockedFn) => {
+  const differences: IMoneyHealthPaymentBankDifference[] = [];
+  let checked = 0;
+  let skipped = 0;
+
+  for (const kind of PAYMENT_KINDS) {
+    // Identifiers through ?? so the tenant mapper writes them as stored.
+    // Raw rows come back with the aliases as written or camel cased,
+    // depending on the connection.
+    const [rows]: any = await knex.raw(
+      `SELECT p.?? AS payment_id, p.?? AS payment_no, p.?? AS account_id,
+         p.?? AS payment_date,
+         COALESCE(SUM(CASE WHEN t.?? = 'cash' THEN t.?? - t.?? END), 0) AS cash_net,
+         COALESCE(SUM(CASE WHEN t.?? IS NULL OR t.?? <> 'cash' THEN t.?? - t.?? END), 0) AS accrual_net,
+         EXISTS (SELECT 1 FROM ?? c
+           WHERE c.?? = ? AND c.?? = p.?? AND c.?? = 'cash') AS has_cash
+       FROM ?? p
+       LEFT JOIN ?? t
+         ON t.?? = ? AND t.?? = p.?? AND t.?? = p.??
+       GROUP BY p.??`,
+      [
+        'id',
+        kind.numberColumn,
+        kind.accountColumn,
+        'payment_date',
+        'basis',
+        'debit',
+        'credit',
+        'basis',
+        'basis',
+        'debit',
+        'credit',
+        'accounts_transactions',
+        'reference_type',
+        kind.paymentType,
+        'reference_id',
+        'id',
+        'basis',
+        kind.table,
+        'accounts_transactions',
+        'reference_type',
+        kind.paymentType,
+        'reference_id',
+        'id',
+        'account_id',
+        kind.accountColumn,
+        'id',
+      ],
+    );
+    for (const raw of rows) {
+      const row = (key: string) => raw[key] ?? raw[camel(key)];
+      const accrual = r(row('accrual_net'), 2);
+      const cash = r(row('cash_net'), 2);
+      if (!Number(row('has_cash'))) {
+        if (toCents(accrual) !== 0) skipped += 1;
+        continue;
+      }
+      checked += 1;
+      if (toCents(accrual) === toCents(cash)) continue;
+      differences.push({
+        paymentType: kind.paymentType,
+        paymentId: row('payment_id'),
+        paymentNo: row('payment_no') ?? `#${row('payment_id')}`,
+        accountId: row('account_id'),
+        accrual,
+        cash,
+        difference: r(cash - accrual, 2),
+        locked: isLocked(row('payment_date'), kind.paymentType),
+      });
+    }
+  }
+  return { differences, checked, skipped };
+};
+
 /**
  * Runs the money health check on the given tenant database.
  * @param {Knex} knex - Tenant database connection.
@@ -738,6 +853,7 @@ export const checkMoneyHealth = async (
   const balanceDifferences = await getBalanceDifferences(knex, baseCurrency);
   const cashDocuments = await getCashDocumentDifferences(knex, isLocked);
   const documentParity = await getDocumentParityDifferences(knex);
+  const paymentBanks = await getPaymentBankDifferences(knex, isLocked);
 
   return {
     unbalancedSets,
@@ -748,6 +864,9 @@ export const checkMoneyHealth = async (
     cashDocumentsChecked: cashDocuments.checked,
     documentDifferences: documentParity.differences,
     documentsChecked: documentParity.checked,
+    paymentBankDifferences: paymentBanks.differences,
+    paymentsChecked: paymentBanks.checked,
+    paymentsSkipped: paymentBanks.skipped,
   };
 };
 
@@ -761,7 +880,8 @@ export const isMoneyHealthClean = (result: IMoneyHealthResult) =>
   result.nonCentRows.every((row) => row.locked) &&
   result.balanceDifferences.length === 0 &&
   result.cashDocumentDifferences.every((row) => row.locked) &&
-  (result.documentDifferences ?? []).length === 0;
+  (result.documentDifferences ?? []).length === 0 &&
+  (result.paymentBankDifferences ?? []).every((row) => row.locked);
 
 /**
  * Formats the result as printable lines.
@@ -811,6 +931,16 @@ export const formatMoneyHealth = (result: IMoneyHealthResult): string[] => {
   documentDifferences.forEach((row) =>
     lines.push(
       `      ${row.documentType} ${row.documentNo}: ${row.field} SQL ${row.sql}, app ${row.app}`,
+    ),
+  );
+  const paymentBankDifferences = result.paymentBankDifferences ?? [];
+  lines.push(
+    `  (f) Payments whose cash basis bank lines differ from the accrual bank line: ${paymentBankDifferences.length}` +
+      ` (${result.paymentsChecked ?? 0} payments checked, ${result.paymentsSkipped ?? 0} skipped: no cash basis lines)`,
+  );
+  paymentBankDifferences.forEach((row) =>
+    lines.push(
+      `      ${row.paymentType} ${row.paymentNo} (#${row.paymentId}) account #${row.accountId}: accrual ${row.accrual}, cash ${row.cash} (diff ${row.difference})${lockedTag(row.locked)}`,
     ),
   );
   return lines;

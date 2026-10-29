@@ -1,6 +1,13 @@
 import request = require('supertest');
 import { faker } from '@faker-js/faker';
-import { multiplyMoney, subtractMoney, sumMoneyBy } from '@bigcapital/utils';
+import {
+  allocateMoney,
+  multiplyMoney,
+  subtractMoney,
+  sumMoney,
+  sumMoneyBy,
+  toCents,
+} from '@bigcapital/utils';
 import { app } from '../init-app-test';
 import {
   authHeaders,
@@ -54,6 +61,16 @@ export interface ParitySide {
   pay: (
     contactId: number,
     documentId: number,
+    amount: number,
+    rate: number,
+  ) => Promise<number>;
+  /**
+   * Creates one payment over several documents, `amount` may be more than
+   * the applied amounts (the excess); returns its id.
+   */
+  payMany: (
+    contactId: number,
+    entries: { documentId: number; amount: number }[],
     amount: number,
     rate: number,
   ) => Promise<number>;
@@ -270,6 +287,88 @@ export const describeDocumentParity = (side: ParitySide) =>
       },
     );
 
+    // Codex: one foreign payment over several documents. Its cash basis bank
+    // lines must add up to the accrual bank line, round(amount x rate), not
+    // to the sum of each document's share converted on its own.
+    it('pays every foreign matrix case with one payment: cash bank = accrual bank', async () => {
+      const foreignCases = cases.filter((matrixCase) => matrixCase.foreign);
+      const contactId = await createContact(
+        side.contactKind,
+        FOREIGN_CURRENCY,
+        `Parity many ${faker.string.alphanumeric(10)}`,
+      );
+      const entries: { documentId: number; amount: number }[] = [];
+      for (const matrixCase of foreignCases) {
+        const created = await request(app.getHttpServer())
+          .post(side.path)
+          .set(authHeaders())
+          .send({
+            ...side.documentBody(
+              contactId,
+              `PARM-${faker.string.alphanumeric(12)}`,
+            ),
+            entries: caseEntries(matrixCase, itemId, taxRateId),
+            ...caseDocumentFields(matrixCase),
+          })
+          .expect(201);
+        documentIds.push(created.body.id);
+        entries.push({
+          documentId: created.body.id,
+          amount: expectedOf(matrixCase).total,
+        });
+      }
+      const rate = expectedOf(foreignCases[0]).rate;
+      const applied = entries.map((entry) => entry.amount);
+      // 0.01 more than applied: the excess (unearned / prepaid).
+      const amount = sumMoney(...applied, 0.01);
+      const paymentId = await side.payMany(contactId, entries, amount, rate);
+      paymentIds.push(paymentId);
+
+      const rows = await getTenantKnex()('accounts_transactions')
+        .where({ referenceType: side.paymentType, referenceId: paymentId })
+        .select('accountId', 'debit', 'credit', 'basis');
+      const bankNet = (basis: 'cash' | 'accrual') =>
+        rows
+          .filter((row) => row.accountId === 1000)
+          .filter((row) =>
+            basis === 'cash' ? row.basis === 'cash' : row.basis !== 'cash',
+          )
+          .reduce(
+            (sum, row) => sum + toCents(row.debit) - toCents(row.credit),
+            0,
+          );
+      const bank = side.contactSign * toCents(multiplyMoney(amount, rate));
+      expect(bankNet('accrual')).toBe(bank);
+      expect(bankNet('cash')).toBe(bank);
+
+      const cashRows = rows.filter((row) => row.basis === 'cash');
+      expect(cashRows.reduce((sum, row) => sum + toCents(row.debit), 0)).toBe(
+        cashRows.reduce((sum, row) => sum + toCents(row.credit), 0),
+      );
+
+      // The excess gets its share of the bank amount.
+      const split = allocateMoney(multiplyMoney(amount, rate), [
+        ...applied,
+        0.01,
+      ]);
+      const excessSlug =
+        side.contactKind === 'customers'
+          ? 'unearned-revenue'
+          : 'prepaid-expenses';
+      const excessAccount = await getTenantKnex()('accounts')
+        .where({ slug: excessSlug })
+        .first();
+      const excessNet =
+        -side.contactSign *
+        cashRows
+          .filter((row) => row.accountId === excessAccount.id)
+          .reduce(
+            (sum, row) => sum + toCents(row.debit) - toCents(row.credit),
+            0,
+          );
+      expect(excessNet + 0).toBe(toCents(split[split.length - 1]));
+    });
+
     it('leaves every matrix document and payment clean in the money health check', async () => {
       const health = await checkMoneyHealth(getTenantKnex(), baseCurrency);
       const ours = (type: string, id: number) =>
@@ -295,6 +394,12 @@ export const describeDocumentParity = (side: ParitySide) =>
           (row) =>
             row.documentType === side.documentType &&
             documentIds.includes(row.documentId),
+        ),
+      ).toEqual([]);
+      // Every payment's cash basis bank lines equal its accrual bank line.
+      expect(
+        (health.paymentBankDifferences ?? []).filter((row) =>
+          ours(row.paymentType, row.paymentId),
         ),
       ).toEqual([]);
     });
