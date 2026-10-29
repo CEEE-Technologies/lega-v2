@@ -171,10 +171,15 @@ export class EditBillPayment {
     );
     // Validate the bills existance and associated to the given vendor
     // (locks the bill rows).
-    await this.validators.validateBillsExistance(
+    const storedBills = await this.validators.validateBillsExistance(
       billPaymentObj.entries,
       billPaymentDTO.vendorId,
       trx,
+    );
+    // Each bill once per payment.
+    this.validators.validateNoDuplicateBills(
+      billPaymentObj.entries,
+      storedBills,
     );
     // Validates the bills due payment amount against the locked rows.
     await this.validators.validateBillsDueAmount(

@@ -63,6 +63,7 @@ export class SaleInvoiceWriteoffGL {
     return {
       ...commontEntry,
       credit: this.saleInvoiceModel.writtenoffAmountLocal,
+      foreignCredit: this.saleInvoiceModel.writtenoffAmount,
       accountId: this.ARAccountId,
       contactId: this.saleInvoiceModel.customerId,
       debit: 0,
@@ -84,6 +85,7 @@ export class SaleInvoiceWriteoffGL {
     return {
       ...commontEntry,
       debit: this.saleInvoiceModel.writtenoffAmountLocal,
+      foreignDebit: this.saleInvoiceModel.writtenoffAmount,
       accountId: this.saleInvoiceModel.writtenoffExpenseAccountId,
       credit: 0,
       index: 2,

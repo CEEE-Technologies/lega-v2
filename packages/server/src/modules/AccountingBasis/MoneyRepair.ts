@@ -13,7 +13,10 @@ import {
   ACCOUNT_TYPES,
 } from '@/constants/accounts';
 import { normalizeLedgerEntries } from '@/modules/Ledger/LedgerNormalizer';
-import { getLockedPeriodChecker } from './MoneyHealthCheck';
+import {
+  getLockedPeriodChecker,
+  hasForeignAmountColumns,
+} from './MoneyHealthCheck';
 
 /**
  * Repair of the money stored before the rounding fixes (plan P8), on one
@@ -281,6 +284,18 @@ const getBalancesFromLedger = async (
   knex: Knex,
   baseCurrency: string,
 ): Promise<IRepairBalance[]> => {
+  // The foreign amounts (before the tenant migration: base / rate). Raw
+  // SQL, so the names are written as the tenant mapper stores them.
+  const hasForeign = await hasForeignAmountColumns(knex);
+  const col = (alias: string, column: string) =>
+    `${alias}.${column}`.toUpperCase();
+  const foreignNet = (alias: string, plus: string, minus: string) => {
+    const byRate = `(${col(alias, plus)} - ${col(alias, minus)}) / COALESCE(NULLIF(${col(alias, 'exchange_rate')}, 0), 1)`;
+    return hasForeign
+      ? `COALESCE(${col(alias, `foreign_${plus}`)} - ${col(alias, `foreign_${minus}`)}, ${byRate})`
+      : byRate;
+  };
+
   const balances: IRepairBalance[] = [];
 
   const accounts: any[] = await knex
@@ -297,16 +312,10 @@ const getBalancesFromLedger = async (
     .select('t.account_id as accountId')
     .select(
       knex.raw('SUM(?? - ??) as ??', ['t.debit', 't.credit', 'local']),
+      // The stored foreign amounts (a row posted before them: base / rate).
       knex.raw(
-        'SUM(CASE WHEN ?? = ?? THEN (?? - ??) / COALESCE(NULLIF(??, 0), 1) ELSE 0 END) as ??',
-        [
-          't.currency_code',
-          'a.currency_code',
-          't.debit',
-          't.credit',
-          't.exchange_rate',
-          'foreign',
-        ],
+        `SUM(CASE WHEN ?? = ?? THEN ${foreignNet('t', 'debit', 'credit')} ELSE 0 END) as ??`,
+        ['t.currency_code', 'a.currency_code', 'foreign'],
       ),
     );
   const sumsByAccount = new Map(accountSums.map((row) => [row.accountId, row]));
@@ -324,8 +333,7 @@ const getBalancesFromLedger = async (
         : debitMinusCredit;
     const stored = Number(account.amount || 0);
 
-    // The account amount column keeps 5 decimals (a foreign currency
-    // balance is local / rate, so it has more).
+    // The account amount column keeps 5 decimals.
     if (Math.abs(stored - fromLedger) > 0.000005 + NOISE) {
       balances.push({
         kind: 'account',
@@ -365,18 +373,12 @@ const getBalancesFromLedger = async (
         'local',
       ]),
       knex.raw(
-        'SUM(CASE WHEN ?? <> ?? THEN 0 WHEN ?? = ? THEN (?? - ??) / COALESCE(NULLIF(??, 0), 1) ELSE (?? - ??) / COALESCE(NULLIF(??, 0), 1) END) as ??',
+        `SUM(CASE WHEN ?? <> ?? THEN 0 WHEN ?? = ? THEN ${foreignNet('t', 'debit', 'credit')} ELSE ${foreignNet('t', 'credit', 'debit')} END) as ??`,
         [
           't.currency_code',
           'c.currency_code',
           'a.account_type',
           ACCOUNT_TYPE.ACCOUNTS_RECEIVABLE,
-          't.debit',
-          't.credit',
-          't.exchange_rate',
-          't.credit',
-          't.debit',
-          't.exchange_rate',
           'foreign',
         ],
       ),
@@ -450,6 +452,8 @@ export const applyLedgerRepair = async (
     documentsSkipped: [],
   };
 
+  const hasForeign = await hasForeignAmountColumns(knex);
+
   await knex.transaction(async (trx) => {
     // 1. The documents' stored totals.
     for (const document of plan.documents) {
@@ -499,6 +503,7 @@ export const applyLedgerRepair = async (
             : b.where('basis', set.basis),
         )
         .select('id', 'debit', 'credit', 'account_id as accountId')
+        .select('exchange_rate as exchangeRate')
         .forUpdate();
 
       const { entries, unbalanced } = normalizeLedgerEntries(
@@ -531,9 +536,17 @@ export const applyLedgerRepair = async (
           Number(before.debit) !== after.debit ||
           Number(before.credit) !== after.credit
         ) {
+          // A base currency row's foreign amounts are its base amounts.
+          const isBase = hasForeign && Number(before.exchangeRate || 1) === 1;
           await trx('accounts_transactions')
             .where('id', before.id)
-            .update({ debit: after.debit, credit: after.credit });
+            .update({
+              debit: after.debit,
+              credit: after.credit,
+              ...(isBase
+                ? { foreignDebit: after.debit, foreignCredit: after.credit }
+                : {}),
+            });
         }
       }
       result.setsReposted.push(set);

@@ -81,6 +81,7 @@ export class RefundVendorCreditGLEntries {
     return {
       ...commonEntry,
       credit: refundVendorCredit.amount,
+      foreignCredit: refundVendorCredit.amount,
       accountId: APAccountId,
       contactId: refundVendorCredit.vendorCredit.vendorId,
       index: 1,
@@ -102,6 +103,7 @@ export class RefundVendorCreditGLEntries {
     return {
       ...commonEntry,
       debit: refundVendorCredit.amount,
+      foreignDebit: refundVendorCredit.amount,
       accountId: refundVendorCredit.depositAccountId,
       index: 2,
       accountNormal: AccountNormal.DEBIT,

@@ -5,6 +5,8 @@ import { ILedgerEntry } from './types/Ledger.types';
 import { AccountTransaction } from '../Accounts/models/AccountTransaction.model';
 import { ModelObject } from 'objection';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { resolveForeignAmounts } from '@/utils/ledger-rounding';
+import { toCents, fromCents } from '@bigcapital/utils';
 
 /**
  * Determines whether the ledger entry affects the stored account
@@ -177,18 +179,32 @@ export class Ledger implements ILedger {
    * @returns {number}
    */
   public getForeignClosingBalance(): number {
-    let closingBalance = 0;
+    // The stored transaction currency amounts, added up in whole cents.
+    // Only a row posted before they were stored (no foreign amounts) still
+    // divides its base amount by the rate.
+    let cents = 0;
+    let legacy = 0;
 
     this.entries.forEach((entry) => {
-      const exchangeRate = entry.exchangeRate || 1;
+      const sign =
+        entry.accountNormal === 'credit'
+          ? -1
+          : entry.accountNormal === 'debit'
+            ? 1
+            : 0;
+      if (sign === 0) return;
+      const foreign = resolveForeignAmounts(entry);
 
-      if (entry.accountNormal === 'credit') {
-        closingBalance += (entry.credit - entry.debit) / exchangeRate;
-      } else if (entry.accountNormal === 'debit') {
-        closingBalance += (entry.debit - entry.credit) / exchangeRate;
+      if (foreign.foreignDebit !== null) {
+        cents +=
+          sign *
+          (toCents(foreign.foreignDebit) - toCents(foreign.foreignCredit));
+      } else {
+        const exchangeRate = entry.exchangeRate || 1;
+        legacy += (sign * (entry.debit - entry.credit)) / exchangeRate;
       }
     });
-    return closingBalance;
+    return legacy === 0 ? fromCents(cents) : fromCents(cents) + legacy;
   }
 
   /**
@@ -228,7 +244,13 @@ export class Ledger implements ILedger {
       const credit = e.debit;
       const debit = e.credit;
 
-      return { ...e, credit, debit };
+      return {
+        ...e,
+        credit,
+        debit,
+        foreignCredit: e.foreignDebit,
+        foreignDebit: e.foreignCredit,
+      };
     });
     return new Ledger(newEntries);
   };
@@ -256,6 +278,9 @@ export class Ledger implements ILedger {
     return {
       credit: defaultTo(entry.credit, 0),
       debit: defaultTo(entry.debit, 0),
+
+      foreignCredit: entry.foreignCredit ?? null,
+      foreignDebit: entry.foreignDebit ?? null,
 
       exchangeRate: entry.exchangeRate,
       currencyCode: entry.currencyCode,

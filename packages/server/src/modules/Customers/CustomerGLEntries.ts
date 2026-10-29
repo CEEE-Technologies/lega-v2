@@ -46,6 +46,7 @@ export class CustomerGLEntries {
       ...commonEntry,
       credit: 0,
       debit: customer.localOpeningBalance,
+      foreignDebit: customer.openingBalance,
       accountId: ARAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 1,
@@ -65,6 +66,7 @@ export class CustomerGLEntries {
       ...commonEntry,
       credit: customer.localOpeningBalance,
       debit: 0,
+      foreignCredit: customer.openingBalance,
       accountId: incomeAccountId,
       accountNormal: AccountNormal.CREDIT,
 

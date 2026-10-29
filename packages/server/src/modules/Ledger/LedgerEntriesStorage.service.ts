@@ -11,8 +11,12 @@ import { AccountTransaction } from '../Accounts/models/AccountTransaction.model'
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
 
 // Filter the blank entries.
+// A line can be 0.00 in the base currency but not in the transaction
+// currency (LKR 1 at 0.0033 USD): it is kept for the foreign balance.
 const filterBlankEntry = (entry: ILedgerEntry) =>
-  Boolean(entry.credit || entry.debit);
+  Boolean(
+    entry.credit || entry.debit || entry.foreignCredit || entry.foreignDebit,
+  );
 
 @Injectable()
 export class LedgerEntriesStorageService {

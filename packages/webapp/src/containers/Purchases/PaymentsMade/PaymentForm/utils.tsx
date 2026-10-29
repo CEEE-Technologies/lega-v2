@@ -83,6 +83,7 @@ export type PaymentMadeRequestBody = {
 
 export type PaymentMadeErrorResponse = {
   type: string;
+  message?: string;
   indexes?: number[];
   meta?: unknown[];
 };
@@ -278,6 +279,9 @@ export const getPaymentMadeOverAppliedMessage = (
 ) =>
   `The amount applied to bills (${appliedAmount}) is more than the payment amount (${paymentAmount}). Lower the bill payment amounts or raise the payment amount.`;
 
+export const DUPLICATE_BILL_ENTRIES_MESSAGE =
+  'A bill is listed twice in this payment. Combine the amounts into one line.';
+
 export const PAYMENT_MADE_ERROR_MESSAGES: Record<string, string> = {
   BILL_ENTRIES_IDS_NOT_FOUND:
     'One of the selected bills was not found for this vendor.',
@@ -323,6 +327,14 @@ export const transformErrors = (
       AppToaster.show({ message, intent: Intent.DANGER });
     }
   });
+  // The server names the bill ("BILL-12 is listed twice ...").
+  const duplicate = getError('PAYMENT_DUPLICATE_BILL_ENTRIES');
+  if (duplicate) {
+    AppToaster.show({
+      message: duplicate.message || DUPLICATE_BILL_ENTRIES_MESSAGE,
+      intent: Intent.DANGER,
+    });
+  }
 };
 
 /**

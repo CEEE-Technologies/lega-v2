@@ -5,6 +5,7 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { SaleReceipt } from '../models/SaleReceipt';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
+import { foreignCreditSide } from '@/utils/ledger-rounding';
 
 export class SaleReceiptGL {
   private saleReceipt: SaleReceipt;
@@ -78,6 +79,7 @@ export class SaleReceiptGL {
       return {
         ...commonEntry,
         credit: totalLocal,
+        foreignCredit: entry.totalExcludingTax,
         accountId: entry.item.sellAccountId,
         note: entry.description,
         index: index + 2,
@@ -98,6 +100,7 @@ export class SaleReceiptGL {
     return {
       ...commonEntry,
       debit: this.saleReceipt.totalLocal,
+      foreignDebit: this.saleReceipt.total,
       accountId: this.saleReceipt.depositAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -114,6 +117,7 @@ export class SaleReceiptGL {
     return {
       ...commonEntry,
       debit: this.saleReceipt.discountAmountLocal,
+      foreignDebit: this.saleReceipt.discountAmount,
       accountId: this.discountAccountId,
       index: 1,
       accountNormal: AccountNormal.CREDIT,
@@ -132,6 +136,7 @@ export class SaleReceiptGL {
       ...commonEntry,
       debit: this.saleReceipt.adjustmentLocal < 0 ? adjustmentAmount : 0,
       credit: this.saleReceipt.adjustmentLocal > 0 ? adjustmentAmount : 0,
+      ...foreignCreditSide(this.saleReceipt.adjustment || 0),
       accountId: this.otherChargesAccountId,
       accountNormal: AccountNormal.CREDIT,
       index: 1,

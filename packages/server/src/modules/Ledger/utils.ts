@@ -1,6 +1,7 @@
 import * as moment from 'moment';
 import { AccountTransaction } from '../Accounts/models/AccountTransaction.model';
 import { ILedgerEntry } from './types/Ledger.types';
+import { resolveForeignAmounts } from '@/utils/ledger-rounding';
 
 export const transformLedgerEntryToTransaction = (
   entry: ILedgerEntry,
@@ -10,6 +11,7 @@ export const transformLedgerEntryToTransaction = (
 
     credit: entry.credit,
     debit: entry.debit,
+    ...resolveForeignAmounts(entry),
 
     currencyCode: entry.currencyCode,
     exchangeRate: entry.exchangeRate,

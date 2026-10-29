@@ -11,6 +11,7 @@ import { AccountNormal } from '@/interfaces/Account';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
 
 /**
  * Records the accrual basis journal entries of the bill payment.
@@ -151,6 +152,7 @@ export class BillPaymentAccrualGL {
             exchangeRate: 1,
             credit: totalExGainOrLoss > 0 ? absExGainOrLoss : 0,
             debit: totalExGainOrLoss < 0 ? absExGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.gainLossAccountId,
             index: 2,
             indexGroup: 20,
@@ -162,6 +164,7 @@ export class BillPaymentAccrualGL {
             exchangeRate: 1,
             debit: totalExGainOrLoss > 0 ? absExGainOrLoss : 0,
             credit: totalExGainOrLoss < 0 ? absExGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.APAccountId,
             // On the vendor, as the A/R line of a payment received is on
             // the customer: without it the vendor's A/P balance missed
@@ -185,6 +188,7 @@ export class BillPaymentAccrualGL {
     return {
       ...commonEntry,
       credit: roundMoney(this.billPayment.localAmount),
+      foreignCredit: this.billPayment.amount,
       accountId: this.billPayment.paymentAccountId,
       accountNormal: AccountNormal.DEBIT,
       index: 2,
@@ -202,6 +206,7 @@ export class BillPaymentAccrualGL {
       ...commonEntry,
       exchangeRate: this.billPayment.exchangeRate,
       debit: roundMoney(this.billPayment.localAmount),
+      foreignDebit: this.billPayment.amount,
       contactId: this.billPayment.vendorId,
       accountId: this.APAccountId,
       accountNormal: AccountNormal.CREDIT,

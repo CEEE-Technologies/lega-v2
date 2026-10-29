@@ -16,6 +16,9 @@ export class AccountTransaction extends BaseModel {
   public readonly contactType: string;
   public readonly credit: number;
   public readonly debit: number;
+  /** Amounts in the transaction currency (null on rows posted before). */
+  public readonly foreignCredit!: number | null;
+  public readonly foreignDebit!: number | null;
   public readonly exchangeRate: number;
   public readonly taxRate: number;
   public readonly date: Date | string;

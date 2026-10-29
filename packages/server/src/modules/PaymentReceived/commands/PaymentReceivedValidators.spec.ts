@@ -201,3 +201,45 @@ describe('PaymentReceivedValidators — comparisons in cents', () => {
     );
   });
 });
+
+// Codex P2: two lines on the same invoice both relieved it from the same
+// "paid before" point, double counting the currency rounding.
+describe('PaymentReceivedValidators — each invoice once per payment', () => {
+  const validators = makeValidators([]);
+
+  it('rejects an invoice listed twice, naming it', () => {
+    let error: any;
+    try {
+      validators.validateNoDuplicateInvoices(
+        [
+          { invoiceId: 12, paymentAmount: 0.01 },
+          { invoiceId: 13, paymentAmount: 1 },
+          { invoiceId: 12, paymentAmount: 0.01 },
+        ],
+        [{ id: 12, invoiceNo: 'INV-12' }] as any,
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toEqual(
+      expect.objectContaining({
+        errorType: ERRORS.PAYMENT_DUPLICATE_INVOICE_ENTRIES,
+        message:
+          'INV-12 is listed twice in this payment. Combine the amounts into one line.',
+      }),
+    );
+    expect(error.payload).toEqual(
+      expect.objectContaining({ invoiceId: 12, indexes: [0, 2] }),
+    );
+  });
+
+  it('accepts different invoices and the opening balance line', () => {
+    expect(() =>
+      validators.validateNoDuplicateInvoices([
+        { invoiceId: 12, paymentAmount: 1 },
+        { invoiceId: 13, paymentAmount: 1 },
+        { entryType: 'opening_balance', invoiceId: null, paymentAmount: 1 },
+      ]),
+    ).not.toThrow();
+  });
+});

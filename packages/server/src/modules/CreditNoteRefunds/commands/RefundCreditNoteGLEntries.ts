@@ -79,6 +79,7 @@ export class RefundCreditNoteGLEntries {
     return {
       ...commonEntry,
       debit: refundCreditNote.amount,
+      foreignDebit: refundCreditNote.amount,
       accountId: ARAccountId,
       contactId: refundCreditNote.creditNote.customerId,
       index: 1,
@@ -99,6 +100,7 @@ export class RefundCreditNoteGLEntries {
     return {
       ...commonEntry,
       credit: refundCreditNote.amount,
+      foreignCredit: refundCreditNote.amount,
       accountId: refundCreditNote.fromAccountId,
       index: 2,
       accountNormal: AccountNormal.DEBIT,

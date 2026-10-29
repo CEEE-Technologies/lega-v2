@@ -25,14 +25,18 @@ import {
  * - (a) entry sets (reference + basis) whose debits differ from the credits,
  * - (b) ledger rows that are not whole cents,
  * - (c) stored account and contact balances that differ from the sum of
- *   their ledger rows,
+ *   their ledger rows (a foreign one: the sum of its rows' foreign amounts,
+ *   to the cent),
  * - (d) fully paid invoices and bills whose cash basis lines don't add up to
  *   the document's accrual lines,
  * - (e) documents whose total or amount left (due / credit remaining) is
  *   not the same in the SQL the lists, due lists and aging reports use and
  *   in the app getters (the "one answer" parity of the money SQL),
  * - (f) payments (received and made) whose cash basis bank lines don't add
- *   up to the accrual bank line.
+ *   up to the accrual bank line,
+ * - (g) payments listing the same invoice or bill on more than one line
+ *   (now rejected; each line relieved its document from the same point, so
+ *   the currency rounding was double counted).
  *
  * Plain queries on the given tenant connection (snake case mappers), so the
  * CLI can run it without the application context. Nothing is written.
@@ -100,6 +104,15 @@ export interface IMoneyHealthPaymentBankDifference {
   locked: boolean;
 }
 
+export interface IMoneyHealthDuplicateDocumentLines {
+  paymentType: 'PaymentReceive' | 'BillPayment';
+  paymentId: number;
+  paymentNo: string;
+  documentId: number;
+  documentNo: string;
+  lines: number;
+}
+
 export interface IMoneyHealthResult {
   unbalancedSets: IMoneyHealthUnbalancedSet[];
   nonCentRows: IMoneyHealthNonCentRow[];
@@ -119,6 +132,13 @@ export interface IMoneyHealthResult {
   paymentsChecked?: number;
   /** Payments skipped from (f): no cash basis lines yet. */
   paymentsSkipped?: number;
+  /**
+   * Foreign accounts and contacts skipped from (c): they have rows posted
+   * before the foreign amounts were stored (re-post them to check).
+   */
+  balancesSkipped?: { accounts: number; contacts: number };
+  /** (g) Payments listing the same document on more than one line. */
+  duplicateDocumentLines?: IMoneyHealthDuplicateDocumentLines[];
 }
 
 /**
@@ -253,6 +273,16 @@ const lockingGroupOf = (referenceType: string) =>
       ? 'purchases'
       : 'financial';
 
+/**
+ * Whether the tenant has the ledger foreign amount columns (tenant
+ * migration 20261029120000). Before it, foreign balances are read as
+ * before (base / rate).
+ * @param {Knex} knex
+ * @returns {Promise<boolean>}
+ */
+export const hasForeignAmountColumns = (knex: Knex): Promise<boolean> =>
+  knex.schema.hasColumn('accounts_transactions', 'foreign_debit');
+
 export type IsLockedFn = (date: any, referenceType: string) => boolean;
 
 /**
@@ -373,7 +403,22 @@ const ACCOUNT_NORMAL_BY_TYPE = new Map(
  * by their exchange rate, as the ledger storage does.
  */
 const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
+  // The foreign amounts (before the tenant migration: base / rate). Raw
+  // SQL, so the names are written as the tenant mapper stores them.
+  const hasForeign = await hasForeignAmountColumns(knex);
+  const col = (alias: string, column: string) =>
+    `${alias}.${column}`.toUpperCase();
+  const foreignNet = (alias: string, plus: string, minus: string) => {
+    const byRate = `(${col(alias, plus)} - ${col(alias, minus)}) / COALESCE(NULLIF(${col(alias, 'exchange_rate')}, 0), 1)`;
+    return hasForeign
+      ? `COALESCE(${col(alias, `foreign_${plus}`)} - ${col(alias, `foreign_${minus}`)}, ${byRate})`
+      : byRate;
+  };
+  const foreignMissing = (alias: string) =>
+    hasForeign ? `${col(alias, 'foreign_debit')} IS NULL` : '1 = 1';
+
   const differences: IMoneyHealthBalanceDifference[] = [];
+  const legacyForeign = { accounts: 0, contacts: 0 };
 
   const accounts: any[] = await knex
     .queryBuilder()
@@ -392,16 +437,15 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
     .select('t.account_id as accountId')
     .select(
       knex.raw('SUM(?? - ??) as ??', ['t.debit', 't.credit', 'local']),
+      // The stored transaction currency amounts; a row posted before they
+      // were stored (NULL) is read as before, base amount / rate.
       knex.raw(
-        'SUM(CASE WHEN ?? = ?? THEN (?? - ??) / COALESCE(NULLIF(??, 0), 1) ELSE 0 END) as ??',
-        [
-          't.currency_code',
-          'a.currency_code',
-          't.debit',
-          't.credit',
-          't.exchange_rate',
-          'foreign',
-        ],
+        `SUM(CASE WHEN ?? = ?? THEN ${foreignNet('t', 'debit', 'credit')} ELSE 0 END) as ??`,
+        ['t.currency_code', 'a.currency_code', 'foreign'],
+      ),
+      knex.raw(
+        `SUM(CASE WHEN ?? = ?? AND ${foreignMissing('t')} THEN 1 ELSE 0 END) as ??`,
+        ['t.currency_code', 'a.currency_code', 'legacy'],
       ),
     );
   const sumsByAccount = new Map(accountSums.map((row) => [row.accountId, row]));
@@ -418,11 +462,15 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
       normal === ACCOUNT_NORMAL.CREDIT ? -debitMinusCredit : debitMinusCredit;
     const stored = Number(account.amount || 0);
 
-    // The account amount column keeps 5 decimals. A foreign currency
-    // account's balance is its rows converted back (local / rate), each
-    // rounded to 5 decimals as it is saved, so over many rows it drifts
-    // below half a cent; a real difference is a cent or more.
-    const tolerance = isForeign ? 0.005 : 0.000005;
+    // A foreign account with rows posted before the foreign amounts were
+    // stored can't be checked to the cent: it is counted, not compared.
+    if (isForeign && Number(sums?.legacy || 0) > 0) {
+      legacyForeign.accounts += 1;
+      return;
+    }
+    // The account amount column keeps 5 decimals; foreign amounts are whole
+    // cents, so the stored balance must match exactly.
+    const tolerance = 0.000005;
     if (Math.abs(stored - fromLedger) > tolerance + NOISE) {
       differences.push({
         kind: 'account',
@@ -466,20 +514,18 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
         'local',
       ]),
       knex.raw(
-        'SUM(CASE WHEN ?? <> ?? THEN 0 WHEN ?? = ? THEN (?? - ??) / COALESCE(NULLIF(??, 0), 1) ELSE (?? - ??) / COALESCE(NULLIF(??, 0), 1) END) as ??',
+        `SUM(CASE WHEN ?? <> ?? THEN 0 WHEN ?? = ? THEN ${foreignNet('t', 'debit', 'credit')} ELSE ${foreignNet('t', 'credit', 'debit')} END) as ??`,
         [
           't.currency_code',
           'c.currency_code',
           'a.account_type',
           ACCOUNT_TYPE.ACCOUNTS_RECEIVABLE,
-          't.debit',
-          't.credit',
-          't.exchange_rate',
-          't.credit',
-          't.debit',
-          't.exchange_rate',
           'foreign',
         ],
+      ),
+      knex.raw(
+        `SUM(CASE WHEN ?? = ?? AND ${foreignMissing('t')} THEN 1 ELSE 0 END) as ??`,
+        ['t.currency_code', 'c.currency_code', 'legacy'],
       ),
     );
   const sumsByContact = new Map(contactSums.map((row) => [row.contactId, row]));
@@ -491,11 +537,13 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
     const fromLedger = Number((isForeign ? sums?.foreign : sums?.local) || 0);
     const stored = Number(contact.balance || 0);
 
-    // The contact balance column keeps 3 decimals. A foreign currency
-    // contact's balance is its ledger rows converted back to its currency
-    // (base amount / rate), each rounded to 3 decimals as it is saved, so
-    // it can drift below half a cent; a real difference is a cent or more.
-    const tolerance = isForeign ? 0.005 : 0.0005;
+    if (isForeign && Number(sums?.legacy || 0) > 0) {
+      legacyForeign.contacts += 1;
+      return;
+    }
+    // The contact balance column keeps 3 decimals; foreign amounts are
+    // whole cents, so the stored balance must match exactly.
+    const tolerance = 0.0005;
     if (Math.abs(stored - fromLedger) > tolerance + NOISE) {
       differences.push({
         kind: 'contact',
@@ -507,7 +555,7 @@ const getBalanceDifferences = async (knex: Knex, baseCurrency: string) => {
       });
     }
   });
-  return differences;
+  return { differences, legacyForeign };
 };
 
 const DOCUMENT_KINDS = [
@@ -837,6 +885,77 @@ const getPaymentBankDifferences = async (knex: Knex, isLocked: IsLockedFn) => {
   return { differences, checked, skipped };
 };
 
+const DUPLICATE_LINE_KINDS = [
+  {
+    paymentType: 'PaymentReceive' as const,
+    entriesTable: 'payment_receives_entries',
+    paymentIdColumn: 'payment_receive_id',
+    documentIdColumn: 'invoice_id',
+    paymentsTable: 'payment_receives',
+    paymentNoColumn: 'payment_receive_no',
+    documentsTable: 'sales_invoices',
+    documentNoColumn: 'invoice_no',
+  },
+  {
+    paymentType: 'BillPayment' as const,
+    entriesTable: 'bills_payments_entries',
+    paymentIdColumn: 'bill_payment_id',
+    documentIdColumn: 'bill_id',
+    paymentsTable: 'bills_payments',
+    paymentNoColumn: 'payment_number',
+    documentsTable: 'bills',
+    documentNoColumn: 'bill_number',
+  },
+];
+
+/**
+ * (g) Payments that list the same invoice or bill on more than one line.
+ * New payments are rejected; existing ones are listed to be combined (edit
+ * the payment and merge the lines; the edit re-posts it).
+ */
+const getDuplicateDocumentLines = async (
+  knex: Knex,
+): Promise<IMoneyHealthDuplicateDocumentLines[]> => {
+  const result: IMoneyHealthDuplicateDocumentLines[] = [];
+  for (const kind of DUPLICATE_LINE_KINDS) {
+    const rows: any[] = await knex
+      .queryBuilder()
+      .from(`${kind.entriesTable} as e`)
+      .join(`${kind.paymentsTable} as p`, 'p.id', `e.${kind.paymentIdColumn}`)
+      .leftJoin(
+        `${kind.documentsTable} as d`,
+        'd.id',
+        `e.${kind.documentIdColumn}`,
+      )
+      .whereNotNull(`e.${kind.documentIdColumn}`)
+      .where((builder) =>
+        builder
+          .whereNull('e.entry_type')
+          .orWhere('e.entry_type', '<>', 'opening_balance'),
+      )
+      .groupBy(`e.${kind.paymentIdColumn}`, `e.${kind.documentIdColumn}`)
+      .havingRaw('COUNT(*) > 1')
+      .select(
+        `e.${kind.paymentIdColumn} as paymentId`,
+        `e.${kind.documentIdColumn} as documentId`,
+      )
+      .max(`p.${kind.paymentNoColumn} as paymentNo`)
+      .max(`d.${kind.documentNoColumn} as documentNo`)
+      .count('* as lines');
+    rows.forEach((row) =>
+      result.push({
+        paymentType: kind.paymentType,
+        paymentId: row.paymentId,
+        paymentNo: row.paymentNo ?? `#${row.paymentId}`,
+        documentId: row.documentId,
+        documentNo: row.documentNo ?? `#${row.documentId}`,
+        lines: Number(row.lines),
+      }),
+    );
+  }
+  return result;
+};
+
 /**
  * Runs the money health check on the given tenant database.
  * @param {Knex} knex - Tenant database connection.
@@ -850,10 +969,12 @@ export const checkMoneyHealth = async (
   const isLocked = await getLockedPeriodChecker(knex);
   const unbalancedSets = await getUnbalancedSets(knex, isLocked);
   const nonCentRows = await getNonCentRows(knex, isLocked);
-  const balanceDifferences = await getBalanceDifferences(knex, baseCurrency);
+  const balances = await getBalanceDifferences(knex, baseCurrency);
+  const balanceDifferences = balances.differences;
   const cashDocuments = await getCashDocumentDifferences(knex, isLocked);
   const documentParity = await getDocumentParityDifferences(knex);
   const paymentBanks = await getPaymentBankDifferences(knex, isLocked);
+  const duplicateDocumentLines = await getDuplicateDocumentLines(knex);
 
   return {
     unbalancedSets,
@@ -867,6 +988,8 @@ export const checkMoneyHealth = async (
     paymentBankDifferences: paymentBanks.differences,
     paymentsChecked: paymentBanks.checked,
     paymentsSkipped: paymentBanks.skipped,
+    duplicateDocumentLines,
+    balancesSkipped: balances.legacyForeign,
   };
 };
 
@@ -881,7 +1004,8 @@ export const isMoneyHealthClean = (result: IMoneyHealthResult) =>
   result.balanceDifferences.length === 0 &&
   result.cashDocumentDifferences.every((row) => row.locked) &&
   (result.documentDifferences ?? []).length === 0 &&
-  (result.paymentBankDifferences ?? []).every((row) => row.locked);
+  (result.paymentBankDifferences ?? []).every((row) => row.locked) &&
+  (result.duplicateDocumentLines ?? []).length === 0;
 
 /**
  * Formats the result as printable lines.
@@ -907,7 +1031,11 @@ export const formatMoneyHealth = (result: IMoneyHealthResult): string[] => {
     ),
   );
   lines.push(
-    `  (c) Stored balances different from their ledger rows: ${result.balanceDifferences.length}`,
+    `  (c) Stored balances different from their ledger rows: ${result.balanceDifferences.length}` +
+      (result.balancesSkipped &&
+      result.balancesSkipped.accounts + result.balancesSkipped.contacts > 0
+        ? ` (skipped: ${result.balancesSkipped.accounts} foreign accounts and ${result.balancesSkipped.contacts} foreign contacts with rows posted before the foreign amounts were stored)`
+        : ''),
   );
   result.balanceDifferences.forEach((row) =>
     lines.push(
@@ -941,6 +1069,15 @@ export const formatMoneyHealth = (result: IMoneyHealthResult): string[] => {
   paymentBankDifferences.forEach((row) =>
     lines.push(
       `      ${row.paymentType} ${row.paymentNo} (#${row.paymentId}) account #${row.accountId}: accrual ${row.accrual}, cash ${row.cash} (diff ${row.difference})${lockedTag(row.locked)}`,
+    ),
+  );
+  const duplicates = result.duplicateDocumentLines ?? [];
+  lines.push(
+    `  (g) Payments listing the same invoice or bill on more than one line: ${duplicates.length}`,
+  );
+  duplicates.forEach((row) =>
+    lines.push(
+      `      ${row.paymentType} ${row.paymentNo} (#${row.paymentId}): ${row.documentNo} (#${row.documentId}) on ${row.lines} lines`,
     ),
   );
   return lines;

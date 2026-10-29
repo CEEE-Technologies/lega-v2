@@ -6,6 +6,7 @@ import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { SaleInvoice } from '../models/SaleInvoice';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { foreignCreditSide } from '@/utils/ledger-rounding';
 
 export class InvoiceAccrualGL {
   private saleInvoice: SaleInvoice;
@@ -93,6 +94,7 @@ export class InvoiceAccrualGL {
     return {
       ...commonEntry,
       debit: this.saleInvoice.totalLocal,
+      foreignDebit: this.saleInvoice.total,
       accountId: this.ARAccountId,
       contactId: this.saleInvoice.customerId,
       accountNormal: AccountNormal.DEBIT,
@@ -115,6 +117,7 @@ export class InvoiceAccrualGL {
       return {
         ...commonEntry,
         credit: localAmount,
+        foreignCredit: entry.totalExcludingTax,
         accountId: entry.sellAccountId,
         note: entry.description,
         index: index + 2,
@@ -138,6 +141,7 @@ export class InvoiceAccrualGL {
     return {
       ...commonEntry,
       credit: entry.taxAmount * this.saleInvoice.exchangeRate,
+      foreignCredit: entry.taxAmount,
       accountId: this.taxPayableAccountId,
       index: index + 1,
       indexGroup: 30,
@@ -157,6 +161,7 @@ export class InvoiceAccrualGL {
     return {
       ...commonEntry,
       debit: this.saleInvoice.discountAmountLocal,
+      foreignDebit: this.saleInvoice.discountAmount,
       accountId: this.discountAccountId,
       accountNormal: AccountNormal.CREDIT,
       index: 1,
@@ -175,6 +180,7 @@ export class InvoiceAccrualGL {
       ...commonEntry,
       debit: this.saleInvoice.adjustmentLocal < 0 ? adjustmentAmount : 0,
       credit: this.saleInvoice.adjustmentLocal > 0 ? adjustmentAmount : 0,
+      ...foreignCreditSide(this.saleInvoice.adjustment || 0),
       accountId: this.otherChargesAccountId,
       accountNormal: AccountNormal.CREDIT,
       index: 1,

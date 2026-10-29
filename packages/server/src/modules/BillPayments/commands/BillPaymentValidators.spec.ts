@@ -142,3 +142,42 @@ describe('BillPaymentValidators — applied vs amount in cents', () => {
     ).toThrow();
   });
 });
+
+// Codex P2: two lines on the same bill both relieved it from the same
+// "paid before" point, double counting the currency rounding.
+describe('BillPaymentValidators — each bill once per payment', () => {
+  const validators = new BillPaymentValidators(
+    (() => ({})) as any,
+    (() => ({})) as any,
+    (() => ({})) as any,
+    (() => ({})) as any,
+  );
+
+  it('rejects a bill listed twice, naming it', () => {
+    expect(() =>
+      validators.validateNoDuplicateBills(
+        [
+          { billId: 7, paymentAmount: 0.01 },
+          { billId: 7, paymentAmount: 0.01 },
+        ],
+        [{ id: 7, billNumber: 'BILL-7' }] as any,
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        errorType: ERRORS.PAYMENT_DUPLICATE_BILL_ENTRIES,
+        message:
+          'BILL-7 is listed twice in this payment. Combine the amounts into one line.',
+      }),
+    );
+  });
+
+  it('accepts different bills and the opening balance line', () => {
+    expect(() =>
+      validators.validateNoDuplicateBills([
+        { billId: 7, paymentAmount: 1 },
+        { billId: 8, paymentAmount: 1 },
+        { entryType: 'opening_balance', billId: null, paymentAmount: 1 },
+      ]),
+    ).not.toThrow();
+  });
+});

@@ -107,3 +107,61 @@ export const debitSide = (amount: number) =>
   amount >= 0
     ? { debit: amount || 0, credit: 0 }
     : { debit: 0, credit: -amount };
+
+interface IForeignAmountsEntry {
+  debit: number;
+  credit: number;
+  exchangeRate?: number | null;
+  foreignDebit?: number | null;
+  foreignCredit?: number | null;
+}
+
+/**
+ * The transaction currency amounts of a ledger line: the ones the builder
+ * gave, else the base amounts when the rate is 1, else none (a row posted
+ * before the foreign amounts were stored).
+ * @returns {{ foreignDebit: number | null; foreignCredit: number | null }}
+ */
+export const resolveForeignAmounts = (
+  entry: IForeignAmountsEntry,
+): { foreignDebit: number | null; foreignCredit: number | null } => {
+  const given =
+    (entry.foreignDebit !== undefined && entry.foreignDebit !== null) ||
+    (entry.foreignCredit !== undefined && entry.foreignCredit !== null);
+  if (given) {
+    return {
+      foreignDebit: roundMoney(entry.foreignDebit || 0),
+      foreignCredit: roundMoney(entry.foreignCredit || 0),
+    };
+  }
+  const rate = entry.exchangeRate || 1;
+  return rate === 1
+    ? {
+        foreignDebit: roundMoney(entry.debit || 0),
+        foreignCredit: roundMoney(entry.credit || 0),
+      }
+    : { foreignDebit: null, foreignCredit: null };
+};
+
+/**
+ * The foreign amounts of a line on the debit side of the given transaction
+ * currency amount (a negative amount is a credit).
+ * @param {number} amount - In the transaction currency.
+ */
+export const foreignDebitSide = (amount: number) =>
+  amount >= 0
+    ? { foreignDebit: roundMoney(amount || 0), foreignCredit: 0 }
+    : { foreignDebit: 0, foreignCredit: roundMoney(-amount) };
+
+/**
+ * The foreign amounts of a line on the credit side of the given transaction
+ * currency amount (a negative amount is a debit).
+ * @param {number} amount - In the transaction currency.
+ */
+export const foreignCreditSide = (amount: number) =>
+  amount >= 0
+    ? { foreignCredit: roundMoney(amount || 0), foreignDebit: 0 }
+    : { foreignCredit: 0, foreignDebit: roundMoney(-amount) };
+
+/** An exchange gain/loss line: no amount in the transaction currency. */
+export const NO_FOREIGN_AMOUNT = { foreignDebit: 0, foreignCredit: 0 };

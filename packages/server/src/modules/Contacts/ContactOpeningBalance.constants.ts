@@ -29,6 +29,29 @@ export const isDocumentEntry = (entry: {
 }): boolean => !isOpeningBalanceEntry(entry);
 
 /**
+ * Finds the first document (invoice or bill) listed on more than one
+ * document line of a payment, with the indexes of those lines.
+ * @param {T[]} entries - Payment entries.
+ * @param {string} documentIdKey - `invoiceId` or `billId`.
+ * @returns {{ id: number; indexes: number[] } | null}
+ */
+export const findDuplicateDocument = <T extends { entryType?: string | null }>(
+  entries: T[],
+  documentIdKey: keyof T & string,
+): { id: number; indexes: number[] } | null => {
+  const linesById = new Map<number, number[]>();
+  (entries || []).forEach((entry, index) => {
+    const id = entry[documentIdKey] as unknown as number | null | undefined;
+    if (!isDocumentEntry(entry) || id === null || id === undefined) return;
+    linesById.set(Number(id), [...(linesById.get(Number(id)) || []), index]);
+  });
+  for (const [id, indexes] of linesById) {
+    if (indexes.length > 1) return { id, indexes };
+  }
+  return null;
+};
+
+/**
  * Stores the entry type explicitly and clears the document id of opening
  * balance lines.
  * @param {T} entry - Payment entry DTO.

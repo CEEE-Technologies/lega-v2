@@ -10,6 +10,7 @@ import { PaymentReceived } from '../models/PaymentReceived';
 import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
 
 export class PaymentReceivedAccrualGL {
   private readonly paymentReceived: PaymentReceived;
@@ -153,6 +154,7 @@ export class PaymentReceivedAccrualGL {
             exchangeRate: 1,
             debit: gainOrLoss > 0 ? absGainOrLoss : 0,
             credit: gainOrLoss < 0 ? absGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.ARAccountId,
             contactId: this.paymentReceived.customerId,
             index: 3,
@@ -164,6 +166,7 @@ export class PaymentReceivedAccrualGL {
             exchangeRate: 1,
             credit: gainOrLoss > 0 ? absGainOrLoss : 0,
             debit: gainOrLoss < 0 ? absGainOrLoss : 0,
+            ...NO_FOREIGN_AMOUNT,
             accountId: this.exchangeGainOrLossAccountId,
             index: 3,
             accountNormal: AccountNormal.DEBIT,
@@ -183,6 +186,7 @@ export class PaymentReceivedAccrualGL {
     return {
       ...commonJournal,
       debit: roundMoney(this.paymentReceived.localAmount),
+      foreignDebit: this.paymentReceived.amount,
       accountId: this.paymentReceived.depositAccountId,
       index: 2,
       accountNormal: AccountNormal.DEBIT,
@@ -201,6 +205,7 @@ export class PaymentReceivedAccrualGL {
     return {
       ...commonJournal,
       credit: roundMoney(this.paymentReceived.localAmount),
+      foreignCredit: this.paymentReceived.amount,
       contactId: this.paymentReceived.customerId,
       accountId: this.ARAccountId,
       index: 1,

@@ -4,6 +4,7 @@ import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
+import { foreignDebitSide } from '@/utils/ledger-rounding';
 
 export class CreditNoteAccrualGL {
   creditNoteModel: CreditNote;
@@ -86,6 +87,7 @@ export class CreditNoteAccrualGL {
     return {
       ...commonEntry,
       credit: this.creditNoteModel.totalLocal,
+      foreignCredit: this.creditNoteModel.total,
       accountId: this.ARAccountId,
       contactId: this.creditNoteModel.customerId,
       index: 1,
@@ -110,6 +112,7 @@ export class CreditNoteAccrualGL {
     return {
       ...commonEntry,
       debit: totalLocal,
+      foreignDebit: entry.totalExcludingTax,
       accountId: entry.sellAccountId || entry.item.sellAccountId,
       note: entry.description,
       index: index + 2,
@@ -130,6 +133,7 @@ export class CreditNoteAccrualGL {
     return {
       ...commonEntry,
       credit: this.creditNoteModel.discountAmountLocal,
+      foreignCredit: this.creditNoteModel.discountAmount,
       accountId: this.discountAccountId,
       accountNormal: AccountNormal.CREDIT,
       index: 1,
@@ -150,6 +154,7 @@ export class CreditNoteAccrualGL {
       ...commonEntry,
       credit: this.creditNoteModel.adjustmentLocal < 0 ? adjustmentAmount : 0,
       debit: this.creditNoteModel.adjustmentLocal > 0 ? adjustmentAmount : 0,
+      ...foreignDebitSide(this.creditNoteModel.adjustment || 0),
       accountId: this.adjustmentAccountId,
       accountNormal: AccountNormal.CREDIT,
       index: 1,

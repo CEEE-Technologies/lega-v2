@@ -37,6 +37,17 @@ export interface ILedgerEntry {
   credit: number;
   debit: number;
 
+  /**
+   * The amounts in the transaction currency (`currencyCode`), whole cents,
+   * as on the document. Foreign balances (contacts and accounts in another
+   * currency) add these up instead of dividing the rounded base amounts by
+   * the rate, which drifted (EUR 0.02 invoice at 1.5 paid as 2 x 0.01 left
+   * -0.0067 EUR). Exchange gain/loss lines have 0. When not given, a line at
+   * rate 1 has its base amounts; another rate has none (null).
+   */
+  foreignDebit?: number | null;
+  foreignCredit?: number | null;
+
   currencyCode: string;
   exchangeRate: number;
 

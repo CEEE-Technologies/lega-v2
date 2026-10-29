@@ -85,6 +85,7 @@ export type PaymentReceiveRequestBody = {
 
 export type PaymentReceiveErrorResponse = {
   type: string;
+  message?: string;
   indexes?: number[];
   meta?: unknown[];
 };
@@ -303,6 +304,9 @@ export const useSetPrimaryBranchToForm = () => {
 export const PAYMENT_ENTRIES_EXCEED_AMOUNT_MESSAGE =
   'The amounts applied to invoices are more than the amount received. Lower the invoice payment amounts or raise the amount received.';
 
+export const DUPLICATE_INVOICE_ENTRIES_MESSAGE =
+  'An invoice is listed twice in this payment. Combine the amounts into one line.';
+
 export const NO_INVOICE_SELECTED_MESSAGE =
   'Select at least one invoice to apply this payment to.';
 
@@ -348,6 +352,14 @@ export const transformErrors = (
       AppToaster.show({ message, intent: Intent.DANGER });
     }
   });
+  // The server names the invoice ("INV-12 is listed twice ...").
+  const duplicate = getError('PAYMENT_DUPLICATE_INVOICE_ENTRIES');
+  if (duplicate) {
+    AppToaster.show({
+      message: duplicate.message || DUPLICATE_INVOICE_ENTRIES_MESSAGE,
+      intent: Intent.DANGER,
+    });
+  }
   if (getError('PAYMENT_ACCOUNT_CURRENCY_INVALID')) {
     AppToaster.show({
       message: intl.get(

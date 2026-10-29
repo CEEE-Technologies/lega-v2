@@ -13,6 +13,7 @@ import { ACCOUNT_TYPE } from '@/constants/accounts';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditPaymentReceivedDto } from '../dtos/PaymentReceived.dto';
 import {
+  findDuplicateDocument,
   isDocumentEntry,
   isOpeningBalanceEntry,
 } from '@/modules/Contacts/ContactOpeningBalance.constants';
@@ -121,6 +122,39 @@ export class PaymentReceivedValidators {
       });
     }
     return storedInvoices;
+  }
+
+  /**
+   * Validates that no invoice is listed more than once in the payment. Each
+   * line of a payment converts and relieves its invoice from the amount paid
+   * before the payment, so two lines on the same invoice would both start from
+   * the same point and double count the currency rounding (EUR 0.02 at 1.5
+   * paid as 0.01 + 0.01 relieved 0.04 instead of 0.03).
+   * @param {{ invoiceId?: number | null; entryType?: string }[]} entries
+   * @param {{ id: number }[]} storedDocuments - To name the invoice in the error.
+   */
+  public validateNoDuplicateInvoices(
+    entries: {
+      invoiceId?: number | null;
+      entryType?: string;
+      paymentAmount?: number;
+    }[],
+    storedInvoices: SaleInvoice[] = [],
+  ) {
+    const duplicate = findDuplicateDocument(entries, 'invoiceId');
+    if (!duplicate) return;
+
+    const invoice = storedInvoices.find((row) => row.id === duplicate.id);
+    const name = invoice?.invoiceNo || `Invoice #${duplicate.id}`;
+    throw new ServiceError(
+      ERRORS.PAYMENT_DUPLICATE_INVOICE_ENTRIES,
+      `${name} is listed twice in this payment. Combine the amounts into one line.`,
+      {
+        invoiceId: duplicate.id,
+        invoiceNo: invoice?.invoiceNo,
+        indexes: duplicate.indexes,
+      },
+    );
   }
 
   /**
