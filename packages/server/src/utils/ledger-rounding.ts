@@ -111,6 +111,7 @@ export const debitSide = (amount: number) =>
 interface IForeignAmountsEntry {
   debit: number;
   credit: number;
+  currencyCode?: string | null;
   exchangeRate?: number | null;
   foreignDebit?: number | null;
   foreignCredit?: number | null;
@@ -118,12 +119,17 @@ interface IForeignAmountsEntry {
 
 /**
  * The transaction currency amounts of a ledger line: the ones the builder
- * gave, else the base amounts when the rate is 1, else none (a row posted
- * before the foreign amounts were stored).
+ * gave, else the base amounts when the line is in the base currency, else
+ * none (null: read as base / rate, like a row posted before the foreign
+ * amounts were stored). A line in another currency at rate 1 is not taken
+ * as base: its amount may have more decimals than a cent (0.333).
+ * @param {IForeignAmountsEntry} entry
+ * @param {string} baseCurrency - The tenant base currency, when known.
  * @returns {{ foreignDebit: number | null; foreignCredit: number | null }}
  */
 export const resolveForeignAmounts = (
   entry: IForeignAmountsEntry,
+  baseCurrency?: string | null,
 ): { foreignDebit: number | null; foreignCredit: number | null } => {
   const given =
     (entry.foreignDebit !== undefined && entry.foreignDebit !== null) ||
@@ -135,7 +141,10 @@ export const resolveForeignAmounts = (
     };
   }
   const rate = entry.exchangeRate || 1;
-  return rate === 1
+  const isBaseCurrency =
+    !!baseCurrency &&
+    (!entry.currencyCode || entry.currencyCode === baseCurrency);
+  return isBaseCurrency && rate === 1
     ? {
         foreignDebit: roundMoney(entry.debit || 0),
         foreignCredit: roundMoney(entry.credit || 0),

@@ -82,24 +82,52 @@ describe('Ledger — foreign closing balance', () => {
     expect(reversed.getForeignClosingBalance()).toBe(-0.02);
   });
 
-  it('stores the base amounts as foreign amounts at rate 1, and none otherwise', () => {
+  it('stores the base amounts as foreign amounts for a base currency line only', () => {
     expect(
       transformLedgerEntryToTransaction(
         line({ exchangeRate: 1, currencyCode: 'USD', debit: 12.34 }),
+        'USD',
       ),
     ).toEqual(
       expect.objectContaining({ foreignDebit: 12.34, foreignCredit: 0 }),
     );
-    expect(transformLedgerEntryToTransaction(line({ debit: 0.03 }))).toEqual(
+    expect(
+      transformLedgerEntryToTransaction(line({ debit: 0.03 }), 'USD'),
+    ).toEqual(
+      expect.objectContaining({ foreignDebit: null, foreignCredit: null }),
+    );
+    // Codex: a EUR line at rate 1 is not base currency.
+    expect(
+      transformLedgerEntryToTransaction(
+        line({ exchangeRate: 1, debit: 0.333 }),
+        'USD',
+      ),
+    ).toEqual(
       expect.objectContaining({ foreignDebit: null, foreignCredit: null }),
     );
     expect(
       transformLedgerEntryToTransaction(
         line({ debit: 0.03, foreignDebit: 0.02 }),
+        'USD',
       ),
     ).toEqual(
       expect.objectContaining({ foreignDebit: 0.02, foreignCredit: 0 }),
     );
+  });
+
+  it('keeps a legacy EUR row at rate 1 with 0.333 exact through a reversal', () => {
+    // A row posted before the foreign amounts (NULL), in EUR at rate 1.
+    const legacy = line({
+      exchangeRate: 1,
+      debit: 0.333,
+      foreignDebit: null,
+      foreignCredit: null,
+    });
+    const added = new Ledger([legacy]).getForeignClosingBalance();
+    const removed = new Ledger([legacy]).reverse().getForeignClosingBalance();
+    expect(added).toBe(0.333);
+    // Rounding it to 0.33 on the way out left 0.003 on the contact.
+    expect(added + removed).toBe(0);
   });
 
   it('gives an exchange gain/loss line no foreign amount', () => {

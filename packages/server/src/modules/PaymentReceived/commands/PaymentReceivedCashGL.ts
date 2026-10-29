@@ -529,7 +529,11 @@ export class PaymentReceivedCashGL {
       isDocumentEntry(entry) &&
       !!entry.invoice &&
       moneyGt(entry.invoice.total, 0) &&
-      moneyGt(this.getPaymentEntryRecognizedLocalAmount(entry), 0)
+      // On the payment currency amount, not its conversion: EUR 0.01 at 0.4
+      // converts to 0.00, yet three of them pay a EUR 0.03 invoice (0.01 base).
+      // The running-total split recognizes that cent on the payment where it
+      // crosses, balanced by exchange gain/loss.
+      moneyGt(this.getPaymentEntryRecognizedAmount(entry), 0)
     );
   };
 

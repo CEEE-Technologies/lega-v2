@@ -66,6 +66,8 @@ export interface IRepairBalance {
 }
 
 export interface IMoneyRepairPlan {
+  /** The tenant base currency the plan was made with. */
+  baseCurrency?: string;
   sets: IRepairSet[];
   documents: IRepairDocument[];
   balances: IRepairBalance[];
@@ -422,6 +424,7 @@ export const planMoneyRepair = async (
     sets: await getSetsToRepost(knex, isLocked),
     documents: await getDocumentsToUpdate(knex, isLocked),
     balances: await getBalancesFromLedger(knex, baseCurrency),
+    baseCurrency,
   };
 };
 
@@ -503,7 +506,10 @@ export const applyLedgerRepair = async (
             : b.where('basis', set.basis),
         )
         .select('id', 'debit', 'credit', 'account_id as accountId')
-        .select('exchange_rate as exchangeRate')
+        .select(
+          'exchange_rate as exchangeRate',
+          'currency_code as currencyCode',
+        )
         .forUpdate();
 
       const { entries, unbalanced } = normalizeLedgerEntries(
@@ -536,8 +542,13 @@ export const applyLedgerRepair = async (
           Number(before.debit) !== after.debit ||
           Number(before.credit) !== after.credit
         ) {
-          // A base currency row's foreign amounts are its base amounts.
-          const isBase = hasForeign && Number(before.exchangeRate || 1) === 1;
+          // A base currency row's foreign amounts are its base amounts (a
+          // row in another currency at rate 1 is not base).
+          const isBase =
+            hasForeign &&
+            !!plan.baseCurrency &&
+            Number(before.exchangeRate || 1) === 1 &&
+            (!before.currencyCode || before.currencyCode === plan.baseCurrency);
           await trx('accounts_transactions')
             .where('id', before.id)
             .update({

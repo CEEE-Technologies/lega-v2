@@ -89,6 +89,7 @@ export interface ILedgerEntry {
 }
 
 export interface ISaveLedgerEntryQueuePayload {
+  baseCurrency?: string | null;
   tenantId: number;
   entry: ILedgerEntry;
   trx?: Knex.Transaction;

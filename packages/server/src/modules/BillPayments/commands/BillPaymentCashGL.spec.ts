@@ -457,3 +457,62 @@ describe('BillPaymentCashGL — payment account lines add up to the accrual line
     expectBalanced(entries);
   });
 });
+
+// Codex: a payment that converts to 0.00 (EUR 0.01 at 0.4) was not
+// recognized, so a bill paid as 3 x EUR 0.01 never had its expense
+// (EUR 0.03 = USD 0.01) recognized in cash basis.
+describe('BillPaymentCashGL — payments that convert to zero', () => {
+  const cents = (value: number) => Math.round((value || 0) * 100);
+
+  it('recognizes EUR 0.03 at 0.4 paid as 3 x 0.01 on the payment where the cent crosses', () => {
+    const bill = buildBill({
+      id: 51,
+      exchangeRate: 0.4,
+      totalLocal: 0.012,
+      entries: [
+        {
+          itemId: 10,
+          totalExcludingTax: 0.03,
+          taxAmount: 0,
+          costAccountId: 200,
+          item: { type: 'service' },
+        },
+      ],
+    });
+    let paid = 0;
+    let expense = 0;
+    let bank = 0;
+    let exchange = 0;
+    for (let i = 0; i < 3; i += 1) {
+      const entries = new BillPaymentCashGL(
+        buildBillPayment({
+          exchangeRate: 0.4,
+          amount: 0.01,
+          entries: [{ billId: 51, paymentAmount: 0.01, bill }],
+        }) as any,
+      )
+        .setTaxPayableAccountId(1)
+        .setPurchaseDiscountAccountId(2)
+        .setOtherExpensesAccountId(3)
+        .setPrepaidExpensesAccountId(4)
+        .setExchangeGainOrLossAccountId(5)
+        .setPaidBefore({ 51: paid })
+        .GLEntries();
+      const sum = (accountId: number, side: string) =>
+        entries
+          .filter((e) => e.accountId === accountId)
+          .reduce((t, e) => t + cents(e[side]), 0);
+      expect(entries.reduce((t, e) => t + cents(e.debit), 0)).toBe(
+        entries.reduce((t, e) => t + cents(e.credit), 0),
+      );
+      expect(sum(4, 'debit')).toBe(0);
+      expense += sum(200, 'debit') - sum(200, 'credit');
+      bank += sum(900, 'credit') - sum(900, 'debit');
+      exchange += sum(5, 'credit') - sum(5, 'debit');
+      paid = Math.round((paid + 0.01) * 100) / 100;
+    }
+    expect(expense).toBe(1);
+    expect(bank).toBe(0);
+    expect(exchange).toBe(1);
+  });
+});

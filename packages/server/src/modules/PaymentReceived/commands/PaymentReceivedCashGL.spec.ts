@@ -762,3 +762,54 @@ describe('PaymentReceivedCashGL — bank lines add up to the accrual bank line',
     expect(bank).toEqual([33.33, 66.67, 0.5]);
   });
 });
+
+// Codex: a payment that converts to 0.00 (EUR 0.01 at 0.4) was not
+// recognized, so an invoice paid as 3 x EUR 0.01 never had its income
+// (EUR 0.03 = USD 0.01) recognized in cash basis.
+describe('PaymentReceivedCashGL — payments that convert to zero', () => {
+  const cents = (value: number) => Math.round((value || 0) * 100);
+
+  it('recognizes EUR 0.03 at 0.4 paid as 3 x 0.01 on the payment where the cent crosses', () => {
+    const invoice = buildInvoice(
+      [buildItemEntry({ totalExcludingTax: 0.03 })],
+      {
+        id: 51,
+        exchangeRate: 0.4,
+        totalLocal: 0.01,
+      },
+    );
+    let paid = 0;
+    let income = 0;
+    let bank = 0;
+    let exchange = 0;
+    for (let i = 0; i < 3; i += 1) {
+      const entries = buildGL({
+        ...buildPayment(),
+        exchangeRate: 0.4,
+        amount: 0.01,
+        entries: [buildPaymentEntry(invoice, 0.01)],
+      } as unknown as PaymentReceived)
+        .setUnearnedRevenueAccountId(600)
+        .setExchangeGainOrLossAccountId(700)
+        .setPaidBefore({ 51: paid })
+        .GLEntries();
+      const sum = (accountId: number, side: string) =>
+        entries
+          .filter((e) => e.accountId === accountId)
+          .reduce((t, e) => t + cents(e[side]), 0);
+      expect(entries.reduce((t, e) => t + cents(e.debit), 0)).toBe(
+        entries.reduce((t, e) => t + cents(e.credit), 0),
+      );
+      // Nothing goes to unearned revenue: the payment pays the invoice.
+      expect(sum(600, 'credit')).toBe(0);
+      income += sum(500, 'credit') - sum(500, 'debit');
+      bank += sum(100, 'debit') - sum(100, 'credit');
+      exchange += sum(700, 'debit') - sum(700, 'credit');
+      paid = Math.round((paid + 0.01) * 100) / 100;
+    }
+    // Accrual income is USD 0.01; each bank line is round(0.004) = 0.00.
+    expect(income).toBe(1);
+    expect(bank).toBe(0);
+    expect(exchange).toBe(1);
+  });
+});
