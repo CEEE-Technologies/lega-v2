@@ -60,8 +60,11 @@ export function CustomersTransactionsTable({
 const CustomersTransactionsDataTable = styled(DataTable)`
   --color-table-border-left-color: #ececec;
   --color-table-customer-border-color: #ddd;
-  --color-table-border-left-color: var(--color-dark-gray4);
-  --color-table-customer-border-color: var(--color-dark-gray4);
+
+  .bp4-dark & {
+    --color-table-border-left-color: var(--color-dark-gray4);
+    --color-table-customer-border-color: var(--color-dark-gray4);
+  }
 
   .table {
     .tbody {
