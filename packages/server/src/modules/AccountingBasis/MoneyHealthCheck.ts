@@ -1,4 +1,16 @@
-import { moneyGt, moneyGte, toCents } from '@bigcapital/utils';
+import {
+  fromCents,
+  moneyGt,
+  moneyGte,
+  multiplyMoney,
+  toCents,
+} from '@bigcapital/utils';
+import {
+  CREDIT_NOTE_APPLICATIONS,
+  getCreditApplicationAdjustment,
+  getCreditApplicationRows,
+  VENDOR_CREDIT_APPLICATIONS,
+} from './CreditApplications';
 import { Knex } from 'knex';
 import * as moment from 'moment';
 import {
@@ -34,6 +46,10 @@ import {
  *   in the app getters (the "one answer" parity of the money SQL),
  * - (f) payments (received and made) whose cash basis bank lines don't add
  *   up to the accrual bank line,
+ * - (h) fully settled foreign currency invoices and bills whose A/R (A/P)
+ *   lines don't add up to 0 for the document (the document, its payments'
+ *   relief at its rate, the credits applied with their exchange lines, the
+ *   write-off),
  * - (g) payments listing the same invoice or bill on more than one line
  *   (now rejected; each line relieved its document from the same point, so
  *   the currency rounding was double counted).
@@ -113,6 +129,15 @@ export interface IMoneyHealthDuplicateDocumentLines {
   lines: number;
 }
 
+export interface IMoneyHealthSettledDocumentDifference {
+  documentType: 'SaleInvoice' | 'Bill';
+  documentId: number;
+  documentNo: string;
+  /** What is left on A/R (A/P) for the document, base currency. */
+  left: number;
+  locked: boolean;
+}
+
 export interface IMoneyHealthResult {
   unbalancedSets: IMoneyHealthUnbalancedSet[];
   nonCentRows: IMoneyHealthNonCentRow[];
@@ -137,6 +162,10 @@ export interface IMoneyHealthResult {
    * before the foreign amounts were stored (re-post them to check).
    */
   balancesSkipped?: { accounts: number; contacts: number };
+  /** (h) Fully settled foreign documents with A/R (A/P) left. */
+  settledDocumentDifferences?: IMoneyHealthSettledDocumentDifference[];
+  /** Documents checked by (h). */
+  settledDocumentsChecked?: number;
   /** (g) Payments listing the same document on more than one line. */
   duplicateDocumentLines?: IMoneyHealthDuplicateDocumentLines[];
 }
@@ -256,6 +285,7 @@ const SALES_TYPES = [
   'RefundCreditNote',
   'CustomerOpeningBalance',
   'InvoiceWriteOff',
+  'CreditNoteApplyInvoice',
 ];
 const PURCHASES_TYPES = [
   'Bill',
@@ -264,6 +294,7 @@ const PURCHASES_TYPES = [
   'RefundVendorCredit',
   'VendorOpeningBalance',
   'LandedCost',
+  'VendorCreditApplyBill',
 ];
 
 const lockingGroupOf = (referenceType: string) =>
@@ -956,6 +987,157 @@ const getDuplicateDocumentLines = async (
   return result;
 };
 
+const SETTLED_KINDS = [
+  {
+    documentType: 'SaleInvoice' as const,
+    table: 'sales_invoices',
+    numberColumn: 'invoice_no',
+    dateColumn: 'invoice_date',
+    dueSql: SALE_INVOICE_MONEY_SQL.due,
+    application: CREDIT_NOTE_APPLICATIONS,
+    paymentEntriesTable: 'payment_receives_entries',
+    paymentDocumentColumn: 'invoice_id',
+    writeoffType: 'InvoiceWriteOff',
+    sign: 1,
+  },
+  {
+    documentType: 'Bill' as const,
+    table: 'bills',
+    numberColumn: 'bill_number',
+    dateColumn: 'bill_date',
+    dueSql: BILL_MONEY_SQL.due,
+    application: VENDOR_CREDIT_APPLICATIONS,
+    paymentEntriesTable: 'bills_payments_entries',
+    paymentDocumentColumn: 'bill_id',
+    writeoffType: null,
+    sign: -1,
+  },
+];
+
+/**
+ * (h) Fully settled foreign currency invoices and bills whose A/R (A/P)
+ * isn't cleared for the document: its own A/R line, less its payments'
+ * relief at its rate (round(paid x rate): each payment relieves a running
+ * total, with exchange gain/loss for its own rate), less what the applied
+ * credits relieved (their part at the credit rate, adjusted by the
+ * application's exchange lines), less the write-off, must be 0.
+ */
+const getSettledDocumentDifferences = async (
+  knex: Knex,
+  isLocked: IsLockedFn,
+) => {
+  const differences: IMoneyHealthSettledDocumentDifference[] = [];
+  let checked = 0;
+
+  const arapAccounts: any[] = await knex
+    .queryBuilder()
+    .from('accounts')
+    .whereIn('account_type', [
+      ACCOUNT_TYPE.ACCOUNTS_RECEIVABLE,
+      ACCOUNT_TYPE.ACCOUNTS_PAYABLE,
+    ])
+    .select('id');
+  const arapIds = arapAccounts.map((row) => row.id);
+  if (arapIds.length === 0) return { differences, checked };
+
+  /** A/R (A/P) debit - credit cents of the references, by reference id. */
+  const arapNet = async (referenceType: string, ids: number[]) => {
+    if (ids.length === 0) return new Map<number, number>();
+    const rows: any[] = await knex
+      .queryBuilder()
+      .from('accounts_transactions')
+      .where('reference_type', referenceType)
+      .whereIn('reference_id', ids)
+      .whereIn('account_id', arapIds)
+      .where((b) => b.whereNull('basis').orWhere('basis', '<>', 'cash'))
+      .groupBy('reference_id')
+      .select('reference_id as referenceId')
+      .select(knex.raw('SUM(?? - ??) as ??', ['debit', 'credit', 'net']));
+    return new Map(rows.map((row) => [row.referenceId, toCents(row.net)]));
+  };
+
+  for (const kind of SETTLED_KINDS) {
+    const documents: any[] = await knex
+      .queryBuilder()
+      .from(kind.table)
+      .whereNot('exchange_rate', 1)
+      .whereNotNull('exchange_rate')
+      .select(
+        'id',
+        `${kind.numberColumn} as documentNo`,
+        `${kind.dateColumn} as documentDate`,
+        'exchange_rate as exchangeRate',
+      )
+      .select(knex.raw(`${kind.dueSql} as settled_check_due`));
+    const settled = documents.filter(
+      (doc) =>
+        toCents(Number(doc.settledCheckDue ?? doc.settled_check_due)) === 0,
+    );
+    if (settled.length === 0) continue;
+    const ids = settled.map((doc) => doc.id);
+
+    const paid: any[] = await knex
+      .queryBuilder()
+      .from(kind.paymentEntriesTable)
+      .whereIn(kind.paymentDocumentColumn, ids)
+      .where((b) =>
+        b.whereNull('entry_type').orWhereNot('entry_type', 'opening_balance'),
+      )
+      .groupBy(kind.paymentDocumentColumn)
+      .select(`${kind.paymentDocumentColumn} as documentId`)
+      .sum('payment_amount as paid');
+    const paidById = new Map(paid.map((p) => [p.documentId, Number(p.paid)]));
+    const documentNet = await arapNet(kind.documentType, ids);
+    const writeoffNet = kind.writeoffType
+      ? await arapNet(kind.writeoffType, ids)
+      : new Map<number, number>();
+    const applications = await getCreditApplicationRows(
+      knex,
+      kind.application,
+      {
+        documentIds: ids,
+      },
+    );
+    const applicationNet = await arapNet(
+      kind.application.referenceType,
+      applications.map((row) => row.id),
+    );
+
+    settled.forEach((doc) => {
+      checked += 1;
+      const rate = Number(doc.exchangeRate || 1);
+      const paymentsRelief = toCents(
+        multiplyMoney(paidById.get(doc.id) || 0, rate),
+      );
+      const own = applications.filter((row) => row.documentId === doc.id);
+      const creditParts = own.reduce(
+        (sum, row) =>
+          sum + toCents(getCreditApplicationAdjustment(row).creditPart),
+        0,
+      );
+      const adjustments = own.reduce(
+        (sum, row) => sum + (applicationNet.get(row.id) || 0),
+        0,
+      );
+      const leftCents =
+        (documentNet.get(doc.id) || 0) -
+        kind.sign * (paymentsRelief + creditParts) +
+        adjustments +
+        (writeoffNet.get(doc.id) || 0);
+      if (leftCents !== 0) {
+        differences.push({
+          documentType: kind.documentType,
+          documentId: doc.id,
+          documentNo: doc.documentNo ?? `#${doc.id}`,
+          left: fromCents(leftCents),
+          locked: isLocked(doc.documentDate, kind.documentType),
+        });
+      }
+    });
+  }
+  return { differences, checked };
+};
+
 /**
  * Runs the money health check on the given tenant database.
  * @param {Knex} knex - Tenant database connection.
@@ -975,6 +1157,7 @@ export const checkMoneyHealth = async (
   const documentParity = await getDocumentParityDifferences(knex);
   const paymentBanks = await getPaymentBankDifferences(knex, isLocked);
   const duplicateDocumentLines = await getDuplicateDocumentLines(knex);
+  const settledDocuments = await getSettledDocumentDifferences(knex, isLocked);
 
   return {
     unbalancedSets,
@@ -989,6 +1172,8 @@ export const checkMoneyHealth = async (
     paymentsChecked: paymentBanks.checked,
     paymentsSkipped: paymentBanks.skipped,
     duplicateDocumentLines,
+    settledDocumentDifferences: settledDocuments.differences,
+    settledDocumentsChecked: settledDocuments.checked,
     balancesSkipped: balances.legacyForeign,
   };
 };
@@ -1005,7 +1190,8 @@ export const isMoneyHealthClean = (result: IMoneyHealthResult) =>
   result.cashDocumentDifferences.every((row) => row.locked) &&
   (result.documentDifferences ?? []).length === 0 &&
   (result.paymentBankDifferences ?? []).every((row) => row.locked) &&
-  (result.duplicateDocumentLines ?? []).length === 0;
+  (result.duplicateDocumentLines ?? []).length === 0 &&
+  (result.settledDocumentDifferences ?? []).every((row) => row.locked);
 
 /**
  * Formats the result as printable lines.
@@ -1078,6 +1264,16 @@ export const formatMoneyHealth = (result: IMoneyHealthResult): string[] => {
   duplicates.forEach((row) =>
     lines.push(
       `      ${row.paymentType} ${row.paymentNo} (#${row.paymentId}): ${row.documentNo} (#${row.documentId}) on ${row.lines} lines`,
+    ),
+  );
+  const settledDifferences = result.settledDocumentDifferences ?? [];
+  lines.push(
+    `  (h) Fully settled foreign invoices and bills with A/R or A/P left: ${settledDifferences.length}` +
+      ` (${result.settledDocumentsChecked ?? 0} documents checked)`,
+  );
+  settledDifferences.forEach((row) =>
+    lines.push(
+      `      ${row.documentType} ${row.documentNo} (#${row.documentId}): ${row.left} left${lockedTag(row.locked)}`,
     ),
   );
   return lines;

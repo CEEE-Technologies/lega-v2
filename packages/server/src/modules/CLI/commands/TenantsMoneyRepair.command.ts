@@ -27,7 +27,8 @@ interface TenantsMoneyRepairOptions {
     'Repairs the money stored before the rounding fixes. Dry run by default: lists, per tenant, the ledger sets to ' +
     're-post (rows not in whole cents, unbalanced sets), the documents whose stored totals change with the new line ' +
     'maths, the transactions in locked periods (skipped) and the stored balances to recalculate. ' +
-    '--apply (with --organization, after a database backup) re-posts them, rebuilds the cash basis set in date order ' +
+    '--apply (with --organization, after a database backup) re-posts them, rebuilds the cash basis set in date order, ' +
+    'the exchange lines of the applied credits and the write-offs, ' +
     'and recalculates the stored balances. --check runs the money health check.',
 })
 export class TenantsMoneyRepairCommand extends BaseCommand {
@@ -166,7 +167,11 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
 
     // 2. Rebuild the cash basis set in date order, in this application
     //    (the GL builders and the tenant context are needed).
-    const rebuild = await this.rebuildCashBasis(organizationId);
+    const {
+      cash: rebuild,
+      credits,
+      writeoffs,
+    } = await this.rebuildCashBasis(organizationId);
     this.log(
       `[${organizationId}] Cash basis rebuilt: ${Object.entries(rebuild.rebuilt)
         .map(([type, count]) => `${type} ${count}`)
@@ -178,6 +183,9 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
       this.log(
         `  Failed ${failure.referenceType} #${failure.referenceId}: ${failure.error}`,
       ),
+    );
+    this.log(
+      `[${organizationId}] Credit applications' exchange lines rebuilt: ${credits.rebuilt}; orphans removed ${credits.orphansRemoved}; locked skipped ${credits.skipped}. Write-offs rebuilt: ${writeoffs}.`,
     );
 
     // 3. Recalculate the stored balances from their ledger rows.
@@ -203,6 +211,12 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
     const { CashBasisRebuildService } = await import(
       '@/modules/AccountingBasis/CashBasisRebuild.service'
     );
+    const { CreditApplicationsGLService } = await import(
+      '@/modules/AccountingBasis/CreditApplicationsGL.service'
+    );
+    const { SaleInvoiceWriteoffGLStorage } = await import(
+      '@/modules/SaleInvoices/commands/writeoff/SaleInvoiceWriteoffGLStorage'
+    );
     const app = await NestFactory.create(AppModule, {
       logger: ['error', 'warn'],
     });
@@ -214,7 +228,21 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
         // The tenant providers (e.g. its database) resolve from the context.
         await cls.resolveProxyProviders();
         const service = await app.resolve(CashBasisRebuildService);
-        return service.rebuild(organizationId);
+        const cash = await service.rebuild(organizationId);
+
+        // The exchange lines of the applied credits, then the write-offs
+        // (what the payments and credits leave), locked periods skipped.
+        const creditsService = await app.resolve(CreditApplicationsGLService);
+        const credits = await creditsService.rebuildAll();
+
+        const writeoffStorage = await app.resolve(
+          SaleInvoiceWriteoffGLStorage,
+          undefined,
+          { strict: false },
+        );
+        const writeoffs =
+          await writeoffStorage.rewriteAllWrittenoffInvoicesEntries();
+        return { cash, credits, writeoffs };
       });
     } finally {
       await app.close();

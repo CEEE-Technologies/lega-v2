@@ -639,5 +639,8 @@ export const formatMoneyRepairPlan = (plan: IMoneyRepairPlan): string[] => {
   lines.push(
     '  The cash basis set of every payment and refund is rebuilt in date order (locked periods skipped).',
   );
+  lines.push(
+    '  The exchange lines of every applied credit and every write-off are rebuilt (locked periods skipped).',
+  );
   return lines;
 };
