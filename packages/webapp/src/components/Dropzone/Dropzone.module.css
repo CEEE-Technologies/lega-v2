@@ -1,9 +1,11 @@
+:global(.bp4-dark) .root {
+  --color-dropzone-background: rgba(255, 255, 255, 0.05);
+  --color-dropzone-border: rgba(255, 255, 255, 0.1);
+}
+
 .root {
   --color-dropzone-background: #fff;
   --color-dropzone-border: #c5cbd3;
-
-  --color-dropzone-background: rgba(255, 255, 255, 0.05);
-  --color-dropzone-border: rgba(255, 255, 255, 0.1);
 
   padding: 20px;
   border-radius: 6px;
