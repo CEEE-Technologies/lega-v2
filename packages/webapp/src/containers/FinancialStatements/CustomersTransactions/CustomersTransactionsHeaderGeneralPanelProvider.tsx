@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { FinancialHeaderLoadingSkeleton } from '../FinancialHeaderLoadingSkeleton';
-import { useCustomers } from '@/hooks/query';
+import { useAllCustomers } from '@/hooks/query';
 
 interface CustomersTransactionsGeneralPanelContextValue {
   customers: any;
@@ -27,7 +27,7 @@ function CustomersTransactionsGeneralPanelProvider({
     data: customersData,
     isFetching: isCustomersFetching,
     isLoading: isCustomersLoading,
-  } = useCustomers();
+  } = useAllCustomers();
 
   const provider: CustomersTransactionsGeneralPanelContextValue = {
     customers: customersData?.data || [],

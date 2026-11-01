@@ -93,10 +93,10 @@ function PaymentsReceivedActionsBarInner({
     history.push('/payments-received/import');
   };
   const handleExportBtnClick = () => {
-    openDialog(DialogsName.Export, { resource: 'payment_receive' });
+    openDialog(DialogsName.Export, { resource: 'payment_received' });
   };
   const handlePrintBtnClick = () => {
-    downloadExportPdf({ resource: 'PaymentReceive' });
+    downloadExportPdf({ resource: 'PaymentReceived' });
   };
   const handleCustomizeBtnClick = () => {
     openDrawer(DRAWERS.BRANDING_TEMPLATES, { resource: 'PaymentReceive' });

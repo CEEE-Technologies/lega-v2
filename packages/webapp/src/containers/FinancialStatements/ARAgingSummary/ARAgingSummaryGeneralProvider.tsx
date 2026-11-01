@@ -1,7 +1,7 @@
 import { CustomersListResponse } from '@bigcapital/sdk-ts';
 import React, { createContext, useContext } from 'react';
 import { FinancialHeaderLoadingSkeleton } from '../FinancialHeaderLoadingSkeleton';
-import { useCustomers } from '@/hooks/query';
+import { useAllCustomers, useCustomers } from '@/hooks/query';
 
 type UseCustomersResult = ReturnType<typeof useCustomers>;
 
@@ -20,7 +20,8 @@ function ARAgingSummaryGeneralProvider({
 }: {
   children?: React.ReactNode;
 }) {
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers();
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
 
   const provider: ARAgingSummaryGeneralContextValue = {
     customers: customersData?.data,

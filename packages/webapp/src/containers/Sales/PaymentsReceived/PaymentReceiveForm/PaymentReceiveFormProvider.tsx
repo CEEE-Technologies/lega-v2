@@ -8,6 +8,7 @@ import {
   useSettingsPaymentReceives,
   usePaymentReceiveEditPage,
   useAccounts,
+  useAllCustomers,
   useCustomers,
   useBranches,
   useCreatePaymentReceive,
@@ -125,9 +126,8 @@ function PaymentReceiveFormProvider({
   const { data: paymentReceiveSettings } = useSettingsPaymentReceives();
 
   // Fetches customers list.
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers({
-    page_size: 10000,
-  });
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
 
   // Fetches the branches list.
   const {

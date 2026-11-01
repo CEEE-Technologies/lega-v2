@@ -1,8 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 import { createExpenseViaApi, readApiAuth } from './_api';
-
-const API_BASE = process.env.PLAYWRIGHT_TEST_API_URL || 'http://localhost:3000';
+import { API_BASE } from './_env';
 
 const seedReferenceNo = () =>
   `BS-${faker.string.alphanumeric(6).toUpperCase()}`;

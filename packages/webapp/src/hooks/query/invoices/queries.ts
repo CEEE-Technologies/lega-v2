@@ -37,6 +37,7 @@ import { estimatesKeys } from '../estimates/query-keys';
 import { financialReportsKeys } from '../FinancialReports/query-keys';
 import { itemsKeys } from '../items/query-keys';
 import { organizationKeys } from '../organization/query-keys';
+import { paymentReceivesKeys } from '../payment-receives/query-keys';
 import { settingsKeys } from '../settings/query-keys';
 import { invoicesKeys } from './query-keys';
 import type {
@@ -56,6 +57,16 @@ function commonInvalidateQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ) {
   queryClient.invalidateQueries({ queryKey: invoicesKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: invoicesKeys.detail(null).slice(0, 1),
+  });
+  // The open invoices listed in the payment forms.
+  queryClient.invalidateQueries({
+    queryKey: paymentReceivesKeys.newEntries().slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentReceivesKeys.editPage(null).slice(0, 1),
+  });
   queryClient.invalidateQueries({ queryKey: customersKeys.all() });
   queryClient.invalidateQueries({ queryKey: itemsKeys.all() });
   queryClient.invalidateQueries({ queryKey: settingsKeys.invoices() });

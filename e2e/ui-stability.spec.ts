@@ -1,5 +1,6 @@
 import { test, expect as baseExpect } from "@playwright/test";
 import { createOnboardedUser } from "./_auth";
+import { API_BASE } from "./_env";
 
 // Allow cold Vite module loading before asserting interactive UI.
 const expect = baseExpect.configure({ timeout: 20_000 });
@@ -121,7 +122,7 @@ test.describe("booting after login", () => {
     page,
   }) => {
     const session = await createOnboardedUser(
-      process.env.PLAYWRIGHT_TEST_API_URL || "http://localhost:3000",
+      API_BASE,
     );
     await page.goto("/auth/login");
     await expect(

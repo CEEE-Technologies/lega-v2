@@ -30,6 +30,7 @@ import { cashflowAccountsKeys } from '../cashflow-accounts/query-keys';
 import { financialReportsKeys } from '../FinancialReports/query-keys';
 import { itemsKeys } from '../items/query-keys';
 import { organizationKeys } from '../organization/query-keys';
+import { paymentMadesKeys } from '../payment-mades/query-keys';
 import { settingsKeys } from '../settings/query-keys';
 import { vendorsKeys } from '../vendors/query-keys';
 import { vendorCreditsKeys } from './query-keys';
@@ -67,7 +68,20 @@ const commonInvalidateQueries = (
   queryClient.invalidateQueries({
     queryKey: vendorCreditsKeys.reconciles(null).slice(0, 1),
   });
+  queryClient.invalidateQueries({
+    queryKey: vendorCreditsKeys.detail(null).slice(0, 1),
+  });
+  // The bills, the open bill panel and the payment form's list.
   queryClient.invalidateQueries({ queryKey: billsKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: billsKeys.detail(null).slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentMadesKeys.newEntries().slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentMadesKeys.editPage(null).slice(0, 1),
+  });
   queryClient.invalidateQueries({
     queryKey: cashflowAccountsKeys.transactionsInfinity().slice(0, 1),
   });

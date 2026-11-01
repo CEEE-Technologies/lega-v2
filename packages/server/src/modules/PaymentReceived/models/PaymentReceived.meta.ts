@@ -10,6 +10,10 @@ export const PaymentReceivedMeta = {
   importAggregateOn: 'entries',
   importAggregateBy: 'paymentReceiveNo',
 
+  print: {
+    pageTitle: 'Payments Received',
+  },
+
   fields: {
     customer: {
       name: 'payment_receive.field.customer',

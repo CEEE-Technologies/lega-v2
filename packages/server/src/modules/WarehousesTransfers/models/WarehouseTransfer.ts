@@ -4,8 +4,11 @@ import { Warehouse } from '@/modules/Warehouses/models/Warehouse.model';
 import { WarehouseTransferEntry } from './WarehouseTransferEntry';
 import { InjectModelMeta } from '@/modules/Tenancy/TenancyModels/decorators/InjectModelMeta.decorator';
 import { WarehouseTransferMeta } from './WarehouseTransfer.meta';
+import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
+import { DEFAULT_VIEWS } from '../constants';
 
 @InjectModelMeta(WarehouseTransferMeta)
+@InjectModelDefaultViews(DEFAULT_VIEWS)
 export class WarehouseTransfer extends TenantBaseModel {
   public date!: Date;
   public transferInitiatedAt!: Date;

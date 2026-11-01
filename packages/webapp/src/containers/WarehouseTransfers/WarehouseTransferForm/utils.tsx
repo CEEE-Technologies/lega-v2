@@ -15,11 +15,11 @@ import {
   updateItemsEntriesTotal,
   ensureEntriesHaveEmptyLine,
 } from '@/containers/Entries/utils';
+import { useSyncAutoIncrementNumber } from '@/hooks/useSyncAutoIncrementNumber';
 import { useWatch } from '@/hooks/utils';
 import {
   transformToForm,
   repeatValue,
-  transactionNumber,
   defaultFastFieldShouldUpdate,
   updateTableRow,
   updateMinEntriesLines,
@@ -91,18 +91,23 @@ export function transformToEditForm(
 }
 
 /**
- * Syncs transfer no. settings with form.
+ * Syncs transfer no. settings with form. Editing keeps the transfer's own
+ * number, nothing is applied while auto-numbering is off, and nothing is
+ * written before the settings have loaded.
  */
 export const useObserveTransferNoSettings = (
-  prefix: string,
-  nextNumber: number,
+  prefix: string | undefined,
+  nextNumber: number | undefined,
+  autoIncrement: boolean | undefined,
+  isNewMode: boolean,
 ) => {
-  const { setFieldValue } = useFormikContext<WarehouseTransferFormValues>();
-
-  React.useEffect(() => {
-    const transferNo = transactionNumber(prefix, nextNumber);
-    setFieldValue('transactionNumber', transferNo);
-  }, [setFieldValue, prefix, nextNumber]);
+  useSyncAutoIncrementNumber({
+    fieldName: 'transactionNumber',
+    prefix,
+    nextNumber,
+    autoIncrement,
+    isNewMode,
+  });
 };
 
 interface EntriesFieldProps {

@@ -18,6 +18,14 @@ import {
   UseQueryOptions,
 } from '@tanstack/react-query';
 import { useApiFetcher } from '../../useRequest';
+import { accountsKeys } from '../accounts/query-keys';
+import { financialReportsKeys } from '../FinancialReports/query-keys';
+import { itemsKeys } from '../items/query-keys';
+import { organizationKeys } from '../organization/query-keys';
+import { paymentMadesKeys } from '../payment-mades/query-keys';
+import { settingsKeys } from '../settings/query-keys';
+import { vendorCreditsKeys } from '../vendor-credit/query-keys';
+import { vendorsKeys } from '../vendors/query-keys';
 import { billsKeys } from './query-keys';
 import type {
   Bill,
@@ -33,6 +41,34 @@ const commonInvalidateQueries = (
   queryClient: ReturnType<typeof useQueryClient>,
 ) => {
   queryClient.invalidateQueries({ queryKey: billsKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: billsKeys.detail(null).slice(0, 1),
+  });
+  // The open bills listed in the payment forms.
+  queryClient.invalidateQueries({
+    queryKey: paymentMadesKeys.newEntries().slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentMadesKeys.editPage(null).slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: vendorCreditsKeys.reconcile(null).slice(0, 1),
+  });
+  // Supplier balances, stock, accounts and reports.
+  queryClient.invalidateQueries({ queryKey: vendorsKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: vendorsKeys.detail(null).slice(0, 1),
+  });
+  queryClient.invalidateQueries({ queryKey: itemsKeys.all() });
+  queryClient.invalidateQueries({ queryKey: accountsKeys.all() });
+  queryClient.invalidateQueries({ queryKey: settingsKeys.bills() });
+  queryClient.invalidateQueries({ queryKey: financialReportsKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: financialReportsKeys.transactionsByReference().slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: organizationKeys.mutateAbilities(),
+  });
 };
 
 export function useCreateBill(

@@ -20,8 +20,8 @@ import {
   readApiAuth,
 } from "../_api";
 import { findLowContrastText, findWrongThemeSurfaces } from "./contrast";
+import { API_BASE } from "../_env";
 
-const API_BASE = process.env.PLAYWRIGHT_TEST_API_URL || "http://localhost:3000";
 const OUT = path.resolve(__dirname, "../../test-results/theme-audit");
 const THEMES = ["light", "dark"] as const;
 

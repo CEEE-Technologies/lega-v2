@@ -30,6 +30,8 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('swagger', app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000);
+  // SERVER_PORT is shared with the webapp dev server and the browser tests;
+  // PORT still works on its own.
+  await app.listen(process.env.SERVER_PORT ?? process.env.PORT ?? 3000);
 }
 bootstrap();

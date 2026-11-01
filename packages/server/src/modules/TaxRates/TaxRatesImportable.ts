@@ -4,8 +4,11 @@ import { Importable } from '../Import/Importable';
 import { TaxRatesSampleData } from './TaxRatesImportable.SampleData';
 import { CreateTaxRateDto } from './dtos/TaxRate.dto';
 import { Injectable } from '@nestjs/common';
+import { ImportableService } from '../Import/decorators/Import.decorator';
 
 @Injectable()
+// The webapp's resource name; ResourceService maps it to TaxRateModel.
+@ImportableService({ name: 'TaxRate' })
 export class TaxRatesImportable extends Importable {
   constructor(private readonly createTaxRateService: CreateTaxRate) {
     super();

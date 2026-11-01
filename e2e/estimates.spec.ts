@@ -11,8 +11,7 @@ import {
   waitForEstimateForm,
   waitForEstimatesList,
 } from './_estimates';
-
-const API_BASE = process.env.PLAYWRIGHT_TEST_API_URL || 'http://localhost:3000';
+import { API_BASE } from './_env';
 
 // Unique name so the estimate form's item picker resolves a single item.
 const ITEM_NAME = `E2E Est Item ${faker.string.alphanumeric(6)}`;

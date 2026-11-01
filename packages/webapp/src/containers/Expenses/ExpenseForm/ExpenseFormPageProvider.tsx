@@ -6,7 +6,7 @@ import { DashboardInsider } from '@/components/Dashboard';
 import { Features } from '@/constants';
 import {
   useCurrencies,
-  useCustomers,
+  useAllCustomers,
   useExpense,
   useAccounts,
   useBranches,
@@ -40,7 +40,8 @@ function ExpenseFormPageProvider({
   const { data: currencies, isLoading: isCurrenciesLoading } = useCurrencies();
 
   // Fetches customers list.
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers();
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
 
   // Fetch the expense details.
   const { data: expense, isLoading: isExpenseLoading } = useExpense(expenseId, {

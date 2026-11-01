@@ -19,7 +19,7 @@ import {
   useCreateCreditNote,
   useEditCreditNote,
   useItems,
-  useCustomers,
+  useAllCustomers,
   useWarehouses,
   useBranches,
   useSettingsCreditNotes,
@@ -94,20 +94,23 @@ function CreditNoteFormProvider({
   const isBranchFeatureCan = featureCan(Features.Branches);
 
   // Handle fetch customers data table or list
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers({
-    page_size: 10000,
-  });
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
   // Handle fetching the items table based on the given query.
   const { data: itemsData, isLoading: isItemsLoading } = useItems({
     page_size: 10000,
   });
   // Handle fetch  credit details.
-  const { data: creditNote, isLoading: isCreditNoteLoading } = useCreditNote(
-    creditNoteId,
-    {
-      enabled: !!creditNoteId,
-    },
-  );
+  const {
+    data: creditNote,
+    isLoading: isCreditNoteLoading,
+    isFetchedAfterMount: isCreditNoteFetched,
+  } = useCreditNote(creditNoteId, {
+    enabled: !!creditNoteId,
+    // Formik reads the values only once, so a cached copy would stick even
+    // after fresh data arrives. Always fetch on open and wait for it.
+    refetchOnMount: 'always',
+  });
   // Handle fetch invoice detail.
   const { data: invoice, isLoading: isInvoiceLoading } = useInvoice(invoiceId);
 
@@ -161,6 +164,7 @@ function CreditNoteFormProvider({
     isItemsLoading ||
     isCustomersLoading ||
     isCreditNoteLoading ||
+    (!!creditNoteId && !isCreditNoteFetched) ||
     isInvoiceLoading ||
     isBrandingTemplatesLoading;
 

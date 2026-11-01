@@ -43,6 +43,21 @@ export function useCustomers(
   });
 }
 
+/**
+ * The server returns 12 contacts per page by default. Pickers and report
+ * filters need every contact, so they ask for one big page.
+ */
+export const ALL_CONTACTS_PAGE_SIZE = 10000;
+
+/**
+ * All customers, for pickers and report filters.
+ */
+export function useAllCustomers(
+  props?: Omit<UseQueryOptions<CustomersListResponse>, 'queryKey' | 'queryFn'>,
+) {
+  return useCustomers({ page_size: ALL_CONTACTS_PAGE_SIZE }, props);
+}
+
 export function useEditCustomer(
   props?: UseMutationOptions<void, Error, [number, EditCustomerBody]>,
 ) {
