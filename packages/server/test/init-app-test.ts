@@ -5,8 +5,9 @@ import { AppModule } from '../src/modules/App/App.module';
 
 let app: INestApplication;
 
-const email = 'kk@kk.com';
-const password = '1231231230';
+// E2E_EMAIL / E2E_PASSWORD run the suite against another test company.
+const email = process.env.E2E_EMAIL || 'kk@kk.com';
+const password = process.env.E2E_PASSWORD || '1231231230';
 
 let orgainzationId = '';
 let authenticationToken = '';

@@ -1,4 +1,3 @@
-import { map, head } from 'lodash';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   IComputeItemCostJobCompletedPayload,
@@ -116,15 +115,15 @@ export class InventoryCostSubscriber {
     if (ignoreWithTransactionTypes.indexOf(transactionType) !== -1) {
       return;
     }
-    const inventoryItemsIds = map(oldInventoryTransactions, 'itemId');
-    const startingDates = map(oldInventoryTransactions, 'date');
-    const startingDate = new Date(head(startingDates));
-
+    // Nothing to recompute when the document had no stock movements.
+    if (!oldInventoryTransactions?.length) {
+      return;
+    }
     runAfterTransaction(trx, async () => {
       try {
-        await this.saleInvoicesCost.scheduleComputeCostByItemsIds(
-          inventoryItemsIds,
-          startingDate,
+        // Each item from the earliest date of its removed movements.
+        await this.saleInvoicesCost.scheduleComputeCostByInventoryTransactions(
+          oldInventoryTransactions,
         );
       } catch (error) {
         console.error(error);

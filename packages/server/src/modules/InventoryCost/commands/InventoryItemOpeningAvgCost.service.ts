@@ -62,6 +62,50 @@ export class InventoryItemOpeningAvgCostService {
   }
 
   /**
+   * Retrieves the last known average cost of the item before the given
+   * date: the unit cost of its latest costed sale or stock-out, otherwise
+   * the average of what came in. Used to value a return while no stock is
+   * left.
+   * @param {Date} closingDate - Closing date.
+   * @param {number} itemId - Item id.
+   * @returns {Promise<number>}
+   */
+  public async getLastAverageCost(
+    closingDate: Date,
+    itemId: number,
+  ): Promise<number> {
+    const lastOut = await this.inventoryCostLotTrackerModel()
+      .query()
+      .where('item_id', itemId)
+      .where('direction', 'OUT')
+      .where('quantity', '>', 0)
+      .where('cost', '>', 0)
+      .modify((builder) => {
+        if (closingDate) builder.where('date', '<', closingDate);
+      })
+      .orderBy('date', 'DESC')
+      .orderBy('id', 'DESC')
+      .first();
+
+    if (lastOut) {
+      return lastOut.cost / lastOut.quantity;
+    }
+    const totalIn = (await this.inventoryCostLotTrackerModel()
+      .query()
+      .where('item_id', itemId)
+      .where('direction', 'IN')
+      .where('quantity', '>', 0)
+      .modify((builder) => {
+        if (closingDate) builder.where('date', '<', closingDate);
+      })
+      .sum('cost as cost')
+      .sum('quantity as quantity')
+      .first()) as unknown as { cost: number; quantity: number };
+
+    return totalIn?.quantity > 0 ? totalIn.cost / totalIn.quantity : 0;
+  }
+
+  /**
    * Computes the item average cost.
    * @static
    * @param {number} quantityIn

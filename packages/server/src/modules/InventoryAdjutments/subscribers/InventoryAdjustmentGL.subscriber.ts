@@ -7,12 +7,31 @@ import {
 } from '../types/InventoryAdjustments.types';
 import { IInventoryAdjustmentEventCreatedPayload } from '../types/InventoryAdjustments.types';
 import { events } from '@/common/events/events';
+import { IInventoryCostLotsGLEntriesWriteEvent } from '@/modules/InventoryCost/types/InventoryCost.types';
+import { InventoryAdjustmentCostGLEntries } from '../commands/ledger/InventoryAdjustmentCostGLEntries';
 
 @Injectable()
 export class InventoryAdjustmentsGLSubscriber {
   constructor(
     private readonly inventoryAdjustmentGL: InventoryAdjustmentsGLEntries,
+    private readonly inventoryAdjustmentCostGL: InventoryAdjustmentCostGLEntries,
   ) {}
+
+  /**
+   * Writes the decrease adjustments cost entries once the cost lots are
+   * written: a decrease takes the units out at their average cost.
+   * @param {IInventoryCostLotsGLEntriesWriteEvent} payload -
+   */
+  @OnEvent(events.inventory.onCostLotsGLEntriesWrite)
+  async writeDecrementAdjustmentsCostEntries({
+    trx,
+    startingDate,
+  }: IInventoryCostLotsGLEntriesWriteEvent) {
+    await this.inventoryAdjustmentCostGL.writeInventoryCostJournalEntries(
+      startingDate,
+      trx,
+    );
+  }
 
   /**
    * Handles writing increment inventory adjustment GL entries.

@@ -7,6 +7,8 @@ export interface IInventoryTransactionItemEntry {
   itemId: number;
   quantity: number;
   rate: number;
+  /** Line total after discount, excluding tax (document currency). */
+  totalExcludingTax?: number;
   costAccountId?: number;
   warehouseId?: number;
   description?: string;

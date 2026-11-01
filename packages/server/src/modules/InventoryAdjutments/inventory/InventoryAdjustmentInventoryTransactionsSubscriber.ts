@@ -16,17 +16,18 @@ export class InventoryAdjustmentInventoryTransactionsSubscriber {
   ) {}
 
   /**
-   * Handles writing inventory transactions once the quick adjustment created.
-   * @param {IInventoryAdjustmentEventPublishedPayload} payload
+   * Writes the stock movement once a published adjustment is created. A
+   * draft has no effect on stock until it is published.
    * @param {IInventoryAdjustmentEventCreatedPayload} payload -
    */
   @OnEvent(events.inventoryAdjustment.onQuickCreated)
-  public async handleWriteInventoryTransactionsOncePublished({
+  public async handleWriteInventoryTransactionsOnceCreated({
     inventoryAdjustment,
     trx,
-  }:
-    | IInventoryAdjustmentEventPublishedPayload
-    | IInventoryAdjustmentEventCreatedPayload) {
+  }: IInventoryAdjustmentEventCreatedPayload) {
+    if (!inventoryAdjustment.isPublished) {
+      return;
+    }
     await this.inventoryTransactions.writeInventoryTransactions(
       inventoryAdjustment,
       false,
@@ -35,15 +36,15 @@ export class InventoryAdjustmentInventoryTransactionsSubscriber {
   }
 
   /**
-   * Handles rewriting the inventory transactions once the inventory adjustment
-   * edited.
-   * @param {IInventoryAdjustmentEditedPayload} payload -
+   * Writes the stock movement once a draft adjustment is published. It
+   * overrides, as drafts saved before this fix may have moved stock already.
+   * @param {IInventoryAdjustmentEventPublishedPayload} payload -
    */
-  @OnEvent(events.inventoryAdjustment.onEdited)
-  public async handleRewriteInventoryTransactionsOnceEdited({
+  @OnEvent(events.inventoryAdjustment.onPublished)
+  public async handleWriteInventoryTransactionsOncePublished({
     inventoryAdjustment,
     trx,
-  }: IInventoryAdjustmentEditedPayload) {
+  }: IInventoryAdjustmentEventPublishedPayload) {
     await this.inventoryTransactions.writeInventoryTransactions(
       inventoryAdjustment,
       true,
@@ -52,20 +53,39 @@ export class InventoryAdjustmentInventoryTransactionsSubscriber {
   }
 
   /**
-   * Handles reverting invetory transactions once the inventory adjustment deleted.
+   * Rewrites the stock movement once the adjustment is edited, only when
+   * it is published. An edited draft clears any movement it still has.
+   * @param {IInventoryAdjustmentEditedPayload} payload -
+   */
+  @OnEvent(events.inventoryAdjustment.onEdited)
+  public async handleRewriteInventoryTransactionsOnceEdited({
+    inventoryAdjustment,
+    trx,
+  }: IInventoryAdjustmentEditedPayload) {
+    if (!inventoryAdjustment.isPublished) {
+      await this.inventoryTransactions.revertInventoryTransactions(
+        inventoryAdjustment.id,
+        trx,
+      );
+      return;
+    }
+    await this.inventoryTransactions.writeInventoryTransactions(
+      inventoryAdjustment,
+      true,
+      trx,
+    );
+  }
+
+  /**
+   * Undoes the stock movement once the adjustment is deleted, draft or
+   * published (drafts saved before this fix may have moved stock).
    * @param {IInventoryAdjustmentEventDeletedPayload} payload -
    */
   @OnEvent(events.inventoryAdjustment.onDeleted)
   public async handleRevertInventoryTransactionsOnceDeleted({
     inventoryAdjustmentId,
-    oldInventoryAdjustment,
     trx,
   }: IInventoryAdjustmentEventDeletedPayload) {
-    // Can't continue if the inventory adjustment is not published.
-    if (!oldInventoryAdjustment.isPublished) {
-      return;
-    }
-    // Reverts the inventory transactions of adjustment transaction.
     await this.inventoryTransactions.revertInventoryTransactions(
       inventoryAdjustmentId,
       trx,

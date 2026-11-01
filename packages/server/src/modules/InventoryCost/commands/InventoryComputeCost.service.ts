@@ -1,4 +1,5 @@
 import { Queue } from 'bullmq';
+import * as moment from 'moment';
 import { ClsService } from 'nestjs-cls';
 import Redis from 'ioredis';
 import { Inject, Injectable } from '@nestjs/common';
@@ -92,39 +93,58 @@ export class InventoryComputeCostService {
    * @param {Date} startingDate
    */
   async scheduleComputeItemCost(itemId: number, startingDate: Date | string) {
-    const debounceKey = `inventory-cost-compute-debounce:${itemId}`;
+    const organizationId = this.clsService.get('organizationId');
+    const userId = this.clsService.get('userId');
+
+    // The waiting job is per company and item: item #5 of one company must
+    // not cancel item #5 of another.
+    const debounceKey = `inventory-cost-compute-debounce:${organizationId}:${itemId}`;
     const debounceTime = 1000 * 10; // 10 seconds
 
     // Generate a unique job ID or use a custom identifier
     const jobId = `task-${Date.now()}-${Math.random().toString(36).substring(2)}`;
 
+    // The job recomputes from its date onwards, so when it replaces a waiting
+    // job it starts from the earlier of the two dates.
+    let earliestDate: Date | string = startingDate;
+
     // Check if there's an existing debounced job
     const existingJobId = await this.redisClient.get(debounceKey);
 
     if (existingJobId) {
-      // Attempt to remove or mark the previous job as skippable
       const existingJob =
         await this.computeItemCostProcessor.getJob(existingJobId);
       const state = await existingJob?.getState();
 
       if (existingJob && ['waiting', 'delayed'].includes(state)) {
-        await existingJob.remove(); // Remove the previous job if it's still waiting
+        try {
+          await existingJob.remove();
+          const existingDate = moment(existingJob.data?.startingDate);
+
+          if (
+            existingDate.isValid() &&
+            existingDate.isBefore(moment(earliestDate))
+          ) {
+            earliestDate = existingJob.data.startingDate;
+          }
+        } catch {
+          // The job started meanwhile: it covers its own date, the new job
+          // only needs the new one.
+        }
       }
     }
-    const organizationId = this.clsService.get('organizationId');
-    const userId = this.clsService.get('userId');
-
     // Add the new job with a delay (debounce period)
-    const _job = await this.computeItemCostProcessor.add(
+    await this.computeItemCostProcessor.add(
       ComputeItemCostQueueJob,
-      { itemId, startingDate, jobId, organizationId, userId },
+      { itemId, startingDate: earliestDate, jobId, organizationId, userId },
       {
         jobId, // Custom job ID
-        delay: debounceTime, // Delay execution by 1 minute
+        delay: debounceTime,
       },
     );
-    // Store the latest job ID in Redis with an expiration
-    await this.redisClient.set(debounceKey, jobId, 'PX', debounceTime);
+    // Store the latest job ID in Redis. It outlives the delay a little, so a
+    // schedule made while the job waits for a worker still merges into it.
+    await this.redisClient.set(debounceKey, jobId, 'PX', debounceTime * 2);
 
     return { jobId, message: 'Task added with debounce' };
   }
