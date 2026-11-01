@@ -61,7 +61,17 @@ const commonInvalidateQueries = (client: ReturnType<typeof useQueryClient>) => {
   client.invalidateQueries({
     queryKey: paymentReceivesKeys.editPage(null).slice(0, 1),
   });
+  client.invalidateQueries({
+    queryKey: paymentReceivesKeys.detail(null).slice(0, 1),
+  });
   client.invalidateQueries({ queryKey: invoicesKeys.all() });
+  // The open invoice details panel is stored apart from the list.
+  client.invalidateQueries({
+    queryKey: invoicesKeys.detail(null).slice(0, 1),
+  });
+  client.invalidateQueries({
+    queryKey: customersKeys.detail(null).slice(0, 1),
+  });
   client.invalidateQueries({ queryKey: accountsKeys.all() });
   client.invalidateQueries({ queryKey: financialReportsKeys.all() });
   client.invalidateQueries({
@@ -75,6 +85,9 @@ const commonInvalidateQueries = (client: ReturnType<typeof useQueryClient>) => {
     queryKey: cashflowAccountsKeys.transactionsInfinity().slice(0, 1),
   });
   client.invalidateQueries({ queryKey: creditNotesKeys.all() });
+  client.invalidateQueries({
+    queryKey: creditNotesKeys.detail(null).slice(0, 1),
+  });
   client.invalidateQueries({
     queryKey: creditNotesKeys.reconcile(null).slice(0, 1),
   });

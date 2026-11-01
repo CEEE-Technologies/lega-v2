@@ -5,14 +5,7 @@ import {
   createOnboardedUser,
   type OnboardedSession,
 } from "./_auth";
-
-const API_BASE =
-  process.env.PLAYWRIGHT_TEST_API_URL ||
-  process.env.PLAYWRIGHT_TEST_BASE_URL ||
-  "http://localhost:3000";
-
-const WEBAPP_BASE =
-  process.env.PLAYWRIGHT_TEST_BASE_URL || "http://localhost:4000";
+import { API_BASE, WEBAPP_BASE } from "./_env";
 
 const warehouseName = () =>
   `${faker.company.name()} ${faker.string.alphanumeric(4)}`;

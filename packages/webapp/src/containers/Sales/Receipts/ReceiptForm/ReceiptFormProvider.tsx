@@ -16,7 +16,7 @@ import {
   useReceipt,
   useAccounts,
   useSettingsReceipts,
-  useCustomers,
+  useAllCustomers,
   useWarehouses,
   useBranches,
   useItems,
@@ -102,9 +102,8 @@ function ReceiptFormProvider({
   const { data: accounts, isLoading: isAccountsLoading } = useAccounts();
 
   // Fetch customers list.
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers({
-    page_size: 10000,
-  });
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
 
   // Fetch warehouses list.
   const {

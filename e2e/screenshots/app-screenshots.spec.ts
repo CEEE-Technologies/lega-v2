@@ -17,8 +17,8 @@ import {
   readApiAuth,
 } from '../_api';
 import { selectCustomer, selectEntryItem } from '../_invoices';
+import { API_BASE } from '../_env';
 
-const API_BASE = process.env.PLAYWRIGHT_TEST_API_URL || 'http://localhost:3000';
 const OUTPUT_DIR = path.resolve(__dirname, '../../screenshots');
 
 interface DemoItem {

@@ -1,17 +1,7 @@
-import { IsOptional, ToNumber } from '@/common/decorators/Validators';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt } from 'class-validator';
+import { DynamicFilterQueryDto } from '@/modules/DynamicListing/dtos/DynamicFilterQuery.dto';
 
-export class InventoryAdjustmentsFilterDto {
-  @ApiPropertyOptional({ example: 1 })
-  @IsInt()
-  @ToNumber()
-  @IsOptional()
-  page?: number;
-
-  @ApiPropertyOptional({ example: 12 })
-  @IsInt()
-  @ToNumber()
-  @IsOptional()
-  pageSize?: number;
-}
+/**
+ * Inventory adjustments list query: the standard list options (page, search,
+ * tab/view, sort and filters).
+ */
+export class InventoryAdjustmentsFilterDto extends DynamicFilterQueryDto {}

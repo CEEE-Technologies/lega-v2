@@ -5,7 +5,7 @@ import type { Item, Customer } from '@bigcapital/sdk-ts';
 import { Features } from '@/constants';
 import {
   useEstimate,
-  useCustomers,
+  useAllCustomers,
   useWarehouses,
   useBranches,
   useItems,
@@ -113,9 +113,8 @@ function EstimateFormProvider({
   });
 
   // Handle fetch customers data table or list
-  const { data: customersData, isLoading: isCustomersLoading } = useCustomers({
-    page_size: 10000,
-  });
+  const { data: customersData, isLoading: isCustomersLoading } =
+    useAllCustomers();
 
   // Fetch warehouses list.
   const {

@@ -4,8 +4,11 @@ import { BillsSampleData } from '../Bills.constants';
 import { Injectable } from '@nestjs/common';
 import { Importable } from '@/modules/Import/Importable';
 import { CreateBillDto } from '../dtos/Bill.dto';
+import { ImportableService } from '@/modules/Import/decorators/Import.decorator';
+import { Bill } from '../models/Bill';
 
 @Injectable()
+@ImportableService({ name: Bill.name })
 export class BillsImportable extends Importable {
   constructor(private readonly createBillService: CreateBill) {
     super();

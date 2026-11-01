@@ -1,7 +1,7 @@
 import { VendorsListResponse } from '@bigcapital/sdk-ts';
 import React, { createContext, useContext } from 'react';
 import { FinancialHeaderLoadingSkeleton } from '../FinancialHeaderLoadingSkeleton';
-import { useVendors } from '@/hooks/query';
+import { useAllVendors } from '@/hooks/query';
 
 interface VendorsTransactionsGeneralPanelContextValue {
   vendors: VendorsListResponse['data'] | undefined;
@@ -26,7 +26,7 @@ function VendorsTransactionsGeneralPanelProvider({
     data: vendorsData,
     isLoading: isVendorsLoading,
     isFetching: isVendorsFetching,
-  } = useVendors({ page_size: 100000 });
+  } = useAllVendors();
 
   const provider: VendorsTransactionsGeneralPanelContextValue = {
     vendors: vendorsData?.data,

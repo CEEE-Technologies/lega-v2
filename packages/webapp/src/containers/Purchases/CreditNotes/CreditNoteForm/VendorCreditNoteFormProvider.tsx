@@ -20,7 +20,7 @@ import {
   useWarehouses,
   useBranches,
   useItems,
-  useVendors,
+  useAllVendors,
   useSettingsVendorCredits,
   useBill,
 } from '@/hooks/query';
@@ -93,15 +93,19 @@ function VendorCreditNoteFormProvider({
   const { data: vendorCreditSettings } = useSettingsVendorCredits();
 
   // Handle fetch vendors data table or list.
-  const { data: vendorsData, isLoading: isVendorsLoading } = useVendors({
-    page_size: 10000,
-  });
+  const { data: vendorsData, isLoading: isVendorsLoading } = useAllVendors();
 
   // Handle fetch vendor credit details.
-  const { data: vendorCredit, isLoading: isVendorCreditLoading } =
-    useVendorCredit(vendorCreditId, {
-      enabled: !!vendorCreditId,
-    });
+  const {
+    data: vendorCredit,
+    isLoading: isVendorCreditLoading,
+    isFetchedAfterMount: isVendorCreditFetched,
+  } = useVendorCredit(vendorCreditId, {
+    enabled: !!vendorCreditId,
+    // Formik reads the values only once, so a cached copy would stick even
+    // after fresh data arrives. Always fetch on open and wait for it.
+    refetchOnMount: 'always',
+  });
 
   // Handle fetch bill details.
   const { isLoading: isBillLoading, data: bill } = useBill(billId, {
@@ -172,6 +176,7 @@ function VendorCreditNoteFormProvider({
     <DashboardInsider
       loading={
         isVendorCreditLoading ||
+        (!!vendorCreditId && !isVendorCreditFetched) ||
         isItemsLoading ||
         isVendorsLoading ||
         isVendorCreditLoading ||

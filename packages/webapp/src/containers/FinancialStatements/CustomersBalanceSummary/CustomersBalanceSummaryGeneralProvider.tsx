@@ -1,7 +1,7 @@
 import { CustomersListResponse } from '@bigcapital/sdk-ts';
 import React, { createContext, useContext } from 'react';
 import { FinancialHeaderLoadingSkeleton } from '../FinancialHeaderLoadingSkeleton';
-import { useCustomers } from '@/hooks/query';
+import { useAllCustomers } from '@/hooks/query';
 
 type CustomersBalanceSummaryGeneralContextValue = {
   isCustomersLoading: boolean;
@@ -24,7 +24,7 @@ function CustomersBalanceSummaryGeneralProvider({
     data: customersData,
     isFetching: isCustomersFetching,
     isLoading: isCustomersLoading,
-  } = useCustomers();
+  } = useAllCustomers();
 
   const provider: CustomersBalanceSummaryGeneralContextValue = {
     isCustomersLoading,

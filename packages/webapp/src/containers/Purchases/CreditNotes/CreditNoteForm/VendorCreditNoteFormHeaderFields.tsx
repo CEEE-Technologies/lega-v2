@@ -59,7 +59,7 @@ function VendorCreditNoteFormHeaderFieldsInner({
   const fieldsClassName = getFieldsStyle(theme);
   const dateInputFormatter = useDateInputFormatter();
   const { values } = useFormikContext<VendorCreditFormValues>();
-  const { vendorCreditSettings } = useVendorCreditNoteFormContext();
+  const { vendorCreditSettings, isNewMode } = useVendorCreditNoteFormContext();
   const vendorcreditAutoIncrement = vendorCreditSettings?.autoIncrement as
     | boolean
     | undefined;
@@ -95,6 +95,8 @@ function VendorCreditNoteFormHeaderFieldsInner({
   useObserveVendorCreditNoSettings(
     vendorcreditNumberPrefix,
     vendorcreditNextNumber,
+    vendorcreditAutoIncrement,
+    isNewMode,
   );
 
   return (

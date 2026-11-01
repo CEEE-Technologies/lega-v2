@@ -6,6 +6,9 @@ export const VendorMeta = {
   },
   importable: true,
   exportable: true,
+  print: {
+    pageTitle: 'Vendors',
+  },
   fields: {
     first_name: {
       name: 'vendor.field.first_name',

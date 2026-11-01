@@ -38,6 +38,7 @@ import { financialReportsKeys } from '../FinancialReports/query-keys';
 import { invoicesKeys } from '../invoices/query-keys';
 import { itemsKeys } from '../items/query-keys';
 import { organizationKeys } from '../organization/query-keys';
+import { paymentReceivesKeys } from '../payment-receives/query-keys';
 import { settingsKeys } from '../settings/query-keys';
 import { creditNotesKeys } from './query-keys';
 import type { CreditNotesListResponse } from '@bigcapital/sdk-ts';
@@ -86,8 +87,21 @@ const commonInvalidateQueries = (
     queryKey: creditNotesKeys.reconciles(null).slice(0, 1),
   });
 
-  // Invalidate invoices.
+  queryClient.invalidateQueries({
+    queryKey: creditNotesKeys.detail(null).slice(0, 1),
+  });
+
+  // Invalidate invoices, the open invoice panel and the payment form's list.
   queryClient.invalidateQueries({ queryKey: invoicesKeys.all() });
+  queryClient.invalidateQueries({
+    queryKey: invoicesKeys.detail(null).slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentReceivesKeys.newEntries().slice(0, 1),
+  });
+  queryClient.invalidateQueries({
+    queryKey: paymentReceivesKeys.editPage(null).slice(0, 1),
+  });
 
   // Invalidate cashflow accounts.
   queryClient.invalidateQueries({

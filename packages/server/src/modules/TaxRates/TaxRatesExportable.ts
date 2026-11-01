@@ -1,11 +1,11 @@
 import { ExportableService } from '../Export/decorators/ExportableModel.decorator';
 import { Exportable } from '../Export/Exportable';
-import { TaxRateModel } from './models/TaxRate.model';
 import { TaxRatesApplication } from './TaxRate.application';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-@ExportableService({ name: TaxRateModel.name })
+// The webapp's resource name; ResourceService maps it to TaxRateModel.
+@ExportableService({ name: 'TaxRate' })
 export class TaxRatesExportable extends Exportable {
   constructor(private readonly taxRatesApplication: TaxRatesApplication) {
     super();

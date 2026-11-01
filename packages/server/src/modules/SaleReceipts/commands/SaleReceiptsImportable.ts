@@ -4,8 +4,11 @@ import { CreateSaleReceipt } from './CreateSaleReceipt.service';
 import { Importable } from '@/modules/Import/Importable';
 import { CreateSaleReceiptDto } from '../dtos/SaleReceipt.dto';
 import { SaleReceiptsSampleData } from '../constants';
+import { ImportableService } from '@/modules/Import/decorators/Import.decorator';
+import { SaleReceipt } from '../models/SaleReceipt';
 
 @Injectable()
+@ImportableService({ name: SaleReceipt.name })
 export class SaleReceiptsImportable extends Importable {
   constructor(private readonly createReceiptService: CreateSaleReceipt) {
     super();

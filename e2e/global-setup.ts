@@ -9,6 +9,7 @@ import {
   OnboardedSession,
 } from './_auth';
 import { defaultPageConfig } from './_utils';
+import { API_BASE } from './_env';
 
 const STORAGE_STATE_PATH = 'e2e/.auth/user.json';
 
@@ -40,10 +41,7 @@ async function step<T>(
 }
 
 export default async function globalSetup(config: FullConfig) {
-  const apiBase =
-    process.env.PLAYWRIGHT_TEST_API_URL ||
-    process.env.PLAYWRIGHT_TEST_BASE_URL ||
-    'http://localhost:3000';
+  const apiBase = API_BASE;
   const webappUrl =
     config.projects[0]?.use?.baseURL ||
     process.env.PLAYWRIGHT_TEST_BASE_URL ||

@@ -8,6 +8,9 @@ export const BillPaymentMeta = {
   },
   exportable: true,
   exportFlattenOn: 'entries',
+  print: {
+    pageTitle: 'Payments Made',
+  },
 
   importable: true,
   importAggregator: 'group',

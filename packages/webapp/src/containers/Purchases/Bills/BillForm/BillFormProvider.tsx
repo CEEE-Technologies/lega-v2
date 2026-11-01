@@ -14,7 +14,7 @@ import { DashboardInsider } from '@/components/Dashboard';
 import { Features } from '@/constants';
 import {
   useAccounts,
-  useVendors,
+  useAllVendors,
   useItems,
   useBill,
   useWarehouses,
@@ -99,9 +99,7 @@ function BillFormProvider({ billId, ...props }: BillFormProviderProps) {
   const { data: accounts, isLoading: isAccountsLoading } = useAccounts();
 
   // Handle fetch vendors data table
-  const { data: vendorsData, isLoading: isVendorsLoading } = useVendors({
-    page_size: 10000,
-  });
+  const { data: vendorsData, isLoading: isVendorsLoading } = useAllVendors();
   // Handle fetch Items data table or list
   const { data: itemsData, isLoading: isItemsLoading } = useItems({
     page_size: 10000,

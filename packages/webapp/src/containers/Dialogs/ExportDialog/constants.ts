@@ -9,7 +9,7 @@ export const ExportResources = [
   { value: 'sale_invoice', text: 'Invoices' },
   { value: 'sale_estimate', text: ' Estimates' },
   { value: 'sale_receipt', text: 'Receipts' },
-  { value: 'payment_receive', text: 'Payments Received' },
+  { value: 'payment_received', text: 'Payments Received' },
   { value: 'credit_note', text: 'Credit Notes' },
   { value: 'bill', text: 'Bills' },
   { value: 'bill_payment', text: 'Bill Payments' },

@@ -50,10 +50,16 @@ function WarehouseTransferFormProvider({
   });
 
   // Handle fetch warehouse transfer detail.
-  const { data: warehouseTransfer, isLoading: isWarehouseTransferLoading } =
-    useWarehouseTransfer(warehouseTransferId, {
-      enabled: !!warehouseTransferId,
-    });
+  const {
+    data: warehouseTransfer,
+    isLoading: isWarehouseTransferLoading,
+    isFetchedAfterMount: isWarehouseTransferFetched,
+  } = useWarehouseTransfer(warehouseTransferId, {
+    enabled: !!warehouseTransferId,
+    // Formik reads the values only once, so a cached copy would stick even
+    // after fresh data arrives. Always fetch on open and wait for it.
+    refetchOnMount: 'always',
+  });
 
   // Handle fetch warehouse transfer settings.
   const { data: warehouseTransferSettings } = useSettingsWarehouseTransfers();
@@ -129,7 +135,10 @@ function WarehouseTransferFormProvider({
   return (
     <DashboardInsider
       loading={
-        isItemsLoading || isWarehouesLoading || isWarehouseTransferLoading
+        isItemsLoading ||
+        isWarehouesLoading ||
+        isWarehouseTransferLoading ||
+        (!!warehouseTransferId && !isWarehouseTransferFetched)
       }
       name={'warehouse-transfer-form'}
     >

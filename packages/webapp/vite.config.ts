@@ -22,6 +22,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, '');
   const clientEnv = pickClientEnv(env);
   const port = Number(env.PORT) || 4000;
+  // API calls go to the server's port (SERVER_PORT in the root .env, the
+  // same setting the server reads). VITE_API_PROXY_TARGET still overrides it.
+  const apiProxyTarget =
+    env.VITE_API_PROXY_TARGET || `http://localhost:${env.SERVER_PORT || 3000}`;
   const plugins: PluginOption[] = [
     react(),
     legacy({
@@ -53,11 +57,11 @@ export default defineConfig(({ mode }) => {
       port,
       proxy: {
         '/api': {
-          target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+          target: apiProxyTarget,
           changeOrigin: true,
         },
         '/socket': {
-          target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+          target: apiProxyTarget,
           changeOrigin: true,
           ws: true,
         },

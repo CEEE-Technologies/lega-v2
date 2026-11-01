@@ -1,7 +1,7 @@
 import { VendorsListResponse } from '@bigcapital/sdk-ts';
 import React, { createContext, useContext } from 'react';
 import { FinancialHeaderLoadingSkeleton } from '../FinancialHeaderLoadingSkeleton';
-import { useVendors } from '@/hooks/query';
+import { useAllVendors } from '@/hooks/query';
 
 type APAgingSummaryGeneralContextValue = {
   vendors: VendorsListResponse['data'] | undefined;
@@ -20,7 +20,7 @@ function APAgingSummaryGeneralProvider({
   children,
   ...props
 }: APAgingSummaryGeneralProviderProps) {
-  const { data: vendorsData, isFetching: isVendorsLoading } = useVendors();
+  const { data: vendorsData, isFetching: isVendorsLoading } = useAllVendors();
 
   const provider: APAgingSummaryGeneralContextValue = {
     vendors: vendorsData?.data,

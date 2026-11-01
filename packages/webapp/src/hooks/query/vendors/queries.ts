@@ -16,6 +16,7 @@ import {
   UseQueryOptions,
 } from '@tanstack/react-query';
 import { useApiFetcher } from '../../useRequest';
+import { ALL_CONTACTS_PAGE_SIZE } from '../customers/queries';
 import { vendorsKeys } from './query-keys';
 import type {
   Vendor,
@@ -42,6 +43,16 @@ export function useVendors(
     queryKey: vendorsKeys.list(query),
     queryFn: () => fetchVendors(fetcher, query),
   });
+}
+
+/**
+ * All suppliers, for pickers and report filters (the server returns 12 per
+ * page by default).
+ */
+export function useAllVendors(
+  props?: Omit<UseQueryOptions<VendorsListResponse>, 'queryKey' | 'queryFn'>,
+) {
+  return useVendors({ page_size: ALL_CONTACTS_PAGE_SIZE }, props);
 }
 
 export function useEditVendor(

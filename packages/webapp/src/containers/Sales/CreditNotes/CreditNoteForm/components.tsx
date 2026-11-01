@@ -1,6 +1,6 @@
 import { useFormikContext } from 'formik';
 import * as FF from 'fp-ts/function';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useCreditNoteFormContext } from './CreditNoteFormProvider';
 import {
   useCreditNoteIsForeignCustomer,
@@ -17,7 +17,7 @@ import {
   withExchangeRateItemEntriesPriceRecalc,
 } from '@/containers/Entries/withExRateItemEntriesPriceRecalc';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
-import { transactionNumber } from '@/utils';
+import { useSyncAutoIncrementNumber } from '@/hooks/useSyncAutoIncrementNumber';
 
 type CreditNoteExchangeRateInputFieldRootProps = Omit<
   React.ComponentProps<typeof ExchangeRateInputGroup>,
@@ -63,7 +63,7 @@ type CreditNoteSyncIncrementSettingsProps = Record<string, never>;
  */
 export const CreditNoteSyncIncrementSettingsToForm =
   ({}: CreditNoteSyncIncrementSettingsProps) => {
-    const { creditNoteSettings } = useCreditNoteFormContext();
+    const { creditNoteSettings, isNewMode } = useCreditNoteFormContext();
     const creditAutoIncrement = creditNoteSettings?.autoIncrement as
       | boolean
       | undefined;
@@ -73,22 +73,14 @@ export const CreditNoteSyncIncrementSettingsToForm =
     const creditNumberPrefix = creditNoteSettings?.numberPrefix as
       | string
       | undefined;
-    const { setFieldValue } = useFormikContext<CreditNoteFormValues>();
-
-    useEffect(() => {
-      // Do not update if the credit note auto-increment mode is disabled.
-      if (!creditAutoIncrement) return;
-
-      setFieldValue(
-        'creditNoteNumber',
-        transactionNumber(creditNumberPrefix, creditNextNumber),
-      );
-    }, [
-      setFieldValue,
-      creditNumberPrefix,
-      creditNextNumber,
-      creditAutoIncrement,
-    ]);
+    // Editing keeps the credit note's own number; see the hook.
+    useSyncAutoIncrementNumber({
+      fieldName: 'creditNoteNumber',
+      prefix: creditNumberPrefix,
+      nextNumber: creditNextNumber,
+      autoIncrement: creditAutoIncrement,
+      isNewMode,
+    });
 
     return null;
   };

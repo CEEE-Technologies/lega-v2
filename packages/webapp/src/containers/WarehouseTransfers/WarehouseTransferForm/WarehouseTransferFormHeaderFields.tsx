@@ -55,7 +55,7 @@ function WarehouseTransferFormHeaderFieldsInner({
   // #withDialogActions
   openDialog,
 }: WarehouseTransferFormHeaderFieldsProps) {
-  const { warehouses, warehouseTransferSettings } =
+  const { warehouses, warehouseTransferSettings, isNewMode } =
     useWarehouseTransferFormContext();
   const warehouseTransferAutoIncrement =
     warehouseTransferSettings?.autoIncrement as boolean | undefined;
@@ -90,8 +90,10 @@ function WarehouseTransferFormHeaderFieldsInner({
 
   // Syncs transfer number settings with form.
   useObserveTransferNoSettings(
-    String(warehouseTransferNumberPrefix ?? ''),
-    Number(warehouseTransferNextNumber ?? 0),
+    warehouseTransferNumberPrefix,
+    warehouseTransferNextNumber,
+    warehouseTransferAutoIncrement,
+    isNewMode,
   );
 
   const dateInputFormatter = useDateInputFormatter();

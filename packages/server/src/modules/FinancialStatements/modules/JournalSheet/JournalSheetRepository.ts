@@ -8,6 +8,7 @@ import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { transformToMap } from '@/utils/transform-to-key';
 import { Inject } from '@nestjs/common';
 import { ModelObject } from 'objection';
+import { castArray, isNumber } from 'lodash';
 import { AccountingBasisService } from '../../common/AccountingBasisService';
 
 export class JournalSheetRepository {
@@ -110,12 +111,24 @@ export class JournalSheetRepository {
     const transactions = await this.accountTransaction()
       .query()
       .onBuild((query) => {
-        if (this.filter.fromRange || this.filter.toRange) {
-          query.modify(
-            'filterAmountRange',
+        // Each line is either a debit or a credit (the other side is 0), so
+        // the line amount is debit + credit. Comparing each side on its own
+        // let every line through "to" (its 0 side is always below it).
+        if (isNumber(this.filter.fromRange)) {
+          query.whereRaw('(COALESCE(debit, 0) + COALESCE(credit, 0)) >= ?', [
             this.filter.fromRange,
+          ]);
+        }
+        if (isNumber(this.filter.toRange)) {
+          query.whereRaw('(COALESCE(debit, 0) + COALESCE(credit, 0)) <= ?', [
             this.filter.toRange,
-          );
+          ]);
+        }
+        const accountsIds = castArray(this.filter.accountsIds ?? []).filter(
+          (id) => isNumber(id),
+        );
+        if (accountsIds.length > 0) {
+          query.whereIn('account_id', accountsIds);
         }
         query.modify(
           'filterDateRange',

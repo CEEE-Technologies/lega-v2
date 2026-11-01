@@ -7,7 +7,9 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { castArray } from 'lodash';
+import { ToNumber } from '@/common/decorators/Validators';
 import { FinancialSheetBranchesQueryDto } from '../../dtos/FinancialSheetBranchesQuery.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { NumberFormatQueryDto } from '@/modules/BankingTransactions/dtos/NumberFormatQuery.dto';
@@ -64,14 +66,22 @@ export class JournalSheetQueryDto extends FinancialSheetBranchesQueryDto {
     description: 'Array of account IDs to filter',
     example: [1, 2, 3],
   })
+  // Query strings arrive as text ("1029"); the ids are compared as numbers,
+  // as in the General Ledger report.
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === ''
+      ? value
+      : castArray(value).map((id) => Number(id)),
+  )
   @IsArray()
   @IsOptional()
-  accountsIds: number | number[];
+  accountsIds: number[];
 
   @ApiPropertyOptional({
     description: 'Start range for filtering',
     example: 100,
   })
+  @ToNumber()
   @IsNumber()
   @IsOptional()
   fromRange: number;
@@ -80,6 +90,7 @@ export class JournalSheetQueryDto extends FinancialSheetBranchesQueryDto {
     description: 'End range for filtering',
     example: 200,
   })
+  @ToNumber()
   @IsNumber()
   @IsOptional()
   toRange: number;

@@ -18,6 +18,13 @@ import {
   UseQueryOptions,
 } from '@tanstack/react-query';
 import { useApiFetcher } from '../../useRequest';
+import { accountsKeys } from '../accounts/query-keys';
+import { billsKeys } from '../bills/query-keys';
+import { cashflowAccountsKeys } from '../cashflow-accounts/query-keys';
+import { financialReportsKeys } from '../FinancialReports/query-keys';
+import { settingsKeys } from '../settings/query-keys';
+import { vendorCreditsKeys } from '../vendor-credit/query-keys';
+import { vendorsKeys } from '../vendors/query-keys';
 import { paymentMadesKeys } from './query-keys';
 import type {
   BillPaymentsListResponse,
@@ -38,6 +45,34 @@ const commonInvalidateQueries = (client: ReturnType<typeof useQueryClient>) => {
   client.invalidateQueries({
     queryKey: paymentMadesKeys.editPage(null).slice(0, 1),
   });
+  client.invalidateQueries({
+    queryKey: paymentMadesKeys.detail(null).slice(0, 1),
+  });
+  // The paid bills: list, open details panel and its payments tab.
+  client.invalidateQueries({ queryKey: billsKeys.all() });
+  client.invalidateQueries({ queryKey: billsKeys.detail(null).slice(0, 1) });
+  client.invalidateQueries({
+    queryKey: billsKeys.paymentTransactions(null).slice(0, 1),
+  });
+  client.invalidateQueries({
+    queryKey: vendorCreditsKeys.reconcile(null).slice(0, 1),
+  });
+  // Supplier balances, accounts, reports and bank lists.
+  client.invalidateQueries({ queryKey: vendorsKeys.all() });
+  client.invalidateQueries({ queryKey: vendorsKeys.detail(null).slice(0, 1) });
+  client.invalidateQueries({ queryKey: accountsKeys.all() });
+  client.invalidateQueries({ queryKey: financialReportsKeys.all() });
+  client.invalidateQueries({
+    queryKey: financialReportsKeys.transactionsByReference().slice(0, 1),
+  });
+  client.invalidateQueries({
+    queryKey: cashflowAccountsKeys.transactions().slice(0, 1),
+  });
+  client.invalidateQueries({
+    queryKey: cashflowAccountsKeys.transactionsInfinity().slice(0, 1),
+  });
+  // The next payment number.
+  client.invalidateQueries({ queryKey: settingsKeys.billPayments() });
 };
 
 export function usePaymentMades(

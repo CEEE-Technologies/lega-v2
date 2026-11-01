@@ -13,8 +13,7 @@ import {
   findVendorIdByName,
   readApiAuth,
 } from './_api';
-
-const API_BASE = process.env.PLAYWRIGHT_TEST_API_URL || 'http://localhost:3000';
+import { API_BASE } from './_env';
 
 // Unique names so reseeding within a run never collides with existing rows.
 const CUSTOMER_NAME = `E2E Customer ${faker.string.alphanumeric(6)}`;

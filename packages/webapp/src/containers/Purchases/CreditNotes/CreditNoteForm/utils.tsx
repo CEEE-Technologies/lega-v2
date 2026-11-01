@@ -21,11 +21,11 @@ import {
   getEntriesTotal,
 } from '@/containers/Entries/utils';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
+import { useSyncAutoIncrementNumber } from '@/hooks/useSyncAutoIncrementNumber';
 import {
   defaultFastFieldShouldUpdate,
   transformToForm,
   repeatValue,
-  transactionNumber,
   formattedAmount,
   orderingLinesIndexes,
   toSafeNumber,
@@ -213,18 +213,22 @@ export const entriesFieldShouldUpdate = (
 };
 
 /**
- * Syncs vendor credit no. settings with form.
+ * Syncs vendor credit no. settings with form. Editing keeps the vendor
+ * credit's own number, and nothing is applied while auto-numbering is off.
  */
 export const useObserveVendorCreditNoSettings = (
-  prefix?: string,
-  nextNumber?: number,
+  prefix: string | undefined,
+  nextNumber: number | undefined,
+  autoIncrement: boolean | undefined,
+  isNewMode: boolean,
 ) => {
-  const { setFieldValue } = useFormikContext<VendorCreditFormValues>();
-
-  React.useEffect(() => {
-    const creditNo = transactionNumber(prefix, nextNumber);
-    setFieldValue('vendorCreditNumber', creditNo);
-  }, [setFieldValue, prefix, nextNumber]);
+  useSyncAutoIncrementNumber({
+    fieldName: 'vendorCreditNumber',
+    prefix,
+    nextNumber,
+    autoIncrement,
+    isNewMode,
+  });
 };
 
 export const useSetPrimaryBranchToForm = () => {

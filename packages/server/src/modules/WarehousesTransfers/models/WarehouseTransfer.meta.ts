@@ -3,9 +3,10 @@ function StatusFieldFilterQuery(query, role) {
 }
 
 export const WarehouseTransferMeta = {
-  defaultFilterField: 'name',
+  defaultFilterField: 'transaction_number',
+  // Transfers have no "name"; newest first by date.
   defaultSort: {
-    sortField: 'name',
+    sortField: 'date',
     sortOrder: 'DESC',
   },
   columns: {
