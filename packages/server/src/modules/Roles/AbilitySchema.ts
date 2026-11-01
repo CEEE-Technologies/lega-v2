@@ -3,7 +3,7 @@ import { ReportsAction } from '../FinancialStatements/types/Report.types';
 import { InventoryAdjustmentAction } from '../InventoryAdjutments/types/InventoryAdjustments.types';
 import { CashflowAction } from '../BankingTransactions/types/BankingTransactions.types';
 import { ManualJournalAction } from '../ManualJournals/types/ManualJournals.types';
-import { AccountAction } from '@/interfaces/Account';
+import { AccountAction, TaxRateAction } from '@/interfaces/Account';
 import { VendorCreditAction } from '../VendorCredit/types/VendorCredit.types';
 import { IPaymentMadeAction } from '../BillPayments/types/BillPayments.types';
 import { ExpenseAction } from '../Expenses/Expenses.types';
@@ -135,6 +135,9 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
         default: true,
       },
     ],
+    extraAbilities: [
+      { key: SaleEstimateAction.NotifyBySms, label: 'ability.notify_by_sms' },
+    ],
   },
   {
     subject: AbilitySubject.SaleInvoice,
@@ -145,7 +148,10 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
       { key: SaleInvoiceAction.Edit, label: 'ability.edit', default: true },
       { key: SaleInvoiceAction.Delete, label: 'ability.delete', default: true },
     ],
-    extraAbilities: [{ key: 'bad-debt', label: 'Due amount to bad debit' }],
+    extraAbilities: [
+      { key: SaleInvoiceAction.Writeoff, label: 'ability.write_off' },
+      { key: SaleInvoiceAction.NotifyBySms, label: 'ability.notify_by_sms' },
+    ],
   },
   {
     subject: AbilitySubject.SaleReceipt,
@@ -155,6 +161,9 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
       { key: SaleReceiptAction.Create, label: 'ability.create', default: true },
       { key: SaleReceiptAction.Edit, label: 'ability.edit', default: true },
       { key: SaleReceiptAction.Delete, label: 'ability.delete', default: true },
+    ],
+    extraAbilities: [
+      { key: SaleReceiptAction.NotifyBySms, label: 'ability.notify_by_sms' },
     ],
   },
   {
@@ -184,6 +193,9 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
         label: 'ability.delete',
         default: true,
       },
+    ],
+    extraAbilities: [
+      { key: PaymentReceiveAction.NotifyBySms, label: 'ability.notify_by_sms' },
     ],
   },
   {
@@ -351,6 +363,16 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
       { key: RoleAction.Create, label: 'ability.create', default: false },
       { key: RoleAction.Edit, label: 'ability.edit', default: false },
       { key: RoleAction.Delete, label: 'ability.delete', default: false },
+    ],
+  },
+  {
+    subject: AbilitySubject.TaxRate,
+    subjectLabel: 'ability.tax_rates',
+    abilities: [
+      { key: TaxRateAction.VIEW, label: 'ability.view', default: true },
+      { key: TaxRateAction.CREATE, label: 'ability.create' },
+      { key: TaxRateAction.EDIT, label: 'ability.edit' },
+      { key: TaxRateAction.DELETE, label: 'ability.delete' },
     ],
   },
   {

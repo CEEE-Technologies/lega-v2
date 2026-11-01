@@ -522,6 +522,76 @@ describe('Security and permissions (e2e)', () => {
       ).toBe(200);
     });
 
+    it('a role saved with Cash flow permissions can use banking', async () => {
+      const roleId = await createRole(app, companyA, 'Banking', [
+        { subject: 'Cashflow', ability: 'View' },
+        { subject: 'Cashflow', ability: 'Create' },
+      ]);
+      const teller = await inviteAndAccept(
+        app,
+        companyA,
+        priya,
+        uniqueEmail('teller'),
+        roleId,
+      );
+      expect((await inA(teller).get('/banking/rules')).status).toBe(200);
+      expect((await inA(teller).get('/banking/accounts')).status).toBe(200);
+      // Past the permission check (refused by validation, not by role).
+      expect((await inA(teller).post('/banking/rules').send({})).status).toBe(
+        400,
+      );
+      // No Cash flow delete.
+      expect((await inA(teller).delete('/banking/rules/1')).status).toBe(403);
+      expect((await inA(nimal).get('/banking/rules')).status).toBe(403);
+    });
+
+    it('a role saved with Warehouses edit can edit a warehouse', async () => {
+      expect(
+        (await inA(priya).post('/warehouses/activate')).status,
+      ).toBeLessThan(300);
+      const warehouses = await inA(priya).get('/warehouses');
+      const warehouse = warehouses.body[0];
+      expect(warehouse?.id).toBeTruthy();
+
+      const roleId = await createRole(app, companyA, 'Stores', [
+        { subject: 'Warehouse', ability: 'View' },
+        { subject: 'Warehouse', ability: 'Edit' },
+      ]);
+      const keeper = await inviteAndAccept(
+        app,
+        companyA,
+        priya,
+        uniqueEmail('keeper'),
+        roleId,
+      );
+      const edit = await inA(keeper)
+        .put(`/warehouses/${warehouse.id}`)
+        .send({ name: 'Main store', code: warehouse.code || 'MAIN' });
+      expect(edit.status).toBe(200);
+      expect(
+        (await inA(keeper).delete(`/warehouses/${warehouse.id}`)).status,
+      ).toBe(403);
+      expect(
+        (await inA(nimal).put(`/warehouses/${warehouse.id}`).send({})).status,
+      ).toBe(403);
+    });
+
+    it('every permission a guarded route needs can be saved on a role', async () => {
+      const roleId = await createRole(app, companyA, 'Everything', [
+        { subject: 'Cashflow', ability: 'Delete' },
+        { subject: 'Preferences', ability: 'Mutate' },
+        { subject: 'Warehouse', ability: 'Delete' },
+        { subject: 'TaxRate', ability: 'View' },
+        { subject: 'SaleInvoice', ability: 'Writeoff' },
+        { subject: 'SaleInvoice', ability: 'NotifyBySms' },
+        { subject: 'SaleEstimate', ability: 'NotifyBySms' },
+        { subject: 'SaleReceipt', ability: 'NotifyBySms' },
+        { subject: 'PaymentReceive', ability: 'NotifyBySms' },
+        { subject: 'User', ability: 'Manage' },
+      ]);
+      expect(roleId).toBeTruthy();
+    });
+
     it('a role with only receipt permissions can use receipts', async () => {
       const roleId = await createRole(app, companyA, 'Receipts', [
         { subject: 'SaleReceipt', ability: 'View' },

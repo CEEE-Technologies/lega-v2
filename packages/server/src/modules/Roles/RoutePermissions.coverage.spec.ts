@@ -14,7 +14,11 @@ import { PermissionGuard } from './Permission.guard';
 import {
   ALLOW_ANY_MEMBER_KEY,
   REQUIRED_PERMISSION_KEY,
+  RequiredPermission,
 } from './RequirePermission.decorator';
+import { AbilitySchema } from './AbilitySchema';
+import { getInvalidPermissions } from './utils';
+import { CONTACT_PERMISSION_KEY } from '../Contacts/ContactPermission.guard';
 
 /**
  * Routes that anyone may call without signing in. Each one checks its own
@@ -84,7 +88,29 @@ interface RouteInfo {
   isTenantAgnostic: boolean;
   hasGuards: boolean;
   hasRule: boolean;
+  /** The permissions a role needs for the route (none for Admin-only). */
+  grants: RequiredPermission[];
 }
+
+/**
+ * The permissions a role must be able to hold to use a route. Admin-only
+ * routes (`manage all`) need none; contact routes need the Customer and the
+ * Vendor permission.
+ */
+const getGrants = (
+  rule: RequiredPermission | undefined,
+  contactAction: string | undefined,
+): RequiredPermission[] => {
+  const grants: RequiredPermission[] = [];
+  if (rule && !(rule.ability === 'manage' && rule.subject === 'all')) {
+    grants.push(rule);
+  }
+  if (contactAction) {
+    grants.push({ ability: contactAction, subject: 'Customer' });
+    grants.push({ ability: contactAction, subject: 'Vendor' });
+  }
+  return grants;
+};
 
 const collectRoutes = (): RouteInfo[] => {
   const routes: RouteInfo[] = [];
@@ -129,6 +155,10 @@ const collectRoutes = (): RouteInfo[] => {
             hasRule: !!(
               read(REQUIRED_PERMISSION_KEY) || read(ALLOW_ANY_MEMBER_KEY)
             ),
+            grants: getGrants(
+              read(REQUIRED_PERMISSION_KEY),
+              read(CONTACT_PERMISSION_KEY),
+            ),
           });
         }
       }
@@ -160,6 +190,18 @@ describe('Route permissions coverage', () => {
           }`,
       );
     expect(missing).toEqual([]);
+  });
+
+  it('every permission a route needs can be granted to a role', () => {
+    // A rule the roles schema doesn't define can't be saved on a role, so
+    // the route would be Admin only by accident.
+    const notGrantable = routes.flatMap((route) =>
+      getInvalidPermissions(
+        AbilitySchema,
+        route.grants.map((grant) => ({ ...grant, value: true })),
+      ).map((grant) => `${route.key}: ${grant.ability} ${grant.subject}`),
+    );
+    expect(notGrantable).toEqual([]);
   });
 
   it('only the listed routes are public', () => {
