@@ -38,7 +38,8 @@ export class CreditNoteGLEntries {
     trx?: Knex.Transaction,
   ): Promise<void> => {
     // Retrieve the credit note with associated entries and items.
-    const creditNoteWithItems = await CreditNote.query(trx)
+    const creditNoteWithItems = await this.creditNoteModel()
+      .query(trx)
       .findById(creditNoteId)
       .withGraphFetched('entries.item');
 
@@ -46,12 +47,14 @@ export class CreditNoteGLEntries {
     const ARAccount =
       await this.accountRepository.findOrCreateAccountReceivable(
         creditNoteWithItems.currencyCode,
+        {},
+        trx,
       );
     const discountAccount =
-      await this.accountRepository.findOrCreateDiscountAccount({});
+      await this.accountRepository.findOrCreateDiscountAccount({}, trx);
 
     const adjustmentAccount =
-      await this.accountRepository.findOrCreateOtherChargesAccount({});
+      await this.accountRepository.findOrCreateOtherChargesAccount({}, trx);
 
     const creditNoteLedger = new CreditNoteAccrualGL(creditNoteWithItems)
       .setARAccountId(ARAccount.id)
@@ -61,6 +64,31 @@ export class CreditNoteGLEntries {
 
     // Saves the credit note GL entries.
     await this.ledgerStorage.commit(creditNoteLedger, trx);
+  };
+
+  /**
+   * Rewrites the credit note GL entries from its stored state: a published
+   * credit note gets its journal rewritten, a draft has none.
+   *
+   * The stored row is read here because the graph an edit saves has only
+   * the edited fields (no `openedAt` unless the edit publishes it), so it
+   * always looked like a draft and an edit never rewrote the journal.
+   * @param {number} creditNoteId - Credit note id.
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteCreditNoteGLEntries = async (
+    creditNoteId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const creditNote = await this.creditNoteModel()
+      .query(trx)
+      .findById(creditNoteId);
+
+    if (!creditNote?.isPublished) {
+      await this.revertVendorCreditGLEntries(creditNoteId, trx);
+      return;
+    }
+    await this.editVendorCreditGLEntries(creditNoteId, trx);
   };
 
   /**
