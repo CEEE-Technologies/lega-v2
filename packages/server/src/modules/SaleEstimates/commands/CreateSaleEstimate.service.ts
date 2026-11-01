@@ -14,6 +14,7 @@ import { ItemsEntriesService } from '@/modules/Items/ItemsEntries.service';
 import { Customer } from '@/modules/Customers/models/Customer';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreateSaleEstimateDto } from '../dtos/SaleEstimate.dto';
+import { SaleEstimateIncrement } from './SaleEstimateIncrement.service';
 
 @Injectable()
 export class CreateSaleEstimate {
@@ -29,6 +30,7 @@ export class CreateSaleEstimate {
     private uow: UnitOfWork,
     private transformerDTO: SaleEstimateDTOTransformer,
     private validators: SaleEstimateValidators,
+    private estimateIncrement: SaleEstimateIncrement,
   ) {}
 
   /**
@@ -57,10 +59,6 @@ export class CreateSaleEstimate {
       estimateDTO,
       customer,
     );
-    // Validate estimate number uniquiness on the storage.
-    await this.validators.validateEstimateNumberExistance(
-      estimateObj.estimateNumber,
-    );
     // Validate items IDs existance on the storage.
     await this.itemsEntriesService.validateItemsIdsExistance(
       estimateDTO.entries,
@@ -71,6 +69,20 @@ export class CreateSaleEstimate {
     );
     // Creates a sale estimate transaction with associated transactions as UOW.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // estimates saved at the same moment never share a number.
+      estimateObj.estimateNumber =
+        (await this.estimateIncrement.reserveEstimateNumber(
+          estimateDTO.estimateNumber,
+          trx,
+        )) || estimateObj.estimateNumber;
+
+      // Validate estimate number uniquiness on the storage.
+      await this.validators.validateEstimateNumberExistance(
+        estimateObj.estimateNumber,
+        undefined,
+        trx,
+      );
       // Triggers `onSaleEstimateCreating` event.
       await this.eventPublisher.emitAsync(events.saleEstimate.onCreating, {
         estimateDTO,

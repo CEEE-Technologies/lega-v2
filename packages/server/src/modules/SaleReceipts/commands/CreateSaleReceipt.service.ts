@@ -14,6 +14,7 @@ import { Customer } from '@/modules/Customers/models/Customer';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreateSaleReceiptDto } from '../dtos/SaleReceipt.dto';
+import { SaleReceiptIncrement } from './SaleReceiptIncrement.service';
 
 @Injectable()
 export class CreateSaleReceipt {
@@ -32,6 +33,7 @@ export class CreateSaleReceipt {
     private readonly uow: UnitOfWork,
     private readonly transformer: SaleReceiptDTOTransformer,
     private readonly validators: SaleReceiptValidators,
+    private readonly receiptIncrement: SaleReceiptIncrement,
 
     @Inject(SaleReceipt.name)
     private readonly saleReceiptModel: TenantModelProxy<typeof SaleReceipt>,
@@ -73,14 +75,24 @@ export class CreateSaleReceipt {
     await this.itemsEntriesService.validateNonSellableEntriesItems(
       saleReceiptDTO.entries,
     );
-    // Validate sale receipt number uniqueness.
-    if (saleReceiptDTO.receiptNumber) {
-      await this.validators.validateReceiptNumberUnique(
-        saleReceiptDTO.receiptNumber,
-      );
-    }
     // Creates a sale receipt transaction and associated transactions under UOW env.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // receipts saved at the same moment never share a number.
+      saleReceiptObj.receiptNumber =
+        (await this.receiptIncrement.reserveReceiptNumber(
+          saleReceiptDTO.receiptNumber,
+          trx,
+        )) || saleReceiptObj.receiptNumber;
+
+      // Validate sale receipt number uniqueness.
+      if (saleReceiptObj.receiptNumber) {
+        await this.validators.validateReceiptNumberUnique(
+          saleReceiptObj.receiptNumber,
+          undefined,
+          trx,
+        );
+      }
       // Triggers `onSaleReceiptCreating` event.
       await this.eventEmitter.emitAsync(events.saleReceipt.onCreating, {
         saleReceiptDTO,

@@ -16,6 +16,12 @@ import {
   ICommandCashflowCreatingPayload,
   ICommandCashflowDeletingPayload,
 } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import {
+  IInventoryAdjustmentCreatingPayload,
+  IInventoryAdjustmentDeletingPayload,
+  IInventoryAdjustmentEditingPayload,
+  IInventoryAdjustmentPublishingPayload,
+} from '@/modules/InventoryAdjutments/types/InventoryAdjustments.types';
 import { events } from '@/common/events/events';
 
 @Injectable()
@@ -216,46 +222,70 @@ export class FinancialTransactionLockingGuardSubscriber {
    * Transactions locking guard on inventory adjustment creating.
    * @param {IInventoryAdjustmentCreatingPayload} payload -
    */
-  // @OnEvent(events.inventoryAdjustment.onQuickCreating)
-  // public async transactionsLockingGuardOnInventoryAdjCreating({
-  //   tenantId,
-  //   quickAdjustmentDTO,
-  // }: IInventoryAdjustmentCreatingPayload) {
-  //   // Can't locking if the new adjustment is not published yet.
-  //   if (!quickAdjustmentDTO.publish) return;
+  @OnEvent(events.inventoryAdjustment.onQuickCreating, {
+    suppressErrors: false,
+  })
+  public async transactionsLockingGuardOnInventoryAdjCreating({
+    quickAdjustmentDTO,
+  }: IInventoryAdjustmentCreatingPayload) {
+    // Can't locking if the new adjustment is not published yet.
+    if (!quickAdjustmentDTO.publish) return;
 
-  //   await this.financialTransactionsLocking.transactionLockingGuard(
-  //     tenantId,
-  //     quickAdjustmentDTO.date
-  //   );
-  // }
+    await this.financialTransactionsLocking.transactionLockingGuard(
+      quickAdjustmentDTO.date,
+    );
+  }
 
-  // /**
-  //  * Transaction locking guard on inventory adjustment deleting.
-  //  * @param {IInventoryAdjustmentDeletingPayload} payload
-  //  */
-  // @OnEvent(events.inventoryAdjustment.onDeleting)
-  // public async transactionsLockingGuardOnInventoryAdjDeleting({
-  //   oldInventoryAdjustment,
-  // }: IInventoryAdjustmentDeletingPayload) {
-  //   // Can't locking if the adjustment is published yet.
-  //   if (!oldInventoryAdjustment.isPublished) return;
+  /**
+   * Transactions locking guard on inventory adjustment editing: the old date
+   * and the new date when either version is published.
+   * @param {IInventoryAdjustmentEditingPayload} payload -
+   */
+  @OnEvent(events.inventoryAdjustment.onEditing, { suppressErrors: false })
+  public async transactionsLockingGuardOnInventoryAdjEditing({
+    oldInventoryAdjustment,
+    quickAdjustmentDTO,
+  }: IInventoryAdjustmentEditingPayload) {
+    // Can't locking if the old and new adjustment are not published.
+    if (!oldInventoryAdjustment.isPublished && !quickAdjustmentDTO.publish)
+      return;
 
-  //   await this.financialTransactionsLocking.transactionLockingGuard(
-  //     oldInventoryAdjustment.date
-  //   );
-  // }
+    // Validate the old adjustment date.
+    await this.financialTransactionsLocking.transactionLockingGuard(
+      oldInventoryAdjustment.date,
+    );
+    // Validate the new adjustment date.
+    await this.financialTransactionsLocking.transactionLockingGuard(
+      quickAdjustmentDTO.date,
+    );
+  }
 
-  // /**
-  //  * Transaction locking guard on inventory adjustment publishing.
-  //  * @param {IInventoryAdjustmentPublishingPayload} payload
-  //  */
-  // @OnEvent(events.inventoryAdjustment.onPublishing)
-  // public async transactionsLockingGuardOnInventoryAdjPublishing({
-  //   oldInventoryAdjustment,
-  // }: IInventoryAdjustmentPublishingPayload) {
-  //   await this.financialTransactionsLocking.transactionLockingGuard(
-  //     oldInventoryAdjustment.date
-  //   );
-  // }
+  /**
+   * Transaction locking guard on inventory adjustment deleting.
+   * @param {IInventoryAdjustmentDeletingPayload} payload
+   */
+  @OnEvent(events.inventoryAdjustment.onDeleting, { suppressErrors: false })
+  public async transactionsLockingGuardOnInventoryAdjDeleting({
+    inventoryAdjustment,
+  }: IInventoryAdjustmentDeletingPayload) {
+    // Can't locking if the adjustment is not published.
+    if (!inventoryAdjustment.isPublished) return;
+
+    await this.financialTransactionsLocking.transactionLockingGuard(
+      inventoryAdjustment.date,
+    );
+  }
+
+  /**
+   * Transaction locking guard on inventory adjustment publishing.
+   * @param {IInventoryAdjustmentPublishingPayload} payload
+   */
+  @OnEvent(events.inventoryAdjustment.onPublishing, { suppressErrors: false })
+  public async transactionsLockingGuardOnInventoryAdjPublishing({
+    oldInventoryAdjustment,
+  }: IInventoryAdjustmentPublishingPayload) {
+    await this.financialTransactionsLocking.transactionLockingGuard(
+      oldInventoryAdjustment.date,
+    );
+  }
 }

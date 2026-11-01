@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import { ERRORS } from '../constants';
 import { SaleReceipt } from '../models/SaleReceipt';
@@ -65,9 +66,10 @@ export class SaleReceiptValidators {
   public async validateReceiptNumberUnique(
     receiptNumber: string,
     notReceiptId?: number,
+    trx?: Knex.Transaction,
   ) {
     const saleReceipt = await this.saleReceiptModel()
-      .query()
+      .query(trx)
       .findOne('receipt_number', receiptNumber)
       .onBuild((builder) => {
         if (notReceiptId) {

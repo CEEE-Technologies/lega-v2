@@ -12,6 +12,7 @@ import { ItemsEntriesService } from '@/modules/Items/ItemsEntries.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { CreditNoteAutoIncrementService } from './CreditNoteAutoIncrement.service';
 import { CreateCreditNoteDto } from '../dtos/CreditNote.dto';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class CreateCreditNoteService {
     private readonly uow: UnitOfWork,
     private readonly itemsEntriesService: ItemsEntriesService,
     private readonly eventPublisher: EventEmitter2,
+    private readonly creditNoteIncrement: CreditNoteAutoIncrementService,
     private readonly commandCreditNoteDTOTransform: CommandCreditNoteDTOTransform,
 
     @Inject(CreditNote.name)
@@ -72,6 +74,14 @@ export class CreateCreditNoteService {
       );
     // Creates a new credit card transactions under unit-of-work envirement.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // credit notes saved at the same moment never share a number.
+      creditNoteModel.creditNoteNumber =
+        (await this.creditNoteIncrement.reserveCreditNumber(
+          creditNoteDTO.creditNoteNumber,
+          trx,
+        )) || creditNoteModel.creditNoteNumber;
+
       // Triggers `onCreditNoteCreating` event.
       await this.eventPublisher.emitAsync(events.creditNote.onCreating, {
         creditNoteDTO,

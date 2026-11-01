@@ -19,6 +19,7 @@ import { CreditNoteAppliedInvoice } from '../models/CreditNoteAppliedInvoice';
 import { CommandCreditNoteDTOTransform } from '@/modules/CreditNotes/commands/CommandCreditNoteDTOTransform.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ApplyCreditNoteToInvoicesDto } from '../dtos/ApplyCreditNoteToInvoices.dto';
+import { findDuplicateDocument } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class CreditNoteApplyToInvoices {
@@ -104,6 +105,9 @@ export class CreditNoteApplyToInvoices {
       .forUpdate()
       .throwIfNotFound();
 
+    // A draft credit note isn't in the books yet.
+    this.creditNoteDTOTransform.validateCreditPublished(creditNote);
+
     // Retrieve the applied invoices (locked) that associated to the credit note customer.
     const appliedInvoicesEntries =
       await this.paymentReceiveValidators.validateInvoicesIDsExistance(
@@ -111,6 +115,12 @@ export class CreditNoteApplyToInvoices {
         applyCreditToInvoicesDTO.entries,
         trx,
       );
+    // Each invoice once per credit application; otherwise each line passes
+    // the invoice's due on its own and the invoice is over-credited.
+    this.validateNoDuplicateInvoices(
+      applyCreditToInvoicesDTO.entries,
+      appliedInvoicesEntries,
+    );
 
     // Transformes apply DTO to model.
     const creditNoteAppliedModel = this.transformApplyDTOToModel(
@@ -149,6 +159,28 @@ export class CreditNoteApplyToInvoices {
       amount: sumMoneyBy(entries, 'amount'),
       entries,
     };
+  };
+
+  /**
+   * Validates no invoice is listed more than once in the credit application.
+   * @param {{ invoiceId: number }[]} entries - Apply lines.
+   * @param {SaleInvoice[]} invoices - The stored invoices.
+   */
+  private validateNoDuplicateInvoices = (
+    entries: Array<{ invoiceId: number; entryType?: string }>,
+    invoices: SaleInvoice[],
+  ) => {
+    const duplicate = findDuplicateDocument(entries, 'invoiceId');
+    if (!duplicate) return;
+
+    const invoice = invoices.find((row) => row.id === duplicate.id);
+    const name = invoice?.invoiceNo || `Invoice #${duplicate.id}`;
+
+    throw new ServiceError(
+      ERRORS.CREDIT_NOTE_APPLY_DUPLICATE_INVOICE,
+      `Invoice ${name} is listed more than once. Combine the amounts into one line.`,
+      { invoiceId: duplicate.id, indexes: duplicate.indexes },
+    );
   };
 
   /**

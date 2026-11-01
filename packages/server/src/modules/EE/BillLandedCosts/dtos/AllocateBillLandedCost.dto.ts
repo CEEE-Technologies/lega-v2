@@ -5,6 +5,7 @@ import {
   IsArray,
   ValidateNested,
   IsString,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsMoney, ToNumber } from '@/common/decorators/Validators';
@@ -17,6 +18,7 @@ export class AllocateBillLandedCostItemDto {
 
   @IsMoney()
   @ToNumber()
+  @Min(0)
   cost: number;
 }
 

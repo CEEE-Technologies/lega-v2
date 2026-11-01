@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
 import { AutoIncrementOrdersService } from '@/modules/AutoIncrementOrders/AutoIncrementOrders.service';
 
@@ -21,11 +22,19 @@ export class PaymentReceivedIncrement {
   }
 
   /**
-   * Increment the payment receive next number.
+   * Picks the payment number inside the payment save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The payment save transaction.
    */
-  public incrementNextPaymentReceiveNumber() {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reservePaymentReceiveNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'payment_receives',
+      givenNumber,
+      trx,
     );
   }
 }

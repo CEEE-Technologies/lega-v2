@@ -17,6 +17,7 @@ import { ServiceError } from '@/modules/Items/ServiceError';
 import { events } from '@/common/events/events';
 import { VendorCreditDTOTransformService } from '@/modules/VendorCredit/commands/VendorCreditDTOTransform.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { findDuplicateDocument } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 @Injectable()
 export class ApplyVendorCreditToBillsService {
@@ -100,6 +101,9 @@ export class ApplyVendorCreditToBillsService {
       .forUpdate()
       .throwIfNotFound();
 
+    // A draft vendor credit isn't in the books yet.
+    this.vendorCreditDTOTransform.validateCreditPublished(vendorCredit);
+
     // Transfomes credit apply to bills DTO to model object.
     const vendorCreditAppliedModel = this.transformApplyDTOToModel(
       applyCreditToBillsDTO,
@@ -113,6 +117,12 @@ export class ApplyVendorCreditToBillsService {
         vendorCredit.vendorId,
         trx,
       );
+
+    // Each bill once per credit application.
+    this.validateNoDuplicateBills(
+      vendorCreditAppliedModel.entries,
+      appliedBills,
+    );
 
     // Validate bills has remaining amount to apply.
     this.validateBillsRemainingAmount(
@@ -148,6 +158,28 @@ export class ApplyVendorCreditToBillsService {
       amount,
       entries,
     };
+  };
+
+  /**
+   * Validates no bill is listed more than once in the credit application.
+   * @param {{ billId: number }[]} entries - Apply lines.
+   * @param {Bill[]} bills - The stored bills.
+   */
+  private validateNoDuplicateBills = (
+    entries: Array<{ billId: number; entryType?: string }>,
+    bills: Bill[],
+  ) => {
+    const duplicate = findDuplicateDocument(entries, 'billId');
+    if (!duplicate) return;
+
+    const bill = bills.find((row) => row.id === duplicate.id);
+    const name = bill?.billNumber || `#${duplicate.id}`;
+
+    throw new ServiceError(
+      ERRORS.VENDOR_CREDIT_APPLY_DUPLICATE_BILL,
+      `Bill ${name} is listed more than once. Combine the amounts into one line.`,
+      { billId: duplicate.id, indexes: duplicate.indexes },
+    );
   };
 
   /**

@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { AutoIncrementOrdersService } from '@/modules/AutoIncrementOrders/AutoIncrementOrders.service';
 import { Injectable } from '@nestjs/common';
 
@@ -18,11 +19,19 @@ export class CreditNoteAutoIncrementService {
   }
 
   /**
-   * Increment the credit note serial next number.
+   * Picks the credit note number inside the credit note save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The credit note save transaction.
    */
-  public incrementSerialNumber() {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveCreditNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'credit_note',
+      givenNumber,
+      trx,
     );
   }
 }

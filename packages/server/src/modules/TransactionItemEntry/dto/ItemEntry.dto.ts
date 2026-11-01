@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 import { ItemLinkDto } from '@/modules/Items/dtos/ItemLink.dto';
 
@@ -43,6 +44,7 @@ export class ItemEntryDto {
     description: 'The rate of the item entry',
     example: 1,
   })
+  @Min(0)
   rate: number;
 
   @IsNotEmpty()
@@ -52,6 +54,7 @@ export class ItemEntryDto {
     description: 'The quantity of the item entry',
     example: 1,
   })
+  @Min(0)
   quantity: number;
 
   @IsOptional()
@@ -62,6 +65,7 @@ export class ItemEntryDto {
     description: 'The discount of the item entry',
     example: 1,
   })
+  @Min(0)
   discount?: number;
 
   @IsOptional()

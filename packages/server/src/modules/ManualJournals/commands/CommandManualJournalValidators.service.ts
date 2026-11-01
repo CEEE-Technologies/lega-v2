@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { moneyEq, moneyGt, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { difference, isEmpty } from 'lodash';
@@ -72,9 +73,10 @@ export class CommandManualJournalValidators {
   public async validateManualJournalNoUnique(
     journalNumber: string,
     notId?: number,
+    trx?: Knex.Transaction,
   ) {
     const journals = await this.manualJournalModel()
-      .query()
+      .query(trx)
       .where('journal_number', journalNumber)
       .onBuild((builder) => {
         if (notId) {

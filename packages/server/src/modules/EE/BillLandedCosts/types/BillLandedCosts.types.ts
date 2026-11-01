@@ -113,6 +113,24 @@ export interface IAllocatedLandedCostDeletedPayload {
   trx: Knex.Transaction;
 }
 
+/**
+ * Triggered inside the save, before the landed cost is stored; a listener
+ * can refuse it by throwing (e.g. the bill date is in a locked period).
+ */
+export interface IAllocatedLandedCostCreatingPayload {
+  bill: Bill;
+  trx: Knex.Transaction;
+}
+
+/**
+ * Triggered inside the save, before the landed cost is removed.
+ */
+export interface IAllocatedLandedCostDeletingPayload {
+  oldBillLandedCost: IBillLandedCostTransaction;
+  billId: number;
+  trx: Knex.Transaction;
+}
+
 export interface IAllocatedLandedCostCreatedPayload {
   bill: Bill;
   billLandedCostId: number;

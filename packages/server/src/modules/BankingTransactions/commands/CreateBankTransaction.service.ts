@@ -118,6 +118,7 @@ export class CreateBankTransactionService {
   public newCashflowTransaction = async (
     newTransactionDTO: CreateBankTransactionDto,
     userId?: number,
+    trx?: Knex.Transaction,
   ): Promise<BankTransaction> => {
     // Retrieves the cashflow account or throw not found error.
     const cashflowAccount = await this.accountModel()
@@ -142,6 +143,14 @@ export class CreateBankTransactionService {
     );
     // Creates a new cashflow transaction under UOW envirement.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // transactions saved at the same moment never share a number.
+      cashflowTransactionObj.transactionNumber =
+        (await this.autoIncrement.reserveTransactionNumber(
+          newTransactionDTO.transactionNumber,
+          trx,
+        )) || cashflowTransactionObj.transactionNumber;
+
       // Triggers `onCashflowTransactionCreate` event.
       await this.eventPublisher.emitAsync(
         events.cashflow.onTransactionCreating,
@@ -165,6 +174,6 @@ export class CreateBankTransactionService {
         } as ICommandCashflowCreatedPayload,
       );
       return cashflowTransaction;
-    });
+    }, trx);
   };
 }

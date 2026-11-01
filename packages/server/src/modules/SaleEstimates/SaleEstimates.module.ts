@@ -44,7 +44,6 @@ import { SaleEstimatesExportable } from './SaleEstimatesExportable';
 import { SaleEstimatesImportable } from './SaleEstimatesImportable';
 import { GetSaleEstimateMailStateService } from './queries/GetSaleEstimateMailState.service';
 import { GetSaleEstimateMailTemplateService } from './queries/GetSaleEstimateMailTemplate.service';
-import { SaleEstimateAutoIncrementSubscriber } from './subscribers/SaleEstimateAutoIncrementSubscriber';
 import { SaleEstimateSmsNotificationSubscriber } from './subscribers/SaleEstimateSmsNotificationSubscriber';
 import { BulkDeleteSaleEstimatesService } from './BulkDeleteSaleEstimates.service';
 import { ValidateBulkDeleteSaleEstimatesService } from './ValidateBulkDeleteSaleEstimates.service';
@@ -100,7 +99,6 @@ import { SendSaleEstimateMailProcess } from './processes/SendSaleEstimateMail.pr
     SaleEstimatesImportable,
     GetSaleEstimateMailStateService,
     GetSaleEstimateMailTemplateService,
-    SaleEstimateAutoIncrementSubscriber,
     SaleEstimateSmsNotificationSubscriber,
     BulkDeleteSaleEstimatesService,
     ValidateBulkDeleteSaleEstimatesService,

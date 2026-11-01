@@ -21,7 +21,6 @@ import { VendorCreditGLEntries } from './commands/VendorCreditGLEntries';
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
 import { VendorCreditInventoryTransactionsSubscriber } from './subscribers/VendorCreditInventoryTransactionsSusbcriber';
-import { VendorCreditAutoSerialSubscriber } from './subscribers/VendorCreditAutoSerialSubscriber';
 import { VendorCreditInventoryTransactions } from './commands/VendorCreditInventoryTransactions';
 import { GetVendorCreditsService } from './queries/GetVendorCredits.service';
 import { DynamicListModule } from '../DynamicListing/DynamicList.module';
@@ -60,7 +59,6 @@ import { ValidateBulkDeleteVendorCreditsService } from './ValidateBulkDeleteVend
     VendorCreditGlEntriesSubscriber,
     VendorCreditInventoryTransactions,
     VendorCreditInventoryTransactionsSubscriber,
-    VendorCreditAutoSerialSubscriber,
     VendorCreditsExportable,
     VendorCreditsImportable,
     BulkDeleteVendorCreditsService,

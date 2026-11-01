@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { IAllocatedLandedCostCreatedPayload } from '../types/BillLandedCosts.types';
+import {
+  IAllocatedLandedCostCreatedPayload,
+  IAllocatedLandedCostCreatingPayload,
+} from '../types/BillLandedCosts.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
@@ -88,6 +91,12 @@ export class AllocateLandedCostService extends BaseLandedCostService {
     // Saves landed cost transactions with associated tranasctions under
     // unit-of-work eniverment.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Triggers `onBillLandedCostCreating` event (the locked-period guard).
+      await this.eventPublisher.emitAsync(billLandedCostEvents.onCreating, {
+        bill,
+        trx,
+      } as IAllocatedLandedCostCreatingPayload);
+
       // Save the bill landed cost model.
       const billLandedCost = await this.billLandedCostModel()
         .query(trx)
