@@ -63,7 +63,12 @@ export function PaymentPortal() {
   };
 
   return (
-    <Box className={styles.root} my={'40px'} mx={'auto'}>
+    // `document-paper`: white paper in both themes (used by the theme audit).
+    <Box
+      className={clsx('document-paper', styles.root)}
+      my={'40px'}
+      mx={'auto'}
+    >
       <Stack spacing={0} className={styles.body}>
         <Stack>
           <Group spacing={10}>

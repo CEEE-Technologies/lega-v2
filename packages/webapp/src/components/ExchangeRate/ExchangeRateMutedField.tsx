@@ -91,6 +91,10 @@ const ExchangeRateButton = styled.div`
   position: relative;
   padding-right: 28px;
 
+  .bp4-dark & {
+    color: var(--color-light-gray1);
+  }
+
   .bp4-button {
     position: absolute;
     right: 0;

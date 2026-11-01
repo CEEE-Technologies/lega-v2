@@ -120,7 +120,8 @@ export function InvoicePaymentPage({
   classNames,
 }: PaymentPageProps) {
   return (
-    <Box className={clsx(styles.root, classNames?.root)}>
+    // `document-paper`: white paper in both themes (used by the theme audit).
+    <Box className={clsx('document-paper', styles.root, classNames?.root)}>
       <Stack spacing={0} className={styles.body}>
         <Stack>
           <Group spacing={10}>

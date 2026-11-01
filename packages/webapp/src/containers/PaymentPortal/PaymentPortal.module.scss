@@ -112,3 +112,18 @@
 .footerText {
   color: #666;
 }
+
+// The payment page is white paper in both themes: muted text and buttons keep
+// their light-theme colours.
+.root :global(.bp4-text-muted),
+:global(.bp4-dark) .root :global(.bp4-text-muted) {
+  color: #60736c;
+}
+
+:global(.bp4-dark) .root :global(.bp4-button:not([class*='bp4-intent-'])) {
+  color: #222;
+
+  :global(.bp4-icon) {
+    color: #5f6b7c;
+  }
+}

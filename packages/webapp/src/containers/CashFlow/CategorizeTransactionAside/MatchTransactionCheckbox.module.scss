@@ -2,6 +2,8 @@
   --item-background: #fff;
   --item-border: #d6dbe3;
   --item-active-border: #88abdb;
+  --item-active-shadow: rgba(136, 171, 219, 0.2);
+  --item-active-text: rgb(21, 82, 200);
   --item-label-text: #252a33;
   --item-date-text: #5c7080;
   --item-border-hover: #c0c0c0;
@@ -12,6 +14,9 @@
     --item-date-text: var(--color-light-gray1);
     --item-label-text: var(--color-light-gray4);
     --item-border-hover: rgba(255, 255, 255, 0.45);
+    --item-active-border: #8abbff;
+    --item-active-shadow: rgba(138, 187, 255, 0.25);
+    --item-active-text: #8abbff;
   }
   background: var(--item-background);
   border-radius: 5px;
@@ -21,11 +26,11 @@
 
   &.active {
     border-color: var(--item-active-border);
-    box-shadow: 0 0 0 2px rgba(136, 171, 219, 0.2);
+    box-shadow: 0 0 0 2px var(--item-active-shadow);
 
     .label,
     .date {
-      color: rgb(21, 82, 200);
+      color: var(--item-active-text);
     }
   }
   &:hover:not(.active) {
