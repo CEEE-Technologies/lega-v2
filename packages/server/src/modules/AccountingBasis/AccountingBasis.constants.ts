@@ -34,6 +34,8 @@ export type CashBasisReferenceType =
 export interface ICashBasisRebuildJobPayload {
   organizationId: string;
   userId?: number;
+  /** Clears the startup rebuild flag once the rebuild checks clean. */
+  clearRebuildFlag?: boolean;
 }
 
 export interface ICashBasisRebuildResult {

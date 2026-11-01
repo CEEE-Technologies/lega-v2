@@ -5,7 +5,6 @@ import { Bill } from '../models/Bill';
 import { Inject, Injectable } from '@nestjs/common';
 import { BillGL } from './BillsGL';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
-import { BillLandedCostsBridge } from '../integrations/BillLandedCostsBridge';
 
 @Injectable()
 export class BillGLEntries {
@@ -17,7 +16,6 @@ export class BillGLEntries {
   constructor(
     private readonly ledgerStorage: LedgerStorageService,
     private readonly accountRepository: AccountRepository,
-    private readonly landedCostsBridge: BillLandedCostsBridge,
 
     @Inject(Bill.name)
     private readonly billModel: TenantModelProxy<typeof Bill>,
@@ -38,14 +36,6 @@ export class BillGLEntries {
       .findById(billId)
       .withGraphFetched('entries.item');
 
-    // Retrieves the allocated landed costs of the bill entries.
-    const itemAllocatedCosts =
-      await this.landedCostsBridge.getItemAllocatedCosts(billId, trx);
-
-    // Retrieves the landed costs ledger contribution.
-    const landedCostLedgerEntries =
-      await this.landedCostsBridge.getLandedCostLedgerEntries(billId, trx);
-
     // Finds or create a A/P account based on the given currency.
     const APAccount = await this.accountRepository.findOrCreateAccountsPayable(
       bill.currencyCode,
@@ -65,11 +55,8 @@ export class BillGLEntries {
       await this.accountRepository.findOrCreatePurchaseDiscountAccount({}, trx);
 
     // Retrieves the bill ledger.
-    const billLedger = new BillGL(
-      bill,
-      itemAllocatedCosts,
-      landedCostLedgerEntries,
-    )
+    // The allocated landed costs are posted by the landed cost itself.
+    const billLedger = new BillGL(bill)
       .setPayableAccountId(APAccount.id)
       .setTaxPayableAccountId(taxPayableAccount.id)
       .setPurchaseDiscountAccountId(purchaseDiscountAccount.id)

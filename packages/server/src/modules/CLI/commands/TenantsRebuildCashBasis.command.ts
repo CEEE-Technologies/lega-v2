@@ -147,9 +147,11 @@ export class TenantsRebuildCashBasisCommand extends BaseCommand {
       host: this.configService.get('queue.host'),
       port: this.configService.get('queue.port'),
     };
-    const queue = new Queue(CASH_BASIS_REBUILD_QUEUE, { connection });
+    const prefix = this.configService.get('queue.prefix');
+    const queue = new Queue(CASH_BASIS_REBUILD_QUEUE, { connection, prefix });
     const queueEvents = new QueueEvents(CASH_BASIS_REBUILD_QUEUE, {
       connection,
+      prefix,
     });
     const timeoutMs = (options.timeout || DEFAULT_TIMEOUT_MINUTES) * 60 * 1000;
     let failed = 0;

@@ -148,6 +148,7 @@ import { AppThrottleModule } from './AppThrottle.module';
           host: configService.get('queue.host'),
           port: configService.get('queue.port'),
         },
+        prefix: configService.get('queue.prefix'),
       }),
       inject: [ConfigService],
     }),

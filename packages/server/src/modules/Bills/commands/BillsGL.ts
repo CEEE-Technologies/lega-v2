@@ -4,32 +4,24 @@ import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { Bill } from '../models/Bill';
 import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
-import {
-  IBillItemAllocatedCost,
-  IBillLandedCostLedgerEntry,
-} from '../integrations/BillLandedCostsBridge';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { foreignDebitSide, NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
+import { foreignDebitSide } from '@/utils/ledger-rounding';
 
 export class BillGL {
   private bill: Bill;
-  private itemAllocatedCosts: Map<number, number>;
-  private landedCostLedgerEntries: IBillLandedCostLedgerEntry[];
   private payableAccountId: number;
   private taxPayableAccountId: number;
   private purchaseDiscountAccountId: number;
   private otherExpensesAccountId: number;
 
-  constructor(
-    bill: Bill,
-    itemAllocatedCosts: IBillItemAllocatedCost[] = [],
-    landedCostLedgerEntries: IBillLandedCostLedgerEntry[] = [],
-  ) {
+  /**
+   * The allocated landed cost isn't part of the bill's entries: the landed
+   * cost posts it in its own set (LandedCostGLEntries.service), so a re-saved
+   * bill would count it twice.
+   * @param {Bill} bill - Bill.
+   */
+  constructor(bill: Bill) {
     this.bill = bill;
-    this.itemAllocatedCosts = new Map(
-      itemAllocatedCosts.map((item) => [item.entryId, item.amount]),
-    );
-    this.landedCostLedgerEntries = landedCostLedgerEntries;
   }
 
   setPayableAccountId(payableAccountId: number) {
@@ -90,12 +82,10 @@ export class BillGL {
   private getBillItemEntry(entry: ItemEntry, index: number): ILedgerEntry {
     const commonJournalMeta = this.billCommonEntry;
     const totalLocal = this.bill.exchangeRate * entry.totalExcludingTax;
-    const landedCostAmount = this.itemAllocatedCosts.get(entry.id) ?? 0;
 
     return {
       ...commonJournalMeta,
-      debit: totalLocal + landedCostAmount,
-      // The landed cost part is base currency (see the landed cost line).
+      debit: totalLocal,
       foreignDebit: entry.totalExcludingTax,
       accountId:
         ['inventory'].indexOf(entry.item.type) !== -1
@@ -105,28 +95,6 @@ export class BillGL {
       indexGroup: 10,
       itemId: entry.itemId,
       accountNormal: AccountNormal.DEBIT,
-    };
-  }
-
-  /**
-   * Retrieves the bill landed cost entry.
-   * @param {IBillLandedCostLedgerEntry} landedCost - Landed cost
-   * @param {number} index - Index
-   */
-  private getBillLandedCostEntry(
-    landedCost: IBillLandedCostLedgerEntry,
-    _index: number,
-  ): ILedgerEntry {
-    const commonJournalMeta = this.billCommonEntry;
-
-    return {
-      ...commonJournalMeta,
-      credit: landedCost.amount,
-      ...NO_FOREIGN_AMOUNT,
-      accountId: landedCost.costAccountId,
-      accountNormal: AccountNormal.DEBIT,
-      index: 1,
-      indexGroup: 20,
     };
   }
 
@@ -231,14 +199,9 @@ export class BillGL {
     const itemsEntries = this.bill.entries.map((entry, index) =>
       this.getBillItemEntry(entry, index),
     );
-    const landedCostEntries = this.landedCostLedgerEntries.map(
-      (landedCost, index) => this.getBillLandedCostEntry(landedCost, index),
-    );
-
     return [
       payableEntry,
       ...itemsEntries,
-      ...landedCostEntries,
       ...this.getBillTaxEntries(),
       this.purchaseDiscountEntry,
       this.adjustmentEntry,

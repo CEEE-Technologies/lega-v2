@@ -2,10 +2,8 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { Knex } from 'knex';
 import {
   BillLandedCostsBridge,
-  IBillItemAllocatedCost,
   IBillLandedCostEntryDTO,
   IBillLandedCostEntryLike,
-  IBillLandedCostLedgerEntry,
   IBillLandedCostsProvider,
 } from '@/modules/Bills/integrations/BillLandedCostsBridge';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
@@ -102,52 +100,5 @@ export class LandedCostsBridgeProvider
       oldEntries,
       newEntries,
     );
-  }
-
-  /**
-   * Retrieves the item entries allocated landed costs of the given bill.
-   * @param {number} billId - Bill id.
-   * @param {Knex.Transaction} trx - Knex transaction.
-   */
-  public async getItemAllocatedCosts(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillItemAllocatedCost[]> {
-    const landedCosts = await this.billLandedCostModel()
-      .query(trx)
-      .where('billId', billId)
-      .withGraphFetched('allocateEntries');
-
-    const allocatedCostsMap = new Map<number, number>();
-    landedCosts.forEach((landedCost) => {
-      landedCost.allocateEntries.forEach((entry) => {
-        const allocatedCost = allocatedCostsMap.get(entry.entryId) ?? 0;
-        allocatedCostsMap.set(entry.entryId, allocatedCost + entry.cost);
-      });
-    });
-
-    return [...allocatedCostsMap.entries()].map(([entryId, amount]) => ({
-      entryId,
-      amount,
-    }));
-  }
-
-  /**
-   * Retrieves the landed costs ledger contribution of the given bill.
-   * @param {number} billId - Bill id.
-   * @param {Knex.Transaction} trx - Knex transaction.
-   */
-  public async getLandedCostLedgerEntries(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillLandedCostLedgerEntry[]> {
-    const landedCosts = await this.billLandedCostModel()
-      .query(trx)
-      .where('billId', billId);
-
-    return landedCosts.map((landedCost) => ({
-      amount: landedCost.amount,
-      costAccountId: landedCost.costAccountId,
-    }));
   }
 }

@@ -8,6 +8,7 @@ import { LedgerModule } from '../Ledger/Ledger.module';
 import { CASH_BASIS_REBUILD_QUEUE } from './AccountingBasis.constants';
 import { CashBasisRebuildService } from './CashBasisRebuild.service';
 import { CashBasisRebuildProcessor } from './CashBasisRebuild.processor';
+import { CashBasisAutoRebuildService } from './CashBasisAutoRebuild.service';
 import { AccountsModule } from '../Accounts/Accounts.module';
 import { TenancyModule } from '../Tenancy/Tenancy.module';
 import { CreditApplicationsGLService } from './CreditApplicationsGL.service';
@@ -32,6 +33,7 @@ import { CreditApplicationsGLSubscriber } from './CreditApplicationsGL.subscribe
   providers: [
     CashBasisRebuildService,
     CashBasisRebuildProcessor,
+    CashBasisAutoRebuildService,
     CreditApplicationsGLService,
     CreditApplicationsGLSubscriber,
   ],

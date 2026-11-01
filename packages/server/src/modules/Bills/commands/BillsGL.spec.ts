@@ -35,70 +35,43 @@ const buildBill = (overrides: Record<string, any> = {}) =>
     ...overrides,
   }) as any;
 
-const buildLedger = (
-  bill: any,
-  itemAllocatedCosts: any[] = [],
-  landedCostLedgerEntries: any[] = [],
-) =>
-  new BillGL(bill, itemAllocatedCosts, landedCostLedgerEntries)
+const buildLedger = (bill: any) =>
+  new BillGL(bill)
     .setPayableAccountId(1)
     .setTaxPayableAccountId(2)
     .setPurchaseDiscountAccountId(3)
     .setOtherExpensesAccountId(4)
     .getBillLedger();
 
+/**
+ * P7: the bill's entries used to add the landed costs allocated to it,
+ * while the landed cost posts them in its own set too, so a re-saved bill
+ * counted them twice. The bill's entries are its own lines only.
+ */
 describe('BillGL', () => {
-  it('adds the allocated landed costs to the item entries debit', () => {
-    const ledger = buildLedger(buildBill(), [{ entryId: 1, amount: 100 }], []);
+  it('posts each item line at its own amount, without allocated landed costs', () => {
+    const ledger = buildLedger(buildBill());
 
     const entries = ledger.getEntries();
     const itemEntryOne = entries.find((entry) => entry.itemId === 10);
     const itemEntryTwo = entries.find((entry) => entry.itemId === 11);
 
-    expect(itemEntryOne.debit).toBe(1100);
+    expect(itemEntryOne.debit).toBe(1000);
     expect(itemEntryOne.accountId).toBe(100);
     expect(itemEntryOne.indexGroup).toBe(10);
     expect(itemEntryOne.accountNormal).toBe(AccountNormal.DEBIT);
 
     expect(itemEntryTwo.debit).toBe(500);
     expect(itemEntryTwo.accountId).toBe(200);
-  });
-
-  it('appends the landed costs as credit ledger entries', () => {
-    const ledger = buildLedger(
-      buildBill(),
-      [],
-      [{ amount: 50, costAccountId: 300 }],
-    );
-
-    const entries = ledger.getEntries();
-    const landedCostEntry = entries.find((entry) => entry.accountId === 300);
-
-    expect(landedCostEntry.credit).toBe(50);
-    expect(landedCostEntry.indexGroup).toBe(20);
-    expect(landedCostEntry.accountNormal).toBe(AccountNormal.DEBIT);
-  });
-
-  it('keeps the bill entries amounts when there are no contributions', () => {
-    const ledger = buildLedger(buildBill());
-
-    const entries = ledger.getEntries();
-    const itemEntryOne = entries.find((entry) => entry.itemId === 10);
-
-    expect(itemEntryOne.debit).toBe(1000);
     expect(entries.some((entry) => entry.accountId === 300)).toBe(false);
   });
 
-  it('applies the exchange rate to the item entries but keeps the allocated costs as is', () => {
-    const ledger = buildLedger(
-      buildBill({ exchangeRate: 2 }),
-      [{ entryId: 1, amount: 100 }],
-      [],
-    );
+  it('applies the exchange rate to the item entries', () => {
+    const ledger = buildLedger(buildBill({ exchangeRate: 2 }));
 
     const entries = ledger.getEntries();
     const itemEntryOne = entries.find((entry) => entry.itemId === 10);
 
-    expect(itemEntryOne.debit).toBe(2100);
+    expect(itemEntryOne.debit).toBe(2000);
   });
 });
