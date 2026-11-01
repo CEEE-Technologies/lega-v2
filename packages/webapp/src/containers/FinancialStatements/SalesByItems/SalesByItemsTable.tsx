@@ -56,12 +56,15 @@ const SalesByItemsSheet = styled(FinancialSheet)`
 const SalesByItemsDataTable = styled(ReportDataTable)`
   --x-table-total-border-bottom-color: #000;
   --x-table-total-border-top-color: #bbb;
-  --x-table-total-border-bottom-color: var(
-    --color-datatable-constrant-cell-border
-  );
-  --x-table-total-border-top-color: var(
-    --color-datatable-constrant-cell-border
-  );
+
+  .bp4-dark & {
+    --x-table-total-border-bottom-color: var(
+      --color-datatable-constrant-cell-border
+    );
+    --x-table-total-border-top-color: var(
+      --color-datatable-constrant-cell-border
+    );
+  }
 
   .table {
     .tbody {

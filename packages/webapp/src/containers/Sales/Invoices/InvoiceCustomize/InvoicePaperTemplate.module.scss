@@ -126,3 +126,9 @@
 .paragraphLabel{
   color: #666;
 }
+
+// The paper is white in both themes, so muted text keeps the light grey.
+.root :global(.bp4-text-muted),
+:global(.bp4-dark) .root :global(.bp4-text-muted) {
+  color: #60736c;
+}
