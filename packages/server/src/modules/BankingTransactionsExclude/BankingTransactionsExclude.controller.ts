@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ExcludeBankTransactionsApplication } from './ExcludeBankTransactionsApplication';
 import {
@@ -21,7 +22,13 @@ import { GetExcludedBankTransactionResponseDto } from './dtos/GetExcludedBankTra
 import { ExcludeBankTransactionsBulkDto } from './dtos/ExcludeBankTransactionsBulk.dto';
 import { GetExcludedBankTransactionsQueryDto } from './dtos/GetExcludedBankTransactionsQuery.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/exclude')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Banking Transactions')
 @ApiExtraModels(
   GetExcludedBankTransactionResponseDto,
@@ -35,6 +42,7 @@ export class BankingTransactionsExcludeController {
   ) {}
 
   @Put('bulk')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Exclude the given bank transactions.' })
   @ApiResponse({
     status: 200,
@@ -47,6 +55,7 @@ export class BankingTransactionsExcludeController {
   }
 
   @Delete('bulk')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Unexclude the given bank transactions.' })
   @ApiResponse({
     status: 200,
@@ -61,6 +70,7 @@ export class BankingTransactionsExcludeController {
   }
 
   @Get()
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Retrieves the excluded bank transactions.' })
   @ApiResponse({
     status: 200,
@@ -91,6 +101,7 @@ export class BankingTransactionsExcludeController {
   }
 
   @Put(':id')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Exclude the given bank transaction.' })
   public excludeBankTransaction(@Param('id') id: string) {
     return this.excludeBankTransactionsApplication.excludeBankTransaction(
@@ -99,6 +110,7 @@ export class BankingTransactionsExcludeController {
   }
 
   @Delete(':id')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Unexclude the given bank transaction.' })
   public unexcludeBankTransaction(@Param('id') id: string) {
     return this.excludeBankTransactionsApplication.unexcludeBankTransaction(

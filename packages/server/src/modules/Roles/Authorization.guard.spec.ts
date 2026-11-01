@@ -114,3 +114,68 @@ describe('AuthorizationGuard', () => {
     expect(requestB.ability).toBe(requestA.ability);
   });
 });
+
+describe('AuthorizationGuard without a usable user', () => {
+  const organizationId = 'org-c';
+  const userId = 20;
+  const clsService: any = {
+    get: jest.fn((key: string) => ({ userId, organizationId })[key]),
+  };
+  const buildRequest = () => ({}) as any;
+  const contextFor = (request: any) =>
+    ({ switchToHttp: () => ({ getRequest: () => request }) }) as any;
+
+  beforeEach(() => purgeTenantAbilities(organizationId));
+
+  it('gives no permissions when the user has no row in the organization', async () => {
+    const withGraphFetched = jest.fn().mockResolvedValue(undefined);
+    const tenantUserModel = jest.fn(() => ({
+      query: () => ({ findOne: () => ({ withGraphFetched }) }),
+    }));
+    const guard = new AuthorizationGuard(clsService, tenantUserModel as any);
+    const request = buildRequest();
+
+    await guard.canActivate(contextFor(request));
+
+    expect(request.ability.can('manage', 'all')).toBe(false);
+    expect(request.ability.can('View', 'Item')).toBe(false);
+    expect(getCachedAbility(organizationId, userId)).toBeUndefined();
+  });
+
+  const unbuiltTenant = (role: string | null) => {
+    const tenantModel: any = {
+      query: () => ({
+        findOne: jest.fn().mockResolvedValue({ id: 5, initializedAt: null }),
+      }),
+    };
+    const userTenantModel: any = {
+      query: () => ({
+        findOne: jest.fn().mockResolvedValue(role ? { role } : undefined),
+      }),
+    };
+    const tenantUserModel = jest.fn(() => {
+      throw new Error('The organization database does not exist yet.');
+    });
+    return new AuthorizationGuard(
+      clsService,
+      tenantUserModel as any,
+      tenantModel,
+      userTenantModel,
+    );
+  };
+
+  it('treats the owner as Admin before the organization is built', async () => {
+    const request = buildRequest();
+    await unbuiltTenant('owner').canActivate(contextFor(request));
+
+    expect(request.ability.can('manage', 'all')).toBe(true);
+    expect(getCachedAbility(organizationId, userId)).toBeUndefined();
+  });
+
+  it('gives a non-owner nothing before the organization is built', async () => {
+    const request = buildRequest();
+    await unbuiltTenant('member').canActivate(contextFor(request));
+
+    expect(request.ability.can('manage', 'all')).toBe(false);
+  });
+});

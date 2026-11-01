@@ -15,6 +15,7 @@ import {
   Body,
   HttpCode,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { BuildOrganizationService } from './commands/BuildOrganization.service';
@@ -39,8 +40,18 @@ import { OrganizationBuildJobResponseDto } from './dtos/OrganizationBuildJobResp
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { OrgBaseCurrencyMutateAbilitiesResponseDto } from './dtos/OrgBaseCurrencyMutateAbilitiesResponse.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import {
+  AllowAnyMember,
+  RequireAdmin,
+  RequirePermission,
+} from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { PreferencesAction } from '@/modules/Settings/Settings.types';
 @ApiTags('Organization')
 @Controller('organization')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @IgnoreTenantInitializedRoute()
 @IgnoreTenantSeededRoute()
 @IgnoreTenantModelsInitialize()
@@ -58,6 +69,7 @@ export class OrganizationController {
   ) {}
 
   @Post('build')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Build organization database' })
   @ApiBody({ type: BuildOrganizationDto })
@@ -82,6 +94,7 @@ export class OrganizationController {
   }
 
   @Get('build/:buildJobId')
+  @RequireAdmin()
   @Throttle({ default: { limit: 300, ttl: 60000 } }) // 300 req/min
   @ApiParam({
     name: 'buildJobId',
@@ -103,6 +116,7 @@ export class OrganizationController {
   }
 
   @Get('current')
+  @AllowAnyMember()
   @HttpCode(200)
   @IgnoreUserVerifiedRoute()
   @ApiOperation({ summary: 'Get current organization' })
@@ -121,6 +135,7 @@ export class OrganizationController {
   }
 
   @Get('base-currency-mutate')
+  @AllowAnyMember()
   @ApiOperation({
     summary: 'Retrieves the base currency mutation lock abilities.',
   })
@@ -137,6 +152,7 @@ export class OrganizationController {
   }
 
   @Put()
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @HttpCode(200)
   @ApiOperation({ summary: 'Update organization information' })
   @ApiBody({ type: UpdateOrganizationDto })

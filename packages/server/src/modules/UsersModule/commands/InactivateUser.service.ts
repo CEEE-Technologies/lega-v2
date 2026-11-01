@@ -8,6 +8,7 @@ import { ERRORS } from '../Users.constants';
 import { ITenantUserInactivatedPayload } from '../Users.types';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { events } from '@/common/events/events';
+import { TenantUserOwnerService } from './TenantUserOwner.service';
 
 @Injectable()
 export class InactivateUserService {
@@ -17,10 +18,12 @@ export class InactivateUserService {
 
     private readonly eventEmitter: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
+    private readonly tenantUserOwner: TenantUserOwnerService,
   ) {}
 
   /**
-   * Inactivate the given user id.
+   * Deactivates the given user in the current organization only. Their
+   * login and their other organizations are untouched.
    * @param {number} userId
    * @return {Promise<void>}
    */
@@ -39,6 +42,9 @@ export class InactivateUserService {
       .query()
       .findById(userId)
       .throwIfNotFound();
+
+    // Nobody can deactivate the owner.
+    await this.tenantUserOwner.throwIfOwner(tenantUser);
 
     // Throw serivce error if the user is already inactivated.
     this.throwErrorIfUserInactive(tenantUser);

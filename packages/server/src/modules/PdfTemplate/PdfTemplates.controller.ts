@@ -18,7 +18,10 @@ import {
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
 import { PermissionGuard } from '@/modules/Roles/Permission.guard';
-import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
+import {
+  RequirePermission,
+  AllowAnyMember,
+} from '@/modules/Roles/RequirePermission.decorator';
 import { AbilitySubject } from '@/modules/Roles/Roles.types';
 import { PreferencesAction } from '@/modules/Settings/Settings.types';
 
@@ -55,6 +58,7 @@ export class PdfTemplatesController {
   }
 
   @Get('/state')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the PDF template branding state.' })
   @ApiResponse({
     status: 200,
@@ -66,6 +70,7 @@ export class PdfTemplatesController {
   }
 
   @Get(':id')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the PDF template details.' })
   @ApiResponse({
     status: 200,
@@ -77,6 +82,7 @@ export class PdfTemplatesController {
   }
 
   @Get()
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the PDF templates.' })
   @ApiResponse({
     status: 200,

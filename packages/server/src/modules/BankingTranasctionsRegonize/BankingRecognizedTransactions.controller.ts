@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -13,7 +13,13 @@ import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { RecognizedTransactionsApplication } from './RecognizedTransactions.application';
 import { GetRecognizedTransactionResponseDto } from './dtos/GetRecognizedTransactionResponse.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/recognized')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Banking Recognized Transactions')
 @ApiExtraModels(GetRecognizedTransactionResponseDto, PaginatedResponseDto)
 @ApiCommonHeaders()
@@ -23,6 +29,7 @@ export class BankingRecognizedTransactionsController {
   ) {}
 
   @Get(':recognizedTransactionId')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get recognized transaction' })
   @ApiParam({
     name: 'recognizedTransactionId',
@@ -49,6 +56,7 @@ export class BankingRecognizedTransactionsController {
   }
 
   @Get()
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get a list of recognized transactions' })
   @ApiQuery({
     name: 'query',

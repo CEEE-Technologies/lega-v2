@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { StripePaymentApplication } from './StripePaymentApplication';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GetStripeConnectLinkResponseDto } from './dtos/GetStripeConnectLinkResponse.dto';
@@ -9,7 +9,13 @@ import { CreateStripeAccountResponseDto } from './dtos/CreateStripeAccountRespon
 import { CreateStripeAccountSessionBodyDto } from './dtos/CreateStripeAccountSessionBody.dto';
 import { CreateStripeAccountSessionResponseDto } from './dtos/CreateStripeAccountSessionResponse.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { PreferencesAction } from '@/modules/Settings/Settings.types';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('/stripe')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('stripe')
 export class StripeIntegrationController {
   constructor(private readonly stripePaymentApp: StripePaymentApplication) {}
@@ -18,6 +24,7 @@ export class StripeIntegrationController {
    * Retrieves Stripe OAuth2 connect link.
    */
   @Get('/link')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({
     summary: 'Get Stripe Connect link',
     description: 'Retrieves the Stripe OAuth2 Connect authorization URL',
@@ -37,6 +44,7 @@ export class StripeIntegrationController {
    * Exchanges the given Stripe authorization code to Stripe user id and access token.
    */
   @Post('/callback')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({
     summary: 'Exchange Stripe OAuth code',
     description:
@@ -57,6 +65,7 @@ export class StripeIntegrationController {
    * Creates a new Stripe account.
    */
   @Post('/account')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({
     summary: 'Create Stripe account',
     description: 'Creates a new Stripe Connect account',
@@ -75,6 +84,7 @@ export class StripeIntegrationController {
    * Creates a Stripe account session for the Connect embedded component.
    */
   @Post('/account_session')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({
     summary: 'Create Stripe account session',
     description:
@@ -99,6 +109,7 @@ export class StripeIntegrationController {
    * Creates a new Stripe account link for onboarding.
    */
   @Post('/account_link')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({
     summary: 'Create Stripe account link',
     description: 'Creates a Stripe Connect account link for onboarding',

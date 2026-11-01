@@ -27,6 +27,7 @@ import { PreferencesAction } from '../Settings/Settings.types';
 import { AuditLogAction } from '../EE/AuditLogs/types/AuditLogs.types';
 import { AttachmentAction } from '../Attachments/Attachments.types';
 import { WarehouseTransferAction } from '../Warehouses/Warehouse.types';
+import { UserAction } from '../UsersModule/Users.types';
 
 export const AbilitySchema: ISubjectAbilitiesSchema[] = [
   {
@@ -350,6 +351,17 @@ export const AbilitySchema: ISubjectAbilitiesSchema[] = [
       { key: RoleAction.Create, label: 'ability.create', default: false },
       { key: RoleAction.Edit, label: 'ability.edit', default: false },
       { key: RoleAction.Delete, label: 'ability.delete', default: false },
+    ],
+  },
+  {
+    subject: AbilitySubject.User,
+    subjectLabel: 'ability.users',
+    extraAbilities: [
+      {
+        key: UserAction.Manage,
+        label: 'ability.manage_users',
+        default: false,
+      },
     ],
   },
   {

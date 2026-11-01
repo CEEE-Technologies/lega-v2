@@ -10,18 +10,33 @@ import { ERRORS } from '../Users.constants';
 import { ModelObject } from 'objection';
 import { SystemUser } from '@/modules/System/models/SystemUser';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import { Role } from '@/modules/Roles/models/Role.model';
+import { TenantUserOwnerService } from './TenantUserOwner.service';
+
+const normalizeEmail = (email: string | null | undefined) =>
+  (email || '').trim().toLowerCase();
 
 @Injectable()
 export class EditUserService {
   constructor(
     @Inject(TenantUser.name)
     private readonly tenantUserModel: TenantModelProxy<typeof TenantUser>,
+
+    @Inject(Role.name)
+    private readonly roleModel: TenantModelProxy<typeof Role>,
+
+    @Inject(SystemUser.name)
+    private readonly systemUserModel: typeof SystemUser,
+
     private readonly eventEmitter: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
+    private readonly tenantUserOwner: TenantUserOwnerService,
   ) {}
 
   /**
-   * Creates a new user.
+   * Edits the given user of the current organization.
+   * Only the user themselves may change their email, because the email is
+   * their login for every organization they belong to.
    * @param {number} userId - User id.
    * @param {IUserDTO} editUserDTO - Edit user DTO.
    * @return {Promise<ISystemUser>}
@@ -30,7 +45,6 @@ export class EditUserService {
     userId: number,
     editUserDTO: EditUserDto,
   ): Promise<any> {
-    const { email } = editUserDTO;
     const authorizedUser = await this.tenancyContext.getSystemUser();
 
     // Retrieve the tenant user or throw not found service error.
@@ -39,22 +53,46 @@ export class EditUserService {
       .findById(userId)
       .throwIfNotFound();
 
+    const isSelf = oldTenantUser.systemUserId === authorizedUser.id;
+
+    // Only the owner may edit the owner.
+    await this.tenantUserOwner.throwIfOwnerOfSomeoneElse(
+      oldTenantUser,
+      authorizedUser.id,
+    );
     // Validate cannot mutate the authorized user.
     this.validateMutateRoleNotAuthorizedUser(
       oldTenantUser,
       editUserDTO,
       authorizedUser,
     );
-    // Validate user email should be unique.
-    await this.validateUserEmailUniquiness(email, userId);
+    // Validate the given role exists.
+    await this.validateRoleExists(editUserDTO.roleId);
 
+    const isEmailChanged =
+      normalizeEmail(editUserDTO.email) !== normalizeEmail(oldTenantUser.email);
+
+    if (isEmailChanged) {
+      if (!isSelf) {
+        throw new ServiceError(
+          ERRORS.CANNOT_CHANGE_OTHER_USER_EMAIL,
+          'You can only change your own email.',
+        );
+      }
+      // The email is the user's login, so it must be unique across logins.
+      await this.validateUserEmailUniquiness(editUserDTO.email, userId);
+      await this.validateLoginEmailUniquiness(
+        editUserDTO.email,
+        authorizedUser.id,
+      );
+    }
     // Updates the tenant user.
     const tenantUser = await this.tenantUserModel()
       .query()
       .updateAndFetchById(userId, {
         firstName: editUserDTO.firstName,
         lastName: editUserDTO.lastName,
-        email: editUserDTO.email,
+        email: isEmailChanged ? editUserDTO.email : oldTenantUser.email,
         roleId: editUserDTO.roleId,
       });
     // Triggers `onTenantUserEdited` event.
@@ -69,6 +107,18 @@ export class EditUserService {
   }
 
   /**
+   * Validate the given role exists.
+   * @param {number} roleId
+   */
+  async validateRoleExists(roleId: number) {
+    const role = await this.roleModel().query().findById(roleId);
+
+    if (!role) {
+      throw new ServiceError(ERRORS.ROLE_NOT_FOUND, 'Role not found.');
+    }
+  }
+
+  /**
    * Validate the given user email should be unique in the storage.
    * @param {string} email - User email.
    * @param {number} userId - User id.
@@ -80,6 +130,22 @@ export class EditUserService {
       .whereNot('id', userId);
 
     if (userByEmail) {
+      throw new ServiceError(ERRORS.EMAIL_ALREADY_EXISTS);
+    }
+  }
+
+  /**
+   * Validate no other login uses the given email.
+   * @param {string} email - New email.
+   * @param {number} systemUserId - The login being changed.
+   */
+  async validateLoginEmailUniquiness(email: string, systemUserId: number) {
+    const loginByEmail = await this.systemUserModel
+      .query()
+      .findOne('email', email)
+      .whereNot('id', systemUserId);
+
+    if (loginByEmail) {
       throw new ServiceError(ERRORS.EMAIL_ALREADY_EXISTS);
     }
   }

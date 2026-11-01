@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,7 +25,11 @@ import { parseJsonSafe } from '@/utils/parse-json';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { ImportFileUploadResponseDto } from './ImportFileUploadResponse.dto';
 
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequireAdmin } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('import')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Import')
 @ApiCommonHeaders()
 export class ImportController {
@@ -34,6 +39,7 @@ export class ImportController {
    * Imports xlsx/csv to the given resource type.
    */
   @Post('/file')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Upload import file' })
   @ApiConsumes('multipart/form-data')
@@ -68,6 +74,7 @@ export class ImportController {
    * Maps the columns of the imported file.
    */
   @Post('/:import_id/mapping')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Map import columns' })
   @ApiResponse({ status: 200, description: 'Mapping successful' })
@@ -83,6 +90,7 @@ export class ImportController {
    * Preview the imported file before actual importing.
    */
   @Get('/:import_id/preview')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Preview import data' })
   @ApiResponse({ status: 200, description: 'Preview data' })
@@ -94,6 +102,7 @@ export class ImportController {
    * Importing the imported file to the application storage.
    */
   @Post('/:import_id/import')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Process import' })
   @ApiResponse({ status: 200, description: 'Import processed successfully' })
   async import(@Param('import_id') importId: string) {
@@ -104,6 +113,7 @@ export class ImportController {
    * Retrieves the csv/xlsx sample sheet of the given resource name.
    */
   @Get('/sample')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Get import sample' })
   @ApiResponse({
     status: 200,
@@ -125,6 +135,7 @@ export class ImportController {
    * Retrieves the import file meta.
    */
   @Get('/:import_id')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Get import metadata' })
   @ApiResponse({ status: 200, description: 'Import metadata' })
   async getImportFileMeta(@Param('import_id') importId: string) {

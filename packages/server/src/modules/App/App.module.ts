@@ -14,7 +14,10 @@ import {
 } from 'nestjs-i18n';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
-import { createBullBoardAuthMiddleware } from '@/middleware/bull-board-auth.middleware';
+import {
+  assertBullBoardConfig,
+  createBullBoardAuthMiddleware,
+} from '@/middleware/bull-board-auth.middleware';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PassportModule } from '@nestjs/passport';
@@ -157,6 +160,10 @@ import { AppThrottleModule } from './AppThrottle.module';
         const enabled = configService.get<boolean>('bullBoard.enabled');
         const username = configService.get<string>('bullBoard.username');
         const password = configService.get<string>('bullBoard.password');
+
+        // Refuse to start rather than serve the jobs page to anyone.
+        assertBullBoardConfig(enabled, username, password);
+
         return {
           route: '/queues',
           adapter: ExpressAdapter,

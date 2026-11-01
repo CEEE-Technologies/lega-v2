@@ -64,14 +64,27 @@ export class AcceptInviteUserService {
         // Retrieve the invite token or throw not found error.
         const inviteToken = await this.getInviteTokenOrThrowError(token, trx);
 
-        // Sets the invited user details after invite accepting.
-        const systemUser = await this.systemUserModel
+        const invitedLogin = await this.systemUserModel
           .query(trx)
-          .updateAndFetchById(inviteToken.userId, {
-            ...inviteUserDTO,
-            inviteAcceptedAt: moment().format('YYYY-MM-DD'),
-            password: hashedPassword,
-          });
+          .findById(inviteToken.userId)
+          .throwIfNotFound();
+
+        // An invite to someone who already has a login joins that login to
+        // this organization. Its password and name stay as they are, and the
+        // person proves it is theirs with the current password.
+        const systemUser = invitedLogin.password
+          ? await this.validateExistingLoginPassword(
+              invitedLogin,
+              inviteUserDTO.password,
+            )
+          : // Sets the invited user details after invite accepting.
+            await this.systemUserModel
+              .query(trx)
+              .updateAndFetchById(inviteToken.userId, {
+                ...inviteUserDTO,
+                inviteAcceptedAt: moment().format('YYYY-MM-DD'),
+                password: hashedPassword,
+              });
         // Clear invite token by the given user id.
         await this.clearInviteTokensByUserId(inviteToken.userId, trx);
 
@@ -81,11 +94,17 @@ export class AcceptInviteUserService {
           .findById(inviteToken.tenantId);
 
         // Link the invited user to the tenant as a member so they can sign in.
-        await this.userTenantModel.query(trx).insert({
-          userId: systemUser.id,
-          tenantId: inviteToken.tenantId,
-          role: 'member',
-        });
+        const membership = await this.userTenantModel
+          .query(trx)
+          .findOne({ userId: systemUser.id, tenantId: inviteToken.tenantId });
+
+        if (!membership) {
+          await this.userTenantModel.query(trx).insert({
+            userId: systemUser.id,
+            tenantId: inviteToken.tenantId,
+            role: 'member',
+          });
+        }
         return { systemUser, tenant, inviteToken };
       });
     // Set CLS values for tenant context before triggering sync events.
@@ -98,6 +117,25 @@ export class AcceptInviteUserService {
       user: systemUser,
       inviteUserDTO,
     } as IAcceptInviteEventPayload);
+  }
+
+  /**
+   * Checks the given password against an existing login.
+   * @param {SystemUser} login - The existing login.
+   * @param {string} password - The password typed on the invite page.
+   * @returns {Promise<SystemUser>}
+   */
+  private async validateExistingLoginPassword(
+    login: SystemUser,
+    password: string,
+  ): Promise<SystemUser> {
+    if (!(await login.checkPassword(password))) {
+      throw new ServiceError(
+        ERRORS.EXISTING_LOGIN_PASSWORD_MISMATCH,
+        'This email already has a LEGA login. Enter its current password to join.',
+      );
+    }
+    return login;
   }
 
   /**

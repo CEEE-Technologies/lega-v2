@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,7 +27,13 @@ import { NumberFormatQueryDto } from '../dtos/NumberFormatQuery.dto';
 import { PaginatedResponseDto } from '@/common/dtos/PaginatedResults.dto';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/transactions')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Banking Transactions')
 @ApiExtraModels(
   BankTransactionResponseDto,
@@ -41,6 +48,7 @@ export class BankingTransactionsController {
   ) {}
 
   @Get()
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get bank account transactions' })
   @ApiResponse({
     status: 200,
@@ -89,6 +97,7 @@ export class BankingTransactionsController {
   }
 
   @Post()
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Create a new bank transaction' })
   @ApiResponse({
     status: 201,
@@ -106,6 +115,7 @@ export class BankingTransactionsController {
   }
 
   @Delete(':id')
+  @RequirePermission(CashflowAction.Delete, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Delete a bank transaction' })
   @ApiResponse({
     status: 200,
@@ -128,6 +138,7 @@ export class BankingTransactionsController {
   }
 
   @Get(':id')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get a specific bank transaction by ID' })
   @ApiResponse({
     status: 200,

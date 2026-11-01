@@ -20,9 +20,11 @@ export class GetLemonSqueezyCheckoutService {
   async getCheckout(variantId: number) {
     configureLemonSqueezy();
     const user = await this.tenancyContext.getSystemUser();
+    // The organization being paid for, not the user's first organization.
+    const tenant = await this.tenancyContext.getTenant();
 
     return createCheckout(
-      this.configService.get('lemonSqueezy.storeId'),
+      this.configService.get('lemonsqueezy.storeId'),
       variantId,
       {
         checkoutOptions: {
@@ -34,7 +36,7 @@ export class GetLemonSqueezyCheckoutService {
           email: user.email,
           custom: {
             user_id: user.id + '',
-            tenant_id: user.tenantId + '',
+            tenant_id: tenant.id + '',
           },
         },
         productOptions: {

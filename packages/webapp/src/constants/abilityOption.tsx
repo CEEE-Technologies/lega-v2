@@ -22,6 +22,7 @@ export const AbilitySubject = {
   TaxRate: 'TaxRate',
   BankRule: 'BankRule',
   AuditLog: 'AuditLog',
+  User: 'User',
 } as const;
 
 export const ItemAction = {
@@ -198,4 +199,9 @@ export const BankRuleAction = {
 
 export const AuditLogAction = {
   View: 'View',
+} as const;
+
+/** Invite, edit, deactivate and remove users. */
+export const UserAction = {
+  Manage: 'Manage',
 } as const;

@@ -37,11 +37,15 @@ export default class InviteSendMainNotificationSubscribe {
     const organizationId = tenant.organizationId;
     const userId = authedUser.id;
 
-    await this.sendInviteMailQueue.add(SendInviteUserMailJob, {
-      fromUser: invitingUser,
-      invite,
-      userId,
-      organizationId,
-    } as SendInviteUserMailJobPayload);
+    await this.sendInviteMailQueue.add(
+      SendInviteUserMailJob,
+      {
+        fromUserId: invitingUser?.id,
+        inviteId: invite.id,
+        userId,
+        organizationId,
+      } as SendInviteUserMailJobPayload,
+      { removeOnComplete: true, removeOnFail: { age: 24 * 3600 } },
+    );
   }
 }

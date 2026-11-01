@@ -29,6 +29,7 @@ import { SendInviteUserMailProcessor } from './processors/SendInviteUserMail.pro
 import { SendInviteUsersMailMessage } from './commands/SendInviteUsersMailMessage.service';
 import { SendBulkInvitesService } from './commands/SendBulkInvites.service';
 import { MailModule } from '../Mail/Mail.module';
+import { TenantUserOwnerService } from './commands/TenantUserOwner.service';
 
 const models = [InjectSystemModel(UserInvite), InjectSystemModel(UserTenant)];
 
@@ -54,6 +55,7 @@ const models = [InjectSystemModel(UserInvite), InjectSystemModel(UserTenant)];
     AcceptInviteUserService,
     InviteTenantUserService,
     SendBulkInvitesService,
+    TenantUserOwnerService,
     PurgeUserAbilityCacheSubscriber,
     SyncTenantUserDeleteSubscriber,
     SyncTenantUserMutateSubscriber,

@@ -7,6 +7,14 @@ import { InviteUserDto } from './dtos/InviteUser.dto';
 import { TenantModel } from '../System/models/TenantModel';
 import { TenantJobPayload } from '@/interfaces/Tenant';
 
+/**
+ * Permissions of the `User` subject. `Manage` covers invite, edit, activate,
+ * deactivate and remove. Listing users needs no extra permission.
+ */
+export enum UserAction {
+  Manage = 'Manage',
+}
+
 export interface ITenantUserEditedPayload {
   userId: number;
   editUserDTO: EditUserDto;
@@ -61,7 +69,11 @@ export interface IUserSendInviteDTO {
   roleId: number;
 }
 
+/**
+ * Holds ids only. The invite (with its token) is read when the mail is sent,
+ * so the token is never stored in the queue.
+ */
 export interface SendInviteUserMailJobPayload extends TenantJobPayload {
-  fromUser: ModelObject<TenantUser>;
-  invite: ModelObject<UserInvite>;
+  fromUserId: number;
+  inviteId: number;
 }

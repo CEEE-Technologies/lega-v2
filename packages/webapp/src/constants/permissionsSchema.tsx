@@ -17,6 +17,7 @@ import {
   SaleReceiptAction,
   VendorAction,
   VendorCreditAction,
+  UserAction,
 } from './abilityOption';
 
 export const ModulePermissionsStyle = {
@@ -663,6 +664,23 @@ export const getPermissionsSchema = (): PermissionModule[] => [
           {
             label: intl.get('permissions.sales_tax_liability_summary'),
             key: ReportsAction.READ_SALES_TAX_LIABILITY_SUMMARY,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Users',
+    type: ModulePermissionsStyle.Vertical,
+    serviceFullAccess: false,
+    services: [
+      {
+        label: 'Users',
+        subject: AbilitySubject.User,
+        permissions: [
+          {
+            label: 'Manage users (invite, edit, deactivate and remove)',
+            key: UserAction.Manage,
           },
         ],
       },

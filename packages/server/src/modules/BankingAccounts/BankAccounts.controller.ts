@@ -1,15 +1,22 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { BankAccountsApplication } from './BankAccountsApplication.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BankAccountsQueryDto } from './dtos/BankAccountsQuery.dto';
 import { BankAccountResponseDto } from './dtos/BankAccountResponse.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/accounts')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Bank Accounts')
 export class BankAccountsController {
   constructor(private bankAccountsApplication: BankAccountsApplication) {}
 
   @Get()
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Retrieve the bank accounts.' })
   @ApiResponse({
     status: 200,
@@ -21,12 +28,14 @@ export class BankAccountsController {
   }
 
   @Get(':bankAccountId/summary')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Retrieve the bank account summary.' })
   getBankAccountSummary(@Param('bankAccountId') bankAccountId: number) {
     return this.bankAccountsApplication.getBankAccountSumnmary(bankAccountId);
   }
 
   @Post(':id/disconnect')
+  @RequirePermission(CashflowAction.Delete, AbilitySubject.Cashflow)
   @ApiOperation({
     summary: 'Disconnect the bank connection of the given bank account.',
   })
@@ -43,6 +52,7 @@ export class BankAccountsController {
   }
 
   @Post(':id/refresh')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({
     summary: 'Refresh the bank account transactions.',
   })
@@ -59,6 +69,7 @@ export class BankAccountsController {
   }
 
   @Post(':id/pause')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({
     summary: 'Pause transactions syncing of the given bank account.',
   })
@@ -75,6 +86,7 @@ export class BankAccountsController {
   }
 
   @Post(':id/resume')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({
     summary: 'Resume transactions syncing of the given bank account.',
   })

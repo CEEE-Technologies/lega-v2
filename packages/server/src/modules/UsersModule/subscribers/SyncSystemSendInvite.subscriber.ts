@@ -40,15 +40,22 @@ export class SyncSystemSendInviteSubscriber {
     const authorizedUser = await this.tenancyContext.getSystemUser();
     const tenantId = authorizedUser.tenantId;
 
-    // Creates a new system user.
-    const systemUser = await this.systemUserModel.query().insert({
-      email: user.email,
-      active: user.active,
-      tenantId,
+    // Links the existing login with that email, so one person keeps one
+    // login across organizations. Otherwise creates a new login.
+    const existingLogin = await this.systemUserModel
+      .query()
+      .findOne('email', user.email);
 
-      // Email should be verified since the user got the invite token through email.
-      verified: true,
-    });
+    const systemUser =
+      existingLogin ||
+      (await this.systemUserModel.query().insert({
+        email: user.email,
+        active: user.active,
+        tenantId,
+
+        // Email should be verified since the user got the invite token through email.
+        verified: true,
+      }));
     // Creates a invite user token.
     const invite = await this.inviteModel.query().insert({
       email: user.email,

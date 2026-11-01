@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ApiExtraModels,
   ApiOperation,
@@ -12,7 +12,13 @@ import { TransactionsByReferenceQueryDto } from './TransactionsByReferenceQuery.
 import { TransactionsByReferenceResponseDto } from './TransactionsByReferenceResponse.dto';
 import { NumberFormatQueryDto } from '@/modules/BankingTransactions/dtos/NumberFormatQuery.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { ReportsAction } from '@/modules/FinancialStatements/types/Report.types';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('reports/transactions-by-reference')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Reports')
 @ApiExtraModels(NumberFormatQueryDto, TransactionsByReferenceResponseDto)
 export class TransactionsByReferenceController {
@@ -21,6 +27,7 @@ export class TransactionsByReferenceController {
   ) {}
 
   @Get()
+  @RequirePermission(ReportsAction.READ_JOURNAL, AbilitySubject.Report)
   @ApiResponse({
     status: 200,
     description: 'Transactions by reference',
