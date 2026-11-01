@@ -6,6 +6,7 @@ import {
   Get,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,14 +26,24 @@ import { EditCurrencyDto } from './dtos/EditCurrency.dto';
 import { CurrencyResponseDto } from './dtos/CurrencyResponse.dto';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import {
+  AllowAnyMember,
+  RequirePermission,
+} from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { PreferencesAction } from '@/modules/Settings/Settings.types';
 @ApiTags('Currencies')
 @Controller('/currencies')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiExtraModels(CurrencyResponseDto)
 @ApiCommonHeaders()
 export class CurrenciesController {
   constructor(private readonly currenciesApp: CurrenciesApplication) {}
 
   @Post()
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({ summary: 'Create a new currency' })
   @ApiBody({ type: CreateCurrencyDto })
   @ApiCreatedResponse({
@@ -47,6 +58,7 @@ export class CurrenciesController {
   }
 
   @Put(':id')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({ summary: 'Edit an existing currency' })
   @ApiParam({ name: 'id', type: Number, description: 'Currency ID' })
   @ApiBody({ type: EditCurrencyDto })
@@ -63,6 +75,7 @@ export class CurrenciesController {
   }
 
   @Delete(':code')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @ApiOperation({ summary: 'Delete a currency by code' })
   @ApiParam({ name: 'code', type: String, description: 'Currency code' })
   @ApiOkResponse({ description: 'The currency has been successfully deleted.' })
@@ -72,6 +85,7 @@ export class CurrenciesController {
   }
 
   @Get()
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get all currencies' })
   @ApiOkResponse({
     description: 'List of all currencies.',
@@ -87,6 +101,7 @@ export class CurrenciesController {
   }
 
   @Get(':currencyCode')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get a currency by code' })
   @ApiParam({
     name: 'currencyCode',

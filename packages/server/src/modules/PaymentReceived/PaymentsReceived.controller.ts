@@ -70,6 +70,7 @@ export class PaymentReceivesController {
   constructor(private paymentReceivesApplication: PaymentReceivesApplication) {}
 
   @Post(':id/mail')
+  @RequirePermission(PaymentReceiveAction.Edit, AbilitySubject.PaymentReceive)
   @HttpCode(200)
   @ApiBody({
     description: 'The payment receive mail options',
@@ -109,6 +110,7 @@ export class PaymentReceivesController {
   }
 
   @Get(':id/edit-page')
+  @RequirePermission(PaymentReceiveAction.Edit, AbilitySubject.PaymentReceive)
   @ApiResponse({
     status: 200,
     description: 'The payment received edit page data.',
@@ -123,6 +125,7 @@ export class PaymentReceivesController {
   }
 
   @Get(':id/mail')
+  @RequirePermission(PaymentReceiveAction.View, AbilitySubject.PaymentReceive)
   @ApiResponse({
     status: 200,
     description:

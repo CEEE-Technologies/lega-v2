@@ -40,5 +40,10 @@
   "inventory_valuation_summary": "Inventory valuation summary",
   "inventory_items_details": "Inventory items details",
   "cashflow_account_transactions": "Cashflow account transactions",
-  "sales_tax_liability_summary_report": "Sales tax liability summary"
+  "sales_tax_liability_summary_report": "Sales tax liability summary",
+  "users": "Users",
+  "manage_users": "Manage users (invite, edit, deactivate and remove)",
+  "tax_rates": "Tax rates",
+  "write_off": "Write off the due amount (bad debt)",
+  "notify_by_sms": "Notify by SMS"
 }

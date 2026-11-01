@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { fromPairs, isUndefined } from 'lodash';
 import {
   ImportDateFormats,
@@ -9,6 +9,7 @@ import { ResourceService } from '../Resource/ResourceService';
 import { ServiceError } from '../Items/ServiceError';
 import { ERRORS } from './_utils';
 import { ImportModel } from './models/Import';
+import { TenancyContext } from '../Tenancy/TenancyContext.service';
 
 @Injectable()
 export class ImportFileMapping {
@@ -17,6 +18,8 @@ export class ImportFileMapping {
 
     @Inject(ImportModel.name)
     private readonly importModel: typeof ImportModel,
+
+    private readonly tenancyContext: TenancyContext,
   ) {}
 
   /**
@@ -28,10 +31,23 @@ export class ImportFileMapping {
     importId: string,
     maps: ImportMappingAttr[],
   ): Promise<ImportFileMapPOJO> {
+    const tenant = await this.tenancyContext.getTenant();
+    const tenantId = tenant.id;
+
+    // Only this organization's imports.
     const importFile = await this.importModel
       .query()
-      .findOne('filename', importId)
-      .throwIfNotFound();
+      .findOne('importId', importId)
+      .where('tenantId', tenantId);
+
+    if (!importFile) {
+      throw new ServiceError(
+        'IMPORT_FILE_NOT_FOUND',
+        'The import file is not found.',
+        null,
+        HttpStatus.NOT_FOUND,
+      );
+    }
 
     // Invalidate the from/to map attributes.
     await this.validateMapsAttrs(importFile, maps);
@@ -46,9 +62,13 @@ export class ImportFileMapping {
 
     const mappingStringified = JSON.stringify(maps);
 
-    await this.importModel.query().findById(importFile.id).patch({
-      mapping: mappingStringified,
-    });
+    await this.importModel
+      .query()
+      .findById(importFile.id)
+      .where('tenantId', tenantId)
+      .patch({
+        mapping: mappingStringified,
+      });
     return {
       import: {
         importId: importFile.importId,

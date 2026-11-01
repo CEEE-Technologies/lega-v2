@@ -2268,5 +2268,17 @@
   "the_expenses_has_been_deleted_successfully": "The expenses have been deleted successfully.",
   "theme.light": "Switch to light mode",
   "theme.dark": "Switch to dark mode",
-  "workspaces.company_switcher": "Companies"
+  "workspaces.company_switcher": "Companies",
+  "permissions.warehouses": "Warehouses and transfers",
+  "permissions.cashflow": "Cash flow and banking",
+  "permissions.tax_rates": "Tax rates",
+  "permissions.notify_by_sms": "Notify by SMS",
+  "permissions.administration": "Administration",
+  "permissions.preferences": "Preferences",
+  "permissions.mutate_preferences": "Change organization settings, currencies and payment services",
+  "permissions.users": "Users",
+  "permissions.manage_users": "Manage users (invite, edit, deactivate and remove)",
+  "permissions.roles": "Roles",
+  "permissions.attachments": "Attachments",
+  "permissions.audit_log": "Audit log"
 }

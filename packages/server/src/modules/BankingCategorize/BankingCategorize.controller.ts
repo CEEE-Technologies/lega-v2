@@ -1,4 +1,12 @@
-import { Body, Controller, Delete, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { castArray, omit } from 'lodash';
 import { BankingCategorizeApplication } from './BankingCategorize.application';
 import { CategorizeBankTransactionRouteDto } from './dtos/CategorizeBankTransaction.dto';
@@ -12,7 +20,13 @@ import {
 } from '@nestjs/swagger';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/categorize')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Banking Categorization')
 @ApiCommonHeaders()
 export class BankingCategorizeController {
@@ -21,6 +35,7 @@ export class BankingCategorizeController {
   ) {}
 
   @Post()
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Categorize bank transactions.' })
   @ApiBody({ type: CategorizeBankTransactionRouteDto })
   @ApiResponse({
@@ -37,6 +52,7 @@ export class BankingCategorizeController {
   }
 
   @Delete('/bulk')
+  @RequirePermission(CashflowAction.Delete, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Uncategorize bank transactions in bulk.' })
   @ApiQuery({
     name: 'uncategorizedTransactionIds',
@@ -58,6 +74,7 @@ export class BankingCategorizeController {
   }
 
   @Delete('/:id')
+  @RequirePermission(CashflowAction.Delete, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Uncategorize a bank transaction.' })
   @ApiParam({
     name: 'id',

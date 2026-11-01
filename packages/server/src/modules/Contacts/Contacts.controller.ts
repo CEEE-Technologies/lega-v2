@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,8 +23,14 @@ import { GetAutoCompleteContactsService } from './queries/GetAutoCompleteContact
 import { GetContactService } from './queries/GetContact.service';
 import { ActivateContactService } from './commands/ActivateContact.service';
 import { InactivateContactService } from './commands/InactivateContact.service';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { AllowAnyMember } from '@/modules/Roles/RequirePermission.decorator';
+import { CustomerAction } from '@/modules/Customers/types/Customers.types';
+import { RequireContactPermission } from './ContactPermission.guard';
 
 @Controller('contacts')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Contacts')
 @ApiExtraModels(ContactAutoCompleteItemDto, ContactResponseDto)
 @ApiCommonHeaders()
@@ -36,6 +43,7 @@ export class ContactsController {
   ) {}
 
   @Get('auto-complete')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get the auto-complete contacts' })
   @ApiResponse({
     status: 200,
@@ -50,6 +58,7 @@ export class ContactsController {
   }
 
   @Get(':id')
+  @RequireContactPermission(CustomerAction.View)
   @ApiOperation({ summary: 'Get contact by ID (customer or vendor)' })
   @ApiParam({ name: 'id', type: Number, description: 'Contact ID' })
   @ApiResponse({
@@ -65,6 +74,7 @@ export class ContactsController {
   }
 
   @Patch(':id/activate')
+  @RequireContactPermission(CustomerAction.Edit)
   @ApiOperation({ summary: 'Activate a contact' })
   @ApiParam({ name: 'id', type: 'number', description: 'Contact ID' })
   async activateContact(@Param('id', ParseIntPipe) contactId: number) {
@@ -73,6 +83,7 @@ export class ContactsController {
   }
 
   @Patch(':id/inactivate')
+  @RequireContactPermission(CustomerAction.Edit)
   @ApiOperation({ summary: 'Inactivate a contact' })
   @ApiParam({ name: 'id', type: 'number', description: 'Contact ID' })
   async inactivateContact(@Param('id', ParseIntPipe) contactId: number) {

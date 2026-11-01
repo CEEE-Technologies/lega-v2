@@ -1,4 +1,12 @@
-import { Controller, Post, Param, Get, Put, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  Get,
+  Put,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { GenerateApiKey } from './commands/GenerateApiKey.service';
 import { GetApiKeysService } from './queries/GetApiKeys.service';
 import {
@@ -21,6 +29,9 @@ import {
 import { IsString, MaxLength } from 'class-validator';
 import { IsOptional } from '@/common/decorators/Validators';
 
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequireAdmin } from '@/modules/Roles/RequirePermission.decorator';
 class GenerateApiKeyDto {
   @IsOptional()
   @IsString()
@@ -34,6 +45,7 @@ class GenerateApiKeyDto {
 }
 
 @Controller('api-keys')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Api keys')
 @ApiCommonHeaders()
 @ApiExtraModels(
@@ -48,6 +60,7 @@ export class AuthApiKeysController {
   ) {}
 
   @Post('generate')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Generate a new API key' })
   @ApiBody({ type: GenerateApiKeyDto })
   @ApiResponse({
@@ -60,6 +73,7 @@ export class AuthApiKeysController {
   }
 
   @Put(':id/revoke')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Revoke an API key' })
   @ApiParam({ name: 'id', type: Number, description: 'API key ID' })
   @ApiResponse({
@@ -72,6 +86,7 @@ export class AuthApiKeysController {
   }
 
   @Get()
+  @RequireAdmin()
   @ApiOperation({ summary: 'Get all API keys for the current tenant' })
   @ApiResponse({
     status: 200,

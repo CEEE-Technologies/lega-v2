@@ -5,7 +5,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Put, Get, Body, Param } from '@nestjs/common';
+import { Controller, Put, Get, Body, Param, UseGuards } from '@nestjs/common';
 import { TransactionsLockingService } from './commands/CommandTransactionsLockingService';
 import { TransactionsLockingGroup } from './types/TransactionsLocking.types';
 import { ITransactionLockingPartiallyDTO } from './types/TransactionsLocking.types';
@@ -17,7 +17,16 @@ import {
 import { TransactionLockingResponseDto } from './dtos/TransactionLockingResponse.dto';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AccountAction } from '@/interfaces/Account';
+import {
+  AllowAnyMember,
+  RequirePermission,
+} from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 @Controller('transactions-locking')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Transactions Locking')
 @ApiExtraModels(TransactionLockingResponseDto)
 @ApiCommonHeaders()
@@ -28,6 +37,7 @@ export class TransactionsLockingController {
   ) {}
 
   @Put('lock')
+  @RequirePermission(AccountAction.TransactionsLocking, AbilitySubject.Account)
   @ApiOperation({
     summary: 'Lock all transactions for a module or all modules',
   })
@@ -54,6 +64,7 @@ export class TransactionsLockingController {
   }
 
   @Put('cancel-lock')
+  @RequirePermission(AccountAction.TransactionsLocking, AbilitySubject.Account)
   @ApiOperation({
     summary: 'Cancel all transactions locking for a module or all modules',
   })
@@ -79,6 +90,7 @@ export class TransactionsLockingController {
   }
 
   @Put('unlock-partial')
+  @RequirePermission(AccountAction.TransactionsLocking, AbilitySubject.Account)
   @ApiOperation({
     summary:
       'Partial unlock all transactions locking for a module or all modules',
@@ -106,6 +118,7 @@ export class TransactionsLockingController {
   }
 
   @Put('cancel-unlock-partial')
+  @RequirePermission(AccountAction.TransactionsLocking, AbilitySubject.Account)
   @ApiOperation({
     summary:
       'Cancel partial unlocking all transactions locking for a module or all modules',
@@ -132,6 +145,7 @@ export class TransactionsLockingController {
   }
 
   @Get('/')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get all transactions locking meta' })
   @ApiResponse({
     status: 200,
@@ -146,6 +160,7 @@ export class TransactionsLockingController {
   }
 
   @Get(':module')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get transactions locking meta for a module' })
   @ApiResponse({
     status: 200,

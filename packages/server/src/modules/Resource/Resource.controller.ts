@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { ResourceService } from './ResourceService';
 import {
   ApiExtraModels,
@@ -10,13 +10,18 @@ import {
 } from '@nestjs/swagger';
 import { ResourceMetaResponseDto } from './dtos/ResourceMetaResponse.dto';
 
+import { AllowAnyMember } from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 @Controller('resources')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('resources')
 @ApiExtraModels(ResourceMetaResponseDto)
 export class ResourceController {
   constructor(private readonly resourcesService: ResourceService) {}
 
   @Get('/:resourceModel/meta')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the resource meta' })
   @ApiParam({
     name: 'resourceModel',

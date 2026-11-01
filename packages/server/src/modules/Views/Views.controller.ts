@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import {
   ApiExtraModels,
   ApiOperation,
@@ -10,7 +10,11 @@ import {
 import { GetResourceViewsService } from './GetResourceViews.service';
 import { ViewResponseDto } from './dtos/ViewResponse.dto';
 
+import { AllowAnyMember } from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 @Controller('views')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Views')
 @ApiExtraModels(ViewResponseDto)
 export class ViewsController {
@@ -19,6 +23,7 @@ export class ViewsController {
   ) {}
 
   @Get('/resource/:resourceModel')
+  @AllowAnyMember()
   @ApiParam({
     name: 'resourceModel',
     description: 'The resource model to get views for',

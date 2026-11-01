@@ -15,6 +15,8 @@ import { Role } from '@/modules/Roles/models/Role.model';
 import { ModelObject } from 'objection';
 import { SendInviteUserDto } from '../dtos/InviteUser.dto';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import { SystemUser } from '@/modules/System/models/SystemUser';
+import { UserTenant } from '@/modules/System/models/UserTenant.model';
 
 @Injectable()
 export class InviteTenantUserService {
@@ -27,6 +29,12 @@ export class InviteTenantUserService {
 
     @Inject(Role.name)
     private readonly roleModel: TenantModelProxy<typeof Role>,
+
+    @Inject(SystemUser.name)
+    private readonly systemUserModel: typeof SystemUser,
+
+    @Inject(UserTenant.name)
+    private readonly userTenantModel: typeof UserTenant,
   ) {}
 
   /**
@@ -39,10 +47,16 @@ export class InviteTenantUserService {
     invitedUser: TenantUser;
   }> {
     // Get the given role or throw not found service error.
-    const _role = await this.roleModel().query().findById(sendInviteDTO.roleId);
+    const role = await this.roleModel().query().findById(sendInviteDTO.roleId);
 
+    if (!role) {
+      throw new ServiceError(ERRORS.ROLE_NOT_FOUND, 'Role not found.');
+    }
     // Validates the given email not exists on the storage.
     await this.validateUserEmailNotExists(sendInviteDTO.email);
+
+    // Validates the login with that email isn't already a member.
+    await this.validateLoginNotMember(sendInviteDTO.email);
 
     // Generates a new invite token.
     const inviteToken = crypto.randomBytes(32).toString('hex');
@@ -142,6 +156,26 @@ export class InviteTenantUserService {
     }
     return user;
   };
+
+  /**
+   * Throws when a login with the given email is already a member of the
+   * current organization (its user row here may carry an older email).
+   * @param {string} email
+   * @throws {ServiceError}
+   */
+  private async validateLoginNotMember(email: string): Promise<void> {
+    const login = await this.systemUserModel.query().findOne('email', email);
+    if (!login) return;
+
+    const tenant = await this.tenancyContext.getTenant();
+    const membership = await this.userTenantModel
+      .query()
+      .findOne({ userId: login.id, tenantId: tenant.id });
+
+    if (membership) {
+      throw new ServiceError(ERRORS.EMAIL_EXISTS);
+    }
+  }
 
   /**
    * Throws error in case the given user email not exists on the storage.

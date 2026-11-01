@@ -26,7 +26,7 @@ export class SyncTenantAcceptInviteSubscriber {
       .query()
       .where('systemUserId', inviteToken.userId)
       .update({
-        ...pick(user, ['firstName', 'lastName', 'email', 'active']),
+        ...pick(user, ['firstName', 'lastName', 'email']),
         inviteAcceptedAt: new Date(),
       });
   }

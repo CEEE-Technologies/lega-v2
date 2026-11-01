@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { WarehousesApplication } from './WarehousesApplication.service';
 import {
   ApiExtraModels,
@@ -11,7 +11,13 @@ import {
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { ItemWarehousesResponseDto } from './Items/dtos/ItemWarehousesResponse.dto';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { ItemAction } from '@/interfaces/Item';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('items')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Warehouses')
 @ApiCommonHeaders()
 @ApiExtraModels(ItemWarehousesResponseDto)
@@ -19,6 +25,7 @@ export class WarehouseItemsController {
   constructor(private warehousesApplication: WarehousesApplication) {}
 
   @Get(':id/warehouses')
+  @RequirePermission(ItemAction.VIEW, AbilitySubject.Item)
   @ApiOperation({
     summary: 'Retrieves the item associated warehouses.',
   })

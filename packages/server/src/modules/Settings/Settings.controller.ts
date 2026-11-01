@@ -19,7 +19,10 @@ import {
 import { SettingsApplicationService } from './SettingsApplication.service';
 import { ISettingsDTO, PreferencesAction } from './Settings.types';
 import { SmsNotificationSettingsService } from './SmsNotificationSettings.service';
-import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
+import {
+  RequirePermission,
+  AllowAnyMember,
+} from '@/modules/Roles/RequirePermission.decorator';
 import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
 import { AbilitySubject } from '@/modules/Roles/Roles.types';
@@ -53,6 +56,7 @@ export class SettingsController {
   }
 
   @Get()
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the settings.' })
   @ApiResponse({
     status: 200,
@@ -67,6 +71,7 @@ export class SettingsController {
   }
 
   @Get('sms-notifications')
+  @AllowAnyMember()
   @UseGuards(SmsNotificationsFeatureGuard)
   @ApiOperation({ summary: 'Retrieves SMS notifications settings.' })
   @ApiResponse({
@@ -79,6 +84,7 @@ export class SettingsController {
   }
 
   @Get('sms-notification/:key')
+  @AllowAnyMember()
   @UseGuards(SmsNotificationsFeatureGuard)
   @ApiOperation({ summary: 'Retrieves a single SMS notification setting.' })
   @ApiParam({

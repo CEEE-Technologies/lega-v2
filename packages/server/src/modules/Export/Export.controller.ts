@@ -1,17 +1,29 @@
 import { Response } from 'express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Headers, Query, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Headers,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AcceptType } from '@/constants/accept-type';
 import { ExportQuery } from './dtos/ExportQuery.dto';
 import { ExportResourceService } from './ExportService';
 import { convertAcceptFormatToFormat } from './Export.utils';
 
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequireAdmin } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('/export')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Export')
 export class ExportController {
   constructor(private readonly exportResourceApp: ExportResourceService) {}
 
   @Get()
+  @RequireAdmin()
   @ApiOperation({ summary: 'Retrieves exported the given resource.' })
   async export(
     @Query() query: ExportQuery,
