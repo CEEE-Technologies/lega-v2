@@ -10,6 +10,7 @@ import {
   IsIn,
   ValidateIf,
   ValidateNested,
+  Min,
 } from 'class-validator';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
 import { IsMoney, ToNumber } from '@/common/decorators/Validators';
@@ -45,6 +46,7 @@ export class BillPaymentEntryDto {
     description: 'The payment amount of the bill payment',
     example: 100,
   })
+  @Min(0)
   paymentAmount: number;
 }
 
@@ -62,6 +64,7 @@ export class CommandBillPaymentDTO {
     description: 'The amount of the bill payment',
     example: 100,
   })
+  @Min(0)
   amount?: number;
 
   @ToNumber()

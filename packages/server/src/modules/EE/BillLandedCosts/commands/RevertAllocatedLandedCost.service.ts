@@ -4,7 +4,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseLandedCostService } from '../BaseLandedCost.service';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { billLandedCostEvents } from '../BillLandedCosts.events';
-import { IAllocatedLandedCostDeletedPayload } from '../types/BillLandedCosts.types';
+import {
+  IAllocatedLandedCostDeletedPayload,
+  IAllocatedLandedCostDeletingPayload,
+} from '../types/BillLandedCosts.types';
 import { BillLandedCostEntry } from '../models/BillLandedCostEntry';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 
@@ -42,6 +45,13 @@ export class RevertAllocatedLandedCost extends BaseLandedCostService {
       await this.getBillLandedCostOrThrowError(landedCostId);
     //  Deletes landed cost with associated transactions.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Triggers `onBillLandedCostDeleting` event (the locked-period guard).
+      await this.eventPublisher.emitAsync(billLandedCostEvents.onDeleting, {
+        oldBillLandedCost,
+        billId: oldBillLandedCost.billId,
+        trx,
+      } as IAllocatedLandedCostDeletingPayload);
+
       // Delete landed cost transaction with associated locate entries.
       await this.deleteLandedCost(landedCostId, trx);
 

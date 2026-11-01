@@ -51,8 +51,8 @@ export class ExchangeRatesController {
     @Query() query: ExchangeRateLatestQueryDto,
   ): Promise<ExchangeRateLatestResponseDto> {
     const exchangeRate = await this.exchangeRateApp.latest({
-      fromCurrency: query.from_currency,
-      toCurrency: query.to_currency,
+      fromCurrency: query.fromCurrency,
+      toCurrency: query.toCurrency,
     });
     return exchangeRate;
   }

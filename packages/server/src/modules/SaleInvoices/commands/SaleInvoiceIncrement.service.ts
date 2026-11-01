@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Knex } from 'knex';
 import { AutoIncrementOrdersService } from '../../AutoIncrementOrders/AutoIncrementOrders.service';
 
 @Injectable()
@@ -19,12 +20,19 @@ export class SaleInvoiceIncrement {
   }
 
   /**
-   * Increment the invoice next number.
-   * @param {number} tenantId -
+   * Picks the invoice number inside the invoice save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The invoice save transaction.
    */
-  public incrementNextInvoiceNumber() {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveInvoiceNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'sales_invoices',
+      givenNumber,
+      trx,
     );
   }
 }

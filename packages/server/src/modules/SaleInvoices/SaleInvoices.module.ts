@@ -57,7 +57,6 @@ import { InvoiceChangeStatusOnMailSentSubscriber } from './subscribers/InvoiceCh
 import { InvoiceCostGLEntriesSubscriber } from './subscribers/InvoiceCostGLEntriesSubscriber';
 import { InvoicePaymentGLRewriteSubscriber } from './subscribers/InvoicePaymentGLRewriteSubscriber';
 import { SaleInvoiceWriteInventoryTransactionsSubscriber } from './subscribers/InvoiceWriteInventoryTransactions';
-import { SaleInvoiceAutoIncrementSubscriber } from './subscribers/SaleInvoiceAutoIncrementSubscriber';
 import { SaleInvoiceSmsNotificationSubscriber } from './subscribers/SaleInvoiceSmsNotificationSubscriber';
 import { SaleInvoiceCostGLEntries } from './SaleInvoiceCostGLEntries';
 import { InvoicePaymentsGLEntriesRewrite } from './InvoicePaymentsGLRewrite';
@@ -138,7 +137,6 @@ import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLo
     InvoiceCostGLEntriesSubscriber,
     InvoicePaymentGLRewriteSubscriber,
     SaleInvoiceWriteInventoryTransactionsSubscriber,
-    SaleInvoiceAutoIncrementSubscriber,
     SaleInvoiceSmsNotificationSubscriber,
     InvoicePaymentsGLEntriesRewrite,
     SaleInvoicesCost,

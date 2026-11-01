@@ -8,7 +8,6 @@ import { WarehouseTransferApplication } from './WarehouseTransferApplication';
 import { WarehouseTransfersController } from './WarehouseTransfers.controller';
 import { WarehouseTransferInventoryTransactions } from './commands/WarehouseTransferWriteInventoryTransactions';
 import { WarehouseTransferAutoIncrement } from './commands/WarehouseTransferAutoIncrement';
-import { WarehouseTransferAutoIncrementSubscriber } from './susbcribers/WarehouseTransferAutoIncrementSubscriber';
 import { WarehouseTransferInventoryTransactionsSubscriber } from './susbcribers/WarehouseTransferInventoryTransactionsSubscriber';
 import { InitiateWarehouseTransfer } from './commands/InitiateWarehouseTransfer';
 import { TransferredWarehouseTransfer } from './commands/TransferredWarehouseTransfer';
@@ -45,7 +44,6 @@ const models = [
     GetWarehouseTransfers,
     WarehouseTransferInventoryTransactions,
     WarehouseTransferAutoIncrement,
-    WarehouseTransferAutoIncrementSubscriber,
     WarehouseTransferInventoryTransactionsSubscriber,
     TransferredWarehouseTransfer,
     InitiateWarehouseTransfer,

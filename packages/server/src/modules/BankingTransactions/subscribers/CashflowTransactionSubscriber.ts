@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BankTransactionAutoIncrement } from '../commands/BankTransactionAutoIncrement.service';
 import { BankTransactionGLEntriesService } from '../commands/BankTransactionGLEntries';
 import { events } from '@/common/events/events';
 import {
@@ -12,11 +11,9 @@ import {
 export class BankingTransactionGLEntriesSubscriber {
   /**
    * @param {BankTransactionGLEntriesService} bankTransactionGLEntries - Bank transaction GL entries service.
-   * @param {BankTransactionAutoIncrement} cashflowTransactionAutoIncrement - Cashflow transaction auto increment service.
    */
   constructor(
     private readonly bankTransactionGLEntries: BankTransactionGLEntriesService,
-    private readonly cashflowTransactionAutoIncrement: BankTransactionAutoIncrement,
   ) {}
 
   /**
@@ -35,15 +32,6 @@ export class BankingTransactionGLEntriesSubscriber {
       cashflowTransaction.id,
       trx,
     );
-  }
-
-  /**
-   * Increment the cashflow transaction number once the transaction created.
-   * @param {ICommandCashflowCreatedPayload} payload -
-   */
-  @OnEvent(events.cashflow.onTransactionCreated)
-  public async incrementTransactionNumberOnceTransactionCreated({}: ICommandCashflowCreatedPayload) {
-    this.cashflowTransactionAutoIncrement.incrementNextTransactionNumber();
   }
 
   /**

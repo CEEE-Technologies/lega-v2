@@ -14,6 +14,7 @@ import {
   IsString,
   MaxLength,
   ValidateNested,
+  Min,
 } from 'class-validator';
 
 class AttachmentDto {
@@ -43,6 +44,7 @@ export class ExpenseCategoryDto {
     example: 100,
     description: 'The amount of the expense category',
   })
+  @Min(0)
   amount?: number;
 
   @IsString()

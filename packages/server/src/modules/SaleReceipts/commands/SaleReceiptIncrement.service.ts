@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
 import { AutoIncrementOrdersService } from '@/modules/AutoIncrementOrders/AutoIncrementOrders.service';
 
@@ -19,12 +20,19 @@ export class SaleReceiptIncrement {
   }
 
   /**
-   * Increment the receipt next number.
-   * @param {number} tenantId -
+   * Picks the receipt number inside the receipt save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The receipt save transaction.
    */
-  public incrementNextReceiptNumber() {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveReceiptNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'sales_receipts',
+      givenNumber,
+      trx,
     );
   }
 }

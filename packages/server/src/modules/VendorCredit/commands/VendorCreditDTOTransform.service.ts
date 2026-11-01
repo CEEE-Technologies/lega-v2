@@ -92,6 +92,21 @@ export class VendorCreditDTOTransformService {
   };
 
   /**
+   * Validates the vendor credit is published (open): a draft isn't in the books,
+   * so it can't be applied or refunded.
+   * @param {VendorCredit} vendorCredit
+   */
+  public validateCreditPublished = (vendorCredit: VendorCredit) => {
+    if (vendorCredit.isDraft) {
+      throw new ServiceError(
+        ERRORS.VENDOR_CREDIT_IS_DRAFT,
+        `Publish the vendor credit first: a draft vendor credit can't be applied or refunded.`,
+        { vendorCreditNumber: vendorCredit.vendorCreditNumber },
+      );
+    }
+  };
+
+  /**
    * Validate the credit note remaining amount.
    * @param {ICreditNote} creditNote
    * @param {number} amount

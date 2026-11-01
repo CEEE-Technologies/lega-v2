@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { AutoIncrementOrdersService } from '@/modules/AutoIncrementOrders/AutoIncrementOrders.service';
 import { Injectable } from '@nestjs/common';
 
@@ -18,11 +19,19 @@ export class WarehouseTransferAutoIncrement {
   }
 
   /**
-   * Increment the invoice next number.
+   * Picks the warehouse transfer number inside the warehouse transfer save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The warehouse transfer save transaction.
    */
-  public incrementNextTransferNumber() {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveTransferNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'warehouse_transfers',
+      givenNumber,
+      trx,
     );
   }
 }

@@ -24,7 +24,6 @@ import { BranchesModule } from '../Branches/Branches.module';
 import { WarehousesModule } from '../Warehouses/Warehouses.module';
 import { PdfTemplatesModule } from '../PdfTemplate/PdfTemplates.module';
 import { AutoIncrementOrdersModule } from '../AutoIncrementOrders/AutoIncrementOrders.module';
-import { PaymentReceivedAutoIncrementSubscriber } from './subscribers/PaymentReceivedAutoIncrementSubscriber';
 import { PaymentReceivedSmsNotificationSubscriber } from './subscribers/PaymentReceivedSmsNotificationSubscriber';
 import { PaymentReceivedGLEntriesSubscriber } from './subscribers/PaymentReceivedGLEntriesSubscriber';
 import { PaymentReceivedGLEntries } from './commands/PaymentReceivedGLEntries';
@@ -54,6 +53,7 @@ import { GetPaymentReceivedMailTemplate } from './queries/GetPaymentReceivedMail
 import { GetPaymentReceivedMailState } from './queries/GetPaymentReceivedMailState.service';
 import { BulkDeletePaymentReceivedService } from './BulkDeletePaymentReceived.service';
 import { ValidateBulkDeletePaymentReceivedService } from './ValidateBulkDeletePaymentReceived.service';
+import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
 
 const models = [RegisterTenancyModel(InventoryCostLotTracker)];
 
@@ -76,7 +76,6 @@ const models = [RegisterTenancyModel(InventoryCostLotTracker)];
     PaymentReceivedGLEntries,
     PaymentReceivedCostGLEntries,
     PaymentReceivedInvoiceSync,
-    PaymentReceivedAutoIncrementSubscriber,
     PaymentReceivedSmsNotificationSubscriber,
     PaymentReceivedGLEntriesSubscriber,
     PaymentReceivedOpeningBalanceSubscriber,
@@ -103,6 +102,7 @@ const models = [RegisterTenancyModel(InventoryCostLotTracker)];
   ],
   imports: [
     TenancyModule,
+    TransactionsLockingModule,
     ...models,
     ChromiumlyTenancyModule,
     TemplateInjectableModule,

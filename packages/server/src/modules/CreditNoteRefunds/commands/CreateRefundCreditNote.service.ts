@@ -110,6 +110,9 @@ export class CreateRefundCreditNoteService {
       .forUpdate()
       .throwIfNotFound();
 
+    // A draft credit note isn't in the books yet.
+    this.commandCreditNoteDTOTransform.validateCreditPublished(creditNote);
+
     // Validate the credit note remaining amount against the locked row.
     this.commandCreditNoteDTOTransform.validateCreditRemainingAmount(
       creditNote,

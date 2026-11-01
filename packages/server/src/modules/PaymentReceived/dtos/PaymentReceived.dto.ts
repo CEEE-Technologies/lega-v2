@@ -11,6 +11,7 @@ import {
   IsIn,
   ValidateIf,
   ValidateNested,
+  Min,
 } from 'class-validator';
 import { IsMoney, ToNumber } from '@/common/decorators/Validators';
 import { AttachmentLinkDto } from '@/modules/Attachments/dtos/Attachment.dto';
@@ -56,6 +57,7 @@ export class PaymentReceivedEntryDto {
   @ToNumber()
   @IsMoney()
   @IsNotEmpty()
+  @Min(0)
   paymentAmount: number;
 }
 
@@ -80,6 +82,7 @@ export class CommandPaymentReceivedDto {
     description: 'The amount of the payment received',
     example: 100,
   })
+  @Min(0)
   amount?: number;
 
   @IsOptional()

@@ -16,6 +16,7 @@ import { IVendorCreditCreatePayload } from '@/modules/VendorCredit/types/VendorC
 import { events } from '@/common/events/events';
 import { ServiceError } from '@/modules/Items/ServiceError';
 import { ERRORS } from '../constants';
+import { ERRORS as VENDOR_CREDIT_ERRORS } from '@/modules/VendorCredit/constants';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { RefundVendorCreditDto } from '../dtos/RefundVendorCredit.dto';
 
@@ -129,6 +130,13 @@ export class CreateRefundVendorCredit {
       .forUpdate()
       .throwIfNotFound();
 
+    // A draft vendor credit isn't in the books yet.
+    if (vendorCredit.isDraft) {
+      throw new ServiceError(
+        VENDOR_CREDIT_ERRORS.VENDOR_CREDIT_IS_DRAFT,
+        "Publish the vendor credit first: a draft vendor credit can't be applied or refunded.",
+      );
+    }
     // Validate vendor credit has remaining credit against the locked row.
     this.validateVendorCreditRemainingCredit(
       vendorCredit,

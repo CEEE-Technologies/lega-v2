@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
@@ -6,12 +7,17 @@ import {
   IBillPaymentEventDeletedPayload,
   IBillPaymentEventEditedPayload,
 } from '../types/BillPayments.types';
-import { IVendorOpeningBalanceEditedPayload } from '@/modules/Vendors/types/Vendors.types';
+import {
+  IVendorOpeningBalanceEditedPayload,
+  IVendorOpeningBalanceEditingPayload,
+} from '@/modules/Vendors/types/Vendors.types';
 import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
 import { PaymentEntryTypes } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import { BillPaymentGLEntries } from '../commands/BillPaymentGLEntries';
 import { BillPayment } from '../models/BillPayment';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { LinkedTransactionsLockingGuard } from '@/modules/TransactionsLocking/guards/LinkedTransactionsLockingGuard';
+import { TransactionsLockingGroup } from '@/modules/TransactionsLocking/types/TransactionsLocking.types';
 
 /**
  * Keeps the vendor's paid opening balance in sync with the payment lines
@@ -23,6 +29,7 @@ export class BillPaymentOpeningBalanceSubscriber {
   constructor(
     private readonly openingBalancePayment: ContactOpeningBalancePayment,
     private readonly billPaymentGLEntries: BillPaymentGLEntries,
+    private readonly linkedTransactionsLockingGuard: LinkedTransactionsLockingGuard,
 
     @Inject(BillPayment.name)
     private readonly billPaymentModel: TenantModelProxy<typeof BillPayment>,
@@ -74,16 +81,7 @@ export class BillPaymentOpeningBalanceSubscriber {
     vendor,
     trx,
   }: IVendorOpeningBalanceEditedPayload) {
-    const payments = await this.billPaymentModel()
-      .query(trx)
-      .where('vendor_id', vendor.id)
-      .whereIn('id', (builder) =>
-        builder
-          .select('bill_payment_id')
-          .from('bills_payments_entries')
-          .where('entry_type', PaymentEntryTypes.OpeningBalance),
-      )
-      .select('id');
+    const payments = await this.getOpeningBalancePayments(vendor.id, trx);
 
     for (const payment of payments) {
       await this.billPaymentGLEntries.rewritePaymentCashGLEntries(
@@ -91,5 +89,42 @@ export class BillPaymentOpeningBalanceSubscriber {
         trx,
       );
     }
+  }
+
+  /**
+   * Blocks the opening balance edit before anything is saved when it would
+   * rewrite a payment (of the opening balance) dated in a locked period.
+   */
+  @OnEvent(events.vendors.onOpeningBalanceChanging, { suppressErrors: false })
+  async validateOpeningBalancePaymentsNotLocked({
+    oldVendor,
+    trx,
+  }: IVendorOpeningBalanceEditingPayload) {
+    const payments = await this.getOpeningBalancePayments(oldVendor.id, trx);
+
+    await this.linkedTransactionsLockingGuard.validateLinkedTransactionsNotLocked(
+      payments.map((payment) => ({
+        label: `Payment ${payment.paymentNumber || `#${payment.id}`}`,
+        date: payment.paymentDate,
+      })),
+      TransactionsLockingGroup.Purchases,
+      'this opening balance',
+    );
+  }
+
+  /**
+   * Retrieves the payments that pay the given contact's opening balance.
+   */
+  private getOpeningBalancePayments(contactId: number, trx?: Knex.Transaction) {
+    return this.billPaymentModel()
+      .query(trx)
+      .where('vendor_id', contactId)
+      .whereIn('id', (builder) =>
+        builder
+          .select('bill_payment_id')
+          .from('bills_payments_entries')
+          .where('entry_type', PaymentEntryTypes.OpeningBalance),
+      )
+      .select('id', 'paymentNumber', 'paymentDate');
   }
 }
