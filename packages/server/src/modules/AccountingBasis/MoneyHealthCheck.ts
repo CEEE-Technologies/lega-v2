@@ -323,9 +323,25 @@ export type IsLockedFn = (date: any, referenceType: string) => boolean;
  * @param {Knex} knex
  * @returns {Promise<IsLockedFn>}
  */
-export const getLockedPeriodChecker = async (
-  knex: Knex,
-): Promise<IsLockedFn> => {
+export const getLockedPeriodChecker = async (knex: Knex): Promise<IsLockedFn> =>
+  (await getLockedPeriods(knex)).isLocked;
+
+export interface ILockedPeriods {
+  /** Whether a transaction of the type and date is in a locked period. */
+  isLocked: IsLockedFn;
+  /**
+   * The active "locked to" date (YYYY-MM-DD) that applies to the type, or
+   * null when its group isn't locked.
+   */
+  lockToDateOf: (referenceType: string) => string | null;
+}
+
+/**
+ * Reads the transactions locking settings of the tenant (read only).
+ * @param {Knex} knex
+ * @returns {Promise<ILockedPeriods>}
+ */
+export const getLockedPeriods = async (knex: Knex): Promise<ILockedPeriods> => {
   const rows: any[] = await knex
     .queryBuilder()
     .from('settings')
@@ -352,10 +368,20 @@ export const getLockedPeriodChecker = async (
         : false;
     return inLocking && !inUnlock;
   };
-  return (date, referenceType) =>
-    lockingType === 'all'
-      ? isLockedInGroup(date, 'all')
-      : isLockedInGroup(date, lockingGroupOf(referenceType));
+  const groupOf = (referenceType: string) =>
+    lockingType === 'all' ? 'all' : lockingGroupOf(referenceType);
+
+  return {
+    isLocked: (date, referenceType) =>
+      isLockedInGroup(date, groupOf(referenceType)),
+    lockToDateOf: (referenceType) => {
+      const group = groupOf(referenceType);
+      const active = settings.get(`${group}.active`);
+      if (!active || active === '0' || active === 'false') return null;
+      const lockToDate = settings.get(`${group}.lock_to_date`);
+      return lockToDate ? moment(lockToDate).format('YYYY-MM-DD') : null;
+    },
+  };
 };
 
 /**
