@@ -2,22 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 
 /**
- * Item entry allocated landed cost.
- */
-export interface IBillItemAllocatedCost {
-  entryId: number;
-  amount: number;
-}
-
-/**
- * Landed cost ledger contribution.
- */
-export interface IBillLandedCostLedgerEntry {
-  amount: number;
-  costAccountId: number;
-}
-
-/**
  * Common landed cost entry contract.
  */
 export interface IBillLandedCostEntryLike {
@@ -65,26 +49,6 @@ export interface IBillLandedCostsProvider {
     oldEntries: IBillLandedCostEntryLike[],
     newEntries: IBillLandedCostEntryLike[],
   ): void;
-
-  /**
-   * Retrieves the item entries allocated landed costs of the given bill.
-   * @param {number} billId - Bill id.
-   * @param {Knex.Transaction} trx - Knex transaction.
-   */
-  getItemAllocatedCosts(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillItemAllocatedCost[]>;
-
-  /**
-   * Retrieves the landed costs ledger contribution of the given bill.
-   * @param {number} billId - Bill id.
-   * @param {Knex.Transaction} trx - Knex transaction.
-   */
-  getLandedCostLedgerEntries(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillLandedCostLedgerEntry[]>;
 }
 
 /**
@@ -132,25 +96,5 @@ export class BillLandedCostsBridge {
     newEntries: IBillLandedCostEntryLike[],
   ): void {
     this.provider?.validateBillEditEntries(oldEntries, newEntries);
-  }
-
-  /**
-   * Retrieves the item entries allocated landed costs of the given bill.
-   */
-  public async getItemAllocatedCosts(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillItemAllocatedCost[]> {
-    return this.provider?.getItemAllocatedCosts(billId, trx) ?? [];
-  }
-
-  /**
-   * Retrieves the landed costs ledger contribution of the given bill.
-   */
-  public async getLandedCostLedgerEntries(
-    billId: number,
-    trx?: Knex.Transaction,
-  ): Promise<IBillLandedCostLedgerEntry[]> {
-    return this.provider?.getLandedCostLedgerEntries(billId, trx) ?? [];
   }
 }

@@ -31,6 +31,7 @@ export class InventoryAverageCostMethodService {
     itemId: number,
     openingQuantity: number,
     openingCost: number,
+    fallbackAverageCost: number = 0,
   ) {
     const afterInvTransactions = await this.inventoryTransactionModel()
       .query()
@@ -49,8 +50,10 @@ export class InventoryAverageCostMethodService {
       afterInvTransactions,
       openingQuantity,
       openingCost,
+      fallbackAverageCost,
     );
   }
+
   /**
    * Computes items costs from the given date using average cost method.
    * ----------
@@ -74,12 +77,21 @@ export class InventoryAverageCostMethodService {
         startingDate,
         itemId,
       );
+    // Values a return while no stock is left.
+    const fallbackAverageCost =
+      openingQuantity > 0
+        ? 0
+        : await this.itemOpeningAvgCostService.getLastAverageCost(
+            startingDate,
+            itemId,
+          );
     // Retrieves the new calculated inventory cost lots.
     const inventoryCostLots = await this.getInventoryCostLots(
       startingDate,
       itemId,
       openingQuantity,
       openingCost,
+      fallbackAverageCost,
     );
     // Revert the inveout out lots transactions
     await this.storeInventoryLotsCostService.revertInventoryCostLotTransactions(

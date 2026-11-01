@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsDecimal,
   IsInt,
+  IsNumber,
   IsNotEmpty,
   IsOptional,
   IsPositive,
@@ -27,8 +28,9 @@ export class WarehouseTransferEntryDto {
   @IsString()
   description?: string;
 
+  // Quantities keep 3 decimals (e.g. 2.5 kg), like the document lines.
   @IsNotEmpty()
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 3 })
   @IsPositive()
   quantity: number;
 

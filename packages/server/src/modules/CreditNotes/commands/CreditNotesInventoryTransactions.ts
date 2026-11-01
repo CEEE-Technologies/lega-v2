@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { InventoryTransactionsService } from '@/modules/InventoryCost/commands/InventoryTransactions.service';
 import { ItemsEntriesService } from '@/modules/Items/ItemsEntries.service';
 import { CreditNote } from '../models/CreditNote';
@@ -9,10 +10,38 @@ export class CreditNoteInventoryTransactions {
   constructor(
     private readonly inventoryService: InventoryTransactionsService,
     private readonly itemsEntriesService: ItemsEntriesService,
+
+    @Inject(CreditNote.name)
+    private readonly creditNoteModel?: TenantModelProxy<typeof CreditNote>,
   ) {}
 
   /**
-   * Creates credit note inventory transactions.
+   * Rewrites the stock movement of the given credit note from its stored
+   * state: a published credit note returns its goods, a draft none.
+   * @param {number} creditNoteId - Credit note id.
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteInventoryTransactions = async (
+    creditNoteId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const creditNote = await this.creditNoteModel()
+      .query(trx)
+      .findById(creditNoteId)
+      .withGraphFetched('entries');
+
+    if (!creditNote?.isPublished) {
+      await this.deleteInventoryTransactions(creditNoteId, trx);
+      return;
+    }
+    await this.editInventoryTransactions(creditNoteId, creditNote, trx);
+  };
+
+  /**
+   * Creates credit note inventory transactions. The returned goods come
+   * back into stock at the item's average cost at the credit note date (the
+   * cost lots, InventoryAverageCostMethod): the entry rate is the selling
+   * price and only kept on the movement for reference.
    * @param {number} tenantId
    * @param {ICreditNote} creditNote
    */

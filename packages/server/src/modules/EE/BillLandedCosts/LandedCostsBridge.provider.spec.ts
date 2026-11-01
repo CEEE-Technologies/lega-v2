@@ -19,14 +19,6 @@ describe('LandedCostsBridgeProvider', () => {
     return { query, where };
   };
 
-  const mockBillLandedCostGraphQuery = (graphResult: any) => {
-    const withGraphFetched = jest.fn().mockResolvedValue(graphResult);
-    const where = jest.fn(() => ({ withGraphFetched }));
-    const query = jest.fn(() => ({ where }));
-    billLandedCostModel.mockReturnValue({ query });
-    return { query, where, withGraphFetched };
-  };
-
   const mockItemsQuery = (items: any[]) => {
     const whereIn = jest.fn().mockResolvedValue(items);
     const query = jest.fn(() => ({ whereIn }));
@@ -131,56 +123,6 @@ describe('LandedCostsBridgeProvider', () => {
       expect(
         transactionLandedCostEntries.validateLocatedCostEntriesSmallerThanNewEntries,
       ).toHaveBeenCalledWith(oldEntries, newEntries);
-    });
-  });
-
-  describe('getItemAllocatedCosts', () => {
-    it('aggregates the allocated costs by the entry id', async () => {
-      mockBillLandedCostGraphQuery([
-        {
-          id: 1,
-          allocateEntries: [
-            { entryId: 1, cost: 10 },
-            { entryId: 1, cost: 5 },
-            { entryId: 2, cost: 7 },
-          ],
-        },
-        {
-          id: 2,
-          allocateEntries: [{ entryId: 2, cost: 3 }],
-        },
-      ]);
-
-      await expect(provider.getItemAllocatedCosts(7)).resolves.toEqual([
-        { entryId: 1, amount: 15 },
-        { entryId: 2, amount: 10 },
-      ]);
-    });
-
-    it('returns an empty list when the bill has no landed costs', async () => {
-      mockBillLandedCostGraphQuery([]);
-
-      await expect(provider.getItemAllocatedCosts(7)).resolves.toEqual([]);
-    });
-  });
-
-  describe('getLandedCostLedgerEntries', () => {
-    it('maps the landed costs to ledger entries', async () => {
-      mockBillLandedCostQuery([
-        { id: 1, amount: 100, costAccountId: 1019 },
-        { id: 2, amount: 50, costAccountId: 1020 },
-      ]);
-
-      await expect(provider.getLandedCostLedgerEntries(7)).resolves.toEqual([
-        { amount: 100, costAccountId: 1019 },
-        { amount: 50, costAccountId: 1020 },
-      ]);
-    });
-
-    it('returns an empty list when the bill has no landed costs', async () => {
-      mockBillLandedCostQuery([]);
-
-      await expect(provider.getLandedCostLedgerEntries(7)).resolves.toEqual([]);
     });
   });
 });

@@ -20,7 +20,8 @@ const Schema = Yup.object().shape({
     Yup.object().shape({
       itemId: Yup.number().nullable(),
       description: Yup.string().nullable().max(DATATYPES_LENGTH.TEXT),
-      quantity: Yup.number().min(1).max(DATATYPES_LENGTH.INT_10),
+      // Quantities keep 3 decimals (e.g. 2.5 kg).
+      quantity: Yup.number().moreThan(0).max(DATATYPES_LENGTH.INT_10),
     }),
   ),
 });

@@ -15,7 +15,8 @@ const Schema = Yup.object().shape({
     .max(DATATYPES_LENGTH.TEXT)
     .label(intl.get('reason')),
   quantityOnHand: Yup.number().required().label(intl.get('qty')),
-  quantity: Yup.number().integer().min(1).required(),
+  // Quantities keep 3 decimals (e.g. 2.5 kg).
+  quantity: Yup.number().moreThan(0).required(),
   cost: Yup.number().when(['type'], {
     is: (type: string) => type === 'increment',
     then: Yup.number().required(),
