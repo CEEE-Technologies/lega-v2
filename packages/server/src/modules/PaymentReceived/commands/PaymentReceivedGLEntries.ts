@@ -13,12 +13,19 @@ import { Account } from '@/modules/Accounts/models/Account.model';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { ContactOpeningBalanceAccount } from '@/modules/Contacts/ContactOpeningBalanceAccount.service';
-import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import {
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
 import {
   getDocumentsAccrualLines,
   getDocumentsPaidBefore,
+  getLaterOpeningBalancePayments,
   getLaterPayments,
+  getOpeningBalancePaidBefore,
+  IOpeningBalancePaidBefore,
   rewritePaymentsInOrder,
+  PAYMENT_RECEIVED_OPENING_BALANCE,
   PAYMENT_RECEIVED_PAID_BEFORE,
 } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
@@ -163,10 +170,17 @@ export class PaymentReceivedGLEntries {
       paymentReceive,
       trx,
     );
+    // The customer opening balance rate and what the earlier payments paid
+    // of it: the opening balance line relieves A/R at that rate.
+    const openingBalance = await this.getPaymentOpeningBalancePaidBefore(
+      paymentReceive,
+      trx,
+    );
     const paymentReceivedAccrualGL = new PaymentReceivedAccrualGL(
       paymentReceive,
     )
       .setPaidBefore(paidBefore)
+      .setOpeningBalance(openingBalance)
       .setARAccountId(receivableAccount.id)
       .setExchangeGainOrLossAccountId(exGainLossAccount.id)
       .setBaseCurrencyCode(baseCurrencyCode);
@@ -257,6 +271,70 @@ export class PaymentReceivedGLEntries {
         .filter(isDocumentEntry)
         .map((entry) => entry.invoiceId),
       !!trx,
+    );
+  };
+
+  /**
+   * Retrieves the customer opening balance rate and what the payments before
+   * this one paid of it, when the payment pays the opening balance. Locks
+   * the customer in a transaction.
+   * @param {PaymentReceived} paymentReceive - Payment received.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<IOpeningBalancePaidBefore | null>}
+   */
+  public getPaymentOpeningBalancePaidBefore = async (
+    paymentReceive: PaymentReceived,
+    trx?: Knex.Transaction,
+  ): Promise<IOpeningBalancePaidBefore | null> => {
+    if (!(paymentReceive.entries || []).some(isOpeningBalanceEntry)) {
+      return null;
+    }
+    return getOpeningBalancePaidBefore(
+      trx ?? this.paymentReceivedModel().knex(),
+      PAYMENT_RECEIVED_OPENING_BALANCE,
+      {
+        id: paymentReceive.id,
+        date: paymentReceive.paymentDate,
+        contactId: paymentReceive.customerId,
+      },
+      !!trx,
+    );
+  };
+
+  /**
+   * Rewrites the payments of the customer that pay its opening balance and
+   * come after the given position, in order: their A/R relief at the
+   * opening balance rate is a running total. Only needed with a foreign
+   * opening balance (in the base currency the relief is the amount itself).
+   * Payments in a locked period are skipped (and logged).
+   * @param {number} customerId - The customer.
+   * @param {{ id: number; date: any }} after - The position to start after.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteLaterOpeningBalancePayments = async (
+    customerId: number,
+    after: { id: number; date: any },
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const knex = trx ?? this.paymentReceivedModel().knex();
+    const { exchangeRate } = await getOpeningBalancePaidBefore(
+      knex,
+      PAYMENT_RECEIVED_OPENING_BALANCE,
+      { ...after, contactId: customerId },
+    );
+    if (exchangeRate === 1) return;
+
+    const laterPayments = await getLaterOpeningBalancePayments(
+      knex,
+      PAYMENT_RECEIVED_OPENING_BALANCE,
+      customerId,
+      after,
+    );
+    await rewritePaymentsInOrder(
+      knex,
+      laterPayments.filter((payment) => payment.id !== after.id),
+      'PaymentReceive',
+      (paymentId) => this.rewritePaymentGLEntries(paymentId, trx),
     );
   };
 

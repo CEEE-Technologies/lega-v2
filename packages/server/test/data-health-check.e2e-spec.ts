@@ -583,7 +583,7 @@ describe('Data health check (H1–H8)', () => {
 
     const result = await run();
     expect(sectionLines(result, 'H8 Landed costs')).toEqual([
-      '  H8 Landed costs from bills posted before the inventory fix (untagged, on both bases): 1',
+      '  H8 Landed costs from bills posted before the inventory fix (untagged, on both bases; run the tenant migrations): 1',
       `      Landed cost #${untagged}: 2,000.00 from bill HC-FRT-${tag} (#${freight}) onto bill HC-GDS-${tag} (#${goods}), 2026-05-01: 2 untagged ledger rows`,
     ]);
   });

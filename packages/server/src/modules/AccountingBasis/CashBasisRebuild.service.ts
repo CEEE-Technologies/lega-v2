@@ -6,6 +6,7 @@ import { BillPaymentGLEntries } from '@/modules/BillPayments/commands/BillPaymen
 import { RefundCreditNoteGLEntries } from '@/modules/CreditNoteRefunds/commands/RefundCreditNoteGLEntries';
 import { RefundVendorCreditGLEntries } from '@/modules/VendorCreditsRefund/commands/RefundVendorCreditGLEntries';
 import { LedgerStorageService } from '@/modules/Ledger/LedgerStorage.service';
+import { LandedCostGLEntriesService } from '@/modules/EE/BillLandedCosts/commands/LandedCostGLEntries.service';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import {
   CASH_BASIS_DOCUMENTS,
@@ -18,11 +19,13 @@ import { getLockedPeriodChecker } from './MoneyHealthCheck';
 /**
  * Rebuilds the cash basis entries of the current tenant from the documents.
  *
- * Each payment and refund gets its cash set deleted and written again from
- * the current document state, one document per transaction, so a failure
- * leaves the other documents done and a re-run picks up where it failed.
- * Only cash-tagged entries are touched (they never change the stored
- * balances), so running it again gives the same result.
+ * Each payment and refund (and each landed cost from a bill) gets its cash
+ * set deleted and written again from the current document state, one
+ * document per transaction, so a failure leaves the other documents done
+ * and a re-run picks up where it failed. Only cash-tagged entries are
+ * written (they never change the stored balances; old untagged landed cost
+ * entries are only tagged accrual), so running it again gives the same
+ * result.
  */
 @Injectable()
 export class CashBasisRebuildService {
@@ -32,6 +35,7 @@ export class CashBasisRebuildService {
     private readonly refundCreditNoteGLEntries: RefundCreditNoteGLEntries,
     private readonly refundVendorCreditGLEntries: RefundVendorCreditGLEntries,
     private readonly ledgerStorage: LedgerStorageService,
+    private readonly landedCostGLEntries: LandedCostGLEntriesService,
 
     @Inject(TENANCY_DB_CONNECTION)
     private readonly tenantKnex: () => Knex,
@@ -85,6 +89,7 @@ export class CashBasisRebuildService {
         BillPayment: 0,
         RefundCreditNote: 0,
         RefundVendorCredit: 0,
+        LandedCost: 0,
       },
       orphansRemoved: 0,
       failures: [],
@@ -145,7 +150,74 @@ export class CashBasisRebuildService {
         result.orphansRemoved += 1;
       }
     }
+    await this.rebuildLandedCosts(knex, isLocked, result);
+
     return result;
+  }
+
+  /**
+   * Rebuilds the cash basis entries of the landed costs from bills: on the
+   * cash basis they follow the payments of the bill they come from, so they
+   * are rewritten after the bill payments. Landed costs posted before the
+   * basis tagging get their untagged entries tagged accrual on the way (see
+   * `rewriteLandedCostsCashGLEntriesOfSourceBills`).
+   */
+  private async rebuildLandedCosts(
+    knex: Knex,
+    isLocked: (date: any, referenceType: string) => boolean,
+    result: ICashBasisRebuildResult,
+  ): Promise<void> {
+    const landedCosts: { id: number; fromBillId: number }[] = await knex(
+      'bill_located_costs',
+    )
+      .where('from_transaction_type', 'Bill')
+      .select('id', 'from_transaction_id as fromBillId')
+      .orderBy('id');
+
+    const bySourceBill = new Map<number, number[]>();
+    landedCosts.forEach(({ id, fromBillId }) =>
+      bySourceBill.set(fromBillId, [
+        ...(bySourceBill.get(fromBillId) || []),
+        id,
+      ]),
+    );
+    for (const [fromBillId, landedCostsIds] of bySourceBill) {
+      // The cash set is dated at the source bill's payments: left as it is
+      // when one of them is in a locked period.
+      const payments: { date: any }[] = await knex(
+        'bills_payments_entries as e',
+      )
+        .join('bills_payments as p', 'p.id', 'e.bill_payment_id')
+        .where('e.bill_id', fromBillId)
+        .select('p.payment_date as date');
+
+      if (payments.some(({ date }) => isLocked(date, 'LandedCost'))) {
+        landedCostsIds.forEach((referenceId) =>
+          result.lockedSkipped.push({
+            referenceType: 'LandedCost',
+            referenceId,
+          }),
+        );
+        continue;
+      }
+      try {
+        await knex.transaction((trx) =>
+          this.landedCostGLEntries.rewriteLandedCostsCashGLEntriesOfSourceBills(
+            [fromBillId],
+            trx,
+          ),
+        );
+        result.rebuilt.LandedCost += landedCostsIds.length;
+      } catch (error) {
+        landedCostsIds.forEach((referenceId) =>
+          result.failures.push({
+            referenceType: 'LandedCost',
+            referenceId,
+            error: error?.message ?? String(error),
+          }),
+        );
+      }
+    }
   }
 
   /**

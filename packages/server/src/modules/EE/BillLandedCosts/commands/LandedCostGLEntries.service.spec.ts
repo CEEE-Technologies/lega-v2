@@ -2,7 +2,11 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { LandedCostGLEntriesService } from './LandedCostGLEntries.service';
 
 describe('LandedCostGLEntriesService', () => {
-  let ledgerStorage: { commit: jest.Mock; deleteByReference: jest.Mock };
+  let ledgerStorage: {
+    commit: jest.Mock;
+    deleteByReference: jest.Mock;
+    tagUntaggedByReference: jest.Mock;
+  };
   let billLandedCostModel: jest.Mock;
   let service: LandedCostGLEntriesService;
 
@@ -36,7 +40,11 @@ describe('LandedCostGLEntriesService', () => {
   } as any;
 
   beforeEach(() => {
-    ledgerStorage = { commit: jest.fn(), deleteByReference: jest.fn() };
+    ledgerStorage = {
+      commit: jest.fn(),
+      deleteByReference: jest.fn(),
+      tagUntaggedByReference: jest.fn(),
+    };
     billLandedCostModel = jest.fn();
     service = new LandedCostGLEntriesService(
       ledgerStorage as any,
@@ -268,6 +276,61 @@ describe('LandedCostGLEntriesService', () => {
           [{ date: '2023-02-01', amount: 1000 }],
         ),
       ).toEqual([]);
+    });
+  });
+
+  describe('rewriteLandedCostsCashGLEntriesOfSourceBills', () => {
+    const queryOf = (landedCosts: any[]) => {
+      const builder: any = {
+        where: jest.fn(() => builder),
+        whereIn: jest.fn(() => builder),
+        withGraphFetched: jest.fn(() => builder),
+        then: (resolve: any, reject: any) =>
+          Promise.resolve(landedCosts).then(resolve, reject),
+      };
+      return { query: jest.fn(() => builder) };
+    };
+
+    it('tags the untagged (old) entries accrual before rewriting the cash set', async () => {
+      const landedCosts = [
+        buildAllocatedLandedCost({ id: 10, fromTransactionType: 'Bill' }),
+        buildAllocatedLandedCost({ id: 11, fromTransactionType: 'Bill' }),
+      ];
+      billLandedCostModel.mockReturnValue(queryOf(landedCosts));
+      const trx = {} as any;
+      const calls: string[] = [];
+      ledgerStorage.tagUntaggedByReference.mockImplementation(async () => {
+        calls.push('tag');
+      });
+      ledgerStorage.deleteByReference.mockImplementation(async () => {
+        calls.push('delete');
+      });
+
+      await service.rewriteLandedCostsCashGLEntriesOfSourceBills([5], trx);
+
+      expect(ledgerStorage.tagUntaggedByReference).toHaveBeenCalledWith(
+        [10, 11],
+        'LandedCost',
+        'accrual',
+        trx,
+      );
+      expect(ledgerStorage.deleteByReference).toHaveBeenCalledWith(
+        10,
+        'LandedCost',
+        trx,
+        { basis: 'cash' },
+      );
+      // Tagged first: an untagged row never sits next to a cash set.
+      expect(calls).toEqual(['tag', 'delete', 'delete']);
+    });
+
+    it('does nothing when no landed cost comes from the bills', async () => {
+      billLandedCostModel.mockReturnValue(queryOf([]));
+
+      await service.rewriteLandedCostsCashGLEntriesOfSourceBills([5]);
+
+      expect(ledgerStorage.tagUntaggedByReference).not.toHaveBeenCalled();
+      expect(ledgerStorage.deleteByReference).not.toHaveBeenCalled();
     });
   });
 });

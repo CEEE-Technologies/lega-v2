@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { NotFoundError } from 'objection';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   IBillPaymentDeletingPayload,
@@ -42,16 +43,19 @@ export class DeleteBillPayment {
     billPaymentId: number,
     trx?: Knex.Transaction,
   ) {
-    // Retrieve the bill payment or throw not found service error.
-    const oldBillPayment = await this.billPaymentModel()
-      .query()
-      .withGraphFetched('entries')
-      .findById(billPaymentId)
-      .throwIfNotFound();
-
     // Deletes the bill transactions with associated transactions under
     // unit-of-work environment.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Retrieves the payment inside the transaction and locks its row, so
+      // a second delete of the same payment waits for this one and then
+      // finds it gone (instead of reverting it a second time).
+      const oldBillPayment = await this.billPaymentModel()
+        .query(trx)
+        .withGraphFetched('entries')
+        .findById(billPaymentId)
+        .forUpdate()
+        .throwIfNotFound();
+
       // Triggers `onBillPaymentDeleting` payload.
       await this.eventEmitter.emitAsync(events.billPayment.onDeleting, {
         oldBillPayment,
@@ -65,10 +69,15 @@ export class DeleteBillPayment {
         .delete();
 
       // Deletes the bill payment transaction.
-      await this.billPaymentModel()
+      const deleted = await this.billPaymentModel()
         .query(trx)
         .where('id', billPaymentId)
         .delete();
+
+      // Nothing deleted: someone else deleted it; nothing to revert.
+      if (!deleted) {
+        throw new NotFoundError({ modelClass: BillPayment });
+      }
 
       // Triggers `onBillPaymentDeleted` event.
       await this.eventEmitter.emitAsync(events.billPayment.onDeleted, {

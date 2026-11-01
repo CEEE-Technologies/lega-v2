@@ -8,6 +8,7 @@ import { BillPaymentGLEntries } from '../commands/BillPaymentGLEntries';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
+import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 /**
  * The bills paid by the given payment entries.
@@ -17,6 +18,20 @@ const billsIdsOf = (...entriesLists: Array<any[] | undefined>) =>
     .flatMap((entries) => entries || [])
     .map((entry) => entry.billId)
     .filter(Boolean);
+
+/**
+ * The vendors of the given payments whose opening balance they pay.
+ */
+const openingBalanceVendorsOf = (
+  ...payments: Array<{ vendorId?: number; entries?: any[] } | undefined>
+): number[] => [
+  ...new Set(
+    payments
+      .filter((payment) => (payment?.entries || []).some(isOpeningBalanceEntry))
+      .map((payment) => payment.vendorId)
+      .filter(Boolean),
+  ),
+];
 
 /**
  * The earlier of two payment dates.
@@ -41,12 +56,18 @@ export class BillPaymentGLEntriesSubscriber {
     // Records the journal transactions after bills payment
     // and change diff account balance.
     await this.billPaymentGLEntries.writePaymentGLEntries(billPayment.id, trx);
+    const after = {
+      id: billPayment.id,
+      date: billPayment.paymentDate ?? billPaymentDTO?.paymentDate,
+    };
     await this.billPaymentGLEntries.rewriteLaterPaymentsCashGLEntries(
       billsIdsOf(billPayment?.entries, billPaymentDTO?.entries),
-      {
-        id: billPayment.id,
-        date: billPayment.paymentDate ?? billPaymentDTO?.paymentDate,
-      },
+      after,
+      trx,
+    );
+    await this.rewriteLaterOpeningBalancePayments(
+      openingBalanceVendorsOf(billPayment),
+      after,
       trx,
     );
   }
@@ -66,15 +87,21 @@ export class BillPaymentGLEntriesSubscriber {
       billPayment.id,
       trx,
     );
+    const after = {
+      id: billPayment.id,
+      date: earlierDate(
+        billPayment.paymentDate,
+        oldBillPayment?.paymentDate ?? billPayment.paymentDate,
+      ),
+    };
     await this.billPaymentGLEntries.rewriteLaterPaymentsCashGLEntries(
       billsIdsOf(billPayment?.entries, oldBillPayment?.entries),
-      {
-        id: billPayment.id,
-        date: earlierDate(
-          billPayment.paymentDate,
-          oldBillPayment?.paymentDate ?? billPayment.paymentDate,
-        ),
-      },
+      after,
+      trx,
+    );
+    await this.rewriteLaterOpeningBalancePayments(
+      openingBalanceVendorsOf(billPayment, oldBillPayment),
+      after,
       trx,
     );
   }
@@ -92,9 +119,33 @@ export class BillPaymentGLEntriesSubscriber {
     await this.billPaymentGLEntries.revertPaymentGLEntries(billPaymentId, trx);
 
     if (oldBillPayment) {
+      const after = { id: billPaymentId, date: oldBillPayment.paymentDate };
       await this.billPaymentGLEntries.rewriteLaterPaymentsCashGLEntries(
         billsIdsOf(oldBillPayment.entries),
-        { id: billPaymentId, date: oldBillPayment.paymentDate },
+        after,
+        trx,
+      );
+      await this.rewriteLaterOpeningBalancePayments(
+        openingBalanceVendorsOf(oldBillPayment),
+        after,
+        trx,
+      );
+    }
+  }
+
+  /**
+   * Rewrites the later payments of the vendors' opening balances: their
+   * A/P relief at the opening balance rate is a running total.
+   */
+  private async rewriteLaterOpeningBalancePayments(
+    vendorsIds: number[],
+    after: { id: number; date: any },
+    trx?: any,
+  ) {
+    for (const vendorId of vendorsIds) {
+      await this.billPaymentGLEntries.rewriteLaterOpeningBalancePayments(
+        vendorId,
+        after,
         trx,
       );
     }

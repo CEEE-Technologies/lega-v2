@@ -8,6 +8,7 @@ import {
 import { PaymentReceivedGLEntries } from '../commands/PaymentReceivedGLEntries';
 import { OnEvent } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
+import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 
 /**
  * The invoices paid by the given payment entries.
@@ -17,6 +18,20 @@ const invoicesIdsOf = (...entriesLists: Array<any[] | undefined>) =>
     .flatMap((entries) => entries || [])
     .map((entry) => entry.invoiceId)
     .filter(Boolean);
+
+/**
+ * The customers of the given payments whose opening balance they pay.
+ */
+const openingBalanceCustomersOf = (
+  ...payments: Array<{ customerId?: number; entries?: any[] } | undefined>
+): number[] => [
+  ...new Set(
+    payments
+      .filter((payment) => (payment?.entries || []).some(isOpeningBalanceEntry))
+      .map((payment) => payment.customerId)
+      .filter(Boolean),
+  ),
+];
 
 /**
  * The earlier of two payment dates.
@@ -46,12 +61,18 @@ export class PaymentReceivedGLEntriesSubscriber {
       paymentReceiveId,
       trx,
     );
+    const after = {
+      id: paymentReceiveId,
+      date: paymentReceive?.paymentDate ?? paymentReceiveDTO?.paymentDate,
+    };
     await this.paymentReceivedGLEntries.rewriteLaterPaymentsCashGLEntries(
       invoicesIdsOf(paymentReceive?.entries, paymentReceiveDTO?.entries),
-      {
-        id: paymentReceiveId,
-        date: paymentReceive?.paymentDate ?? paymentReceiveDTO?.paymentDate,
-      },
+      after,
+      trx,
+    );
+    await this.rewriteLaterOpeningBalancePayments(
+      openingBalanceCustomersOf(paymentReceive),
+      after,
       trx,
     );
   }
@@ -71,15 +92,21 @@ export class PaymentReceivedGLEntriesSubscriber {
       paymentReceive.id,
       trx,
     );
+    const after = {
+      id: paymentReceive.id,
+      date: earlierDate(
+        paymentReceive.paymentDate,
+        oldPaymentReceive?.paymentDate ?? paymentReceive.paymentDate,
+      ),
+    };
     await this.paymentReceivedGLEntries.rewriteLaterPaymentsCashGLEntries(
       invoicesIdsOf(paymentReceive?.entries, oldPaymentReceive?.entries),
-      {
-        id: paymentReceive.id,
-        date: earlierDate(
-          paymentReceive.paymentDate,
-          oldPaymentReceive?.paymentDate ?? paymentReceive.paymentDate,
-        ),
-      },
+      after,
+      trx,
+    );
+    await this.rewriteLaterOpeningBalancePayments(
+      openingBalanceCustomersOf(paymentReceive, oldPaymentReceive),
+      after,
       trx,
     );
   }
@@ -99,9 +126,36 @@ export class PaymentReceivedGLEntriesSubscriber {
       trx,
     );
     if (oldPaymentReceive) {
+      const after = {
+        id: paymentReceiveId,
+        date: oldPaymentReceive.paymentDate,
+      };
       await this.paymentReceivedGLEntries.rewriteLaterPaymentsCashGLEntries(
         invoicesIdsOf(oldPaymentReceive.entries),
-        { id: paymentReceiveId, date: oldPaymentReceive.paymentDate },
+        after,
+        trx,
+      );
+      await this.rewriteLaterOpeningBalancePayments(
+        openingBalanceCustomersOf(oldPaymentReceive),
+        after,
+        trx,
+      );
+    }
+  }
+
+  /**
+   * Rewrites the later payments of the customers' opening balances: their
+   * A/R relief at the opening balance rate is a running total.
+   */
+  private async rewriteLaterOpeningBalancePayments(
+    customersIds: number[],
+    after: { id: number; date: any },
+    trx?: any,
+  ) {
+    for (const customerId of customersIds) {
+      await this.paymentReceivedGLEntries.rewriteLaterOpeningBalancePayments(
+        customerId,
+        after,
         trx,
       );
     }

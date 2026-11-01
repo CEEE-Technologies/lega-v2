@@ -948,8 +948,12 @@ export const getOwnerMemberships = async (
 /**
  * H8 (a). Landed costs from a bill whose ledger rows aren't tagged with a
  * basis. Since PR 11 they are tagged accrual and the cash basis follows the
- * bill's payments; older ones still count on both bases, so the cash basis
- * shows them before the bill is paid.
+ * bill's payments; older ones counted on both bases, so the cash basis
+ * showed them before the bill was paid (and twice once a payment of the
+ * bill wrote their cash set). The tenant migration
+ * 20261102120000_tag_old_landed_costs_accrual tags them and flags the cash
+ * basis rebuild, and rewriting a cash set tags them first, so any row
+ * listed here means that migration hasn't run.
  */
 const getUntaggedLandedCosts = async (
   knex: Knex,
@@ -1333,7 +1337,7 @@ export const formatDataHealth = (
 
   section(
     lines,
-    'H8 Landed costs from bills posted before the inventory fix (untagged, on both bases)',
+    'H8 Landed costs from bills posted before the inventory fix (untagged, on both bases; run the tenant migrations)',
     result.untaggedLandedCosts.map(
       (row) =>
         `Landed cost #${row.landedCostId}: ${money(row.amount)} from bill ${row.fromBillNo} (#${row.fromBillId}) onto bill ${row.billNo} (#${row.billId}), ${row.date ?? 'no date'}: ${row.rows} untagged ledger rows`,

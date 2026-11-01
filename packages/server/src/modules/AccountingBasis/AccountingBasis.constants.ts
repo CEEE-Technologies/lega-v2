@@ -40,7 +40,9 @@ export interface ICashBasisRebuildJobPayload {
 
 export interface ICashBasisRebuildResult {
   organizationId: string;
-  rebuilt: Record<CashBasisReferenceType, number>;
+  /** Also `LandedCost`: the landed costs from bills (they follow the
+   * payments of the bill they come from). */
+  rebuilt: Record<CashBasisReferenceType | 'LandedCost', number>;
   orphansRemoved: number;
   failures: { referenceType: string; referenceId: number; error: string }[];
   /** Documents in a locked period, left as they are. */

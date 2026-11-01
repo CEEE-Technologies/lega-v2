@@ -377,6 +377,18 @@ export class LandedCostGLEntriesService extends BaseLandedCostService {
       .withGraphFetched('bill')
       .withGraphFetched('allocateEntries.itemEntry.item');
 
+    if (landedCosts.length === 0) return;
+
+    // Landed costs posted before the basis tagging have untagged entries,
+    // which count on both bases: a cash set next to them would count the
+    // cost twice on the cash basis. Their entries are the accrual set.
+    await this.ledgerStorage.tagUntaggedByReference(
+      landedCosts.map((landedCost) => landedCost.id),
+      'LandedCost',
+      AccountingBasis.Accrual,
+      trx,
+    );
+
     for (const landedCost of landedCosts) {
       await this.ledgerStorage.deleteByReference(
         landedCost.id,

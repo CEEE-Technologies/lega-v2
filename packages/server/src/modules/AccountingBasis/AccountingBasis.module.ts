@@ -5,6 +5,7 @@ import { BillPaymentsModule } from '../BillPayments/BillPayments.module';
 import { CreditNoteRefundsModule } from '../CreditNoteRefunds/CreditNoteRefunds.module';
 import { VendorCreditsRefundModule } from '../VendorCreditsRefund/VendorCreditsRefund.module';
 import { LedgerModule } from '../Ledger/Ledger.module';
+import { BillLandedCostsModule } from '../EE/BillLandedCosts/BillLandedCosts.module';
 import { CASH_BASIS_REBUILD_QUEUE } from './AccountingBasis.constants';
 import { CashBasisRebuildService } from './CashBasisRebuild.service';
 import { CashBasisRebuildProcessor } from './CashBasisRebuild.processor';
@@ -25,6 +26,7 @@ import { CreditApplicationsGLSubscriber } from './CreditApplicationsGL.subscribe
     BillPaymentsModule,
     CreditNoteRefundsModule,
     VendorCreditsRefundModule,
+    BillLandedCostsModule,
     LedgerModule,
     AccountsModule,
     TenancyModule,
