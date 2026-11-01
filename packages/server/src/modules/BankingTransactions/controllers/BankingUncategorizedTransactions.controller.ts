@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -13,7 +13,13 @@ import { GetAutofillCategorizeTransactionResponseDto } from '../dtos/GetAutofill
 import { BankingTransactionsApplication } from '../BankingTransactionsApplication.service';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/uncategorized')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Banking Uncategorized Transactions')
 @ApiExtraModels(GetAutofillCategorizeTransactionResponseDto)
 @ApiCommonHeaders()
@@ -23,6 +29,7 @@ export class BankingUncategorizedTransactionsController {
   ) {}
 
   @Get('autofill')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get autofill values for categorize transactions' })
   @ApiQuery({
     name: 'uncategorizedTransactionIds',
@@ -53,6 +60,7 @@ export class BankingUncategorizedTransactionsController {
   }
 
   @Get('accounts/:accountId')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({
     summary: 'Get uncategorized transactions for a specific bank account',
   })
@@ -90,6 +98,7 @@ export class BankingUncategorizedTransactionsController {
   }
 
   @Get(':uncategorizedTransactionId')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Get a specific uncategorized transaction by ID' })
   @ApiResponse({
     status: 200,

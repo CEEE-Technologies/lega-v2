@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { events } from '@/common/events/events';
 import {
   IRefundVendorCreditCreatingPayload,
@@ -8,11 +8,13 @@ import {
   IVendorCreditCreatingPayload,
   IVendorCreditDeletingPayload,
   IVendorCreditEditingPayload,
+  IVendorCreditOpeningPayload,
 } from '@/modules/VendorCredit/types/VendorCredit.types';
 import {
   IBillCreatingPayload,
   IBillEditingPayload,
   IBillEventDeletingPayload,
+  IBillOpeningPayload,
 } from '@/modules/Bills/Bills.types';
 import {
   IBillPaymentCreatingPayload,
@@ -21,11 +23,22 @@ import {
 import { IBillPaymentDeletingPayload } from '@/modules/BillPayments/types/BillPayments.types';
 import { PurchasesTransactionLockingGuard } from '../guards/PurchasesTransactionLockingGuard';
 import { OnEvent } from '@nestjs/event-emitter';
+import { billLandedCostEvents } from '@/modules/EE/BillLandedCosts/BillLandedCosts.events';
+import {
+  IAllocatedLandedCostCreatingPayload,
+  IAllocatedLandedCostDeletingPayload,
+} from '@/modules/EE/BillLandedCosts/types/BillLandedCosts.types';
+import { Bill } from '@/modules/Bills/models/Bill';
+import { IVendorOpeningBalanceEditingPayload } from '@/modules/Vendors/types/Vendors.types';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 
 @Injectable()
 export class PurchasesTransactionLockingGuardSubscriber {
   constructor(
     public readonly purchasesTransactionsLocking: PurchasesTransactionLockingGuard,
+
+    @Inject(Bill.name)
+    private readonly billModel: TenantModelProxy<typeof Bill>,
   ) {}
 
   /**
@@ -139,6 +152,60 @@ export class PurchasesTransactionLockingGuardSubscriber {
   }
 
   /**
+   * Transaction locking guard on opening a draft bill, which puts it into
+   * the books on its date.
+   * @param {IBillOpeningPayload} payload
+   */
+  @OnEvent(events.bill.onOpening, { suppressErrors: false })
+  public async transactionLockingGuardOnBillOpening({
+    oldBill,
+  }: IBillOpeningPayload) {
+    await this.purchasesTransactionsLocking.transactionLockingGuard(
+      oldBill.billDate,
+    );
+  }
+
+  /**
+   * ---------------------------------------------
+   * LANDED COST.
+   * ---------------------------------------------
+   */
+
+  /**
+   * Transaction locking guard on allocating landed cost: its entries are
+   * written on the bill's date.
+   * @param {IAllocatedLandedCostCreatingPayload} payload
+   */
+  @OnEvent(billLandedCostEvents.onCreating, { suppressErrors: false })
+  public async transactionLockingGuardOnLandedCostAllocating({
+    bill,
+  }: IAllocatedLandedCostCreatingPayload) {
+    await this.purchasesTransactionsLocking.transactionLockingGuard(
+      bill.billDate,
+    );
+  }
+
+  /**
+   * Transaction locking guard on removing an allocated landed cost: it
+   * reverts entries dated on the bill's date.
+   * @param {IAllocatedLandedCostDeletingPayload} payload
+   */
+  @OnEvent(billLandedCostEvents.onDeleting, { suppressErrors: false })
+  public async transactionLockingGuardOnLandedCostDeleting({
+    billId,
+    trx,
+  }: IAllocatedLandedCostDeletingPayload) {
+    const bill = await this.billModel()
+      .query(trx)
+      .findById(billId)
+      .throwIfNotFound();
+
+    await this.purchasesTransactionsLocking.transactionLockingGuard(
+      bill.billDate,
+    );
+  }
+
+  /**
    * ---------------------------------------------
    * VENDOR CREDITS.
    * ---------------------------------------------
@@ -199,6 +266,20 @@ export class PurchasesTransactionLockingGuardSubscriber {
   }
 
   /**
+   * Transaction locking guard on opening a draft vendor credit, which puts it
+   * into the books on its date.
+   * @param {IVendorCreditOpeningPayload} payload
+   */
+  @OnEvent(events.vendorCredit.onOpening, { suppressErrors: false })
+  public async transactionLockingGuardOnVendorCreditOpening({
+    oldVendorCredit,
+  }: IVendorCreditOpeningPayload) {
+    await this.purchasesTransactionsLocking.transactionLockingGuard(
+      oldVendorCredit.vendorCreditDate,
+    );
+  }
+
+  /**
    * Transaction locking guard on refund vendor credit creating.
    * @param {IRefundVendorCreditCreatingPayload} payload -
    */
@@ -222,5 +303,34 @@ export class PurchasesTransactionLockingGuardSubscriber {
     await this.purchasesTransactionsLocking.transactionLockingGuard(
       oldRefundCredit.date,
     );
+  }
+
+  /**
+   * ---------------------------------------------
+   * VENDOR OPENING BALANCE.
+   * ---------------------------------------------
+   */
+
+  /**
+   * Transaction locking guard on editing a vendor's opening balance: its
+   * entries are rewritten on the old and the new opening balance date.
+   * @param {IVendorOpeningBalanceEditingPayload} payload
+   */
+  @OnEvent(events.vendors.onOpeningBalanceChanging, { suppressErrors: false })
+  public async transactionLockingGuardOnVendorOpeningBalanceChanging({
+    oldVendor,
+    openingBalanceEditDTO,
+  }: IVendorOpeningBalanceEditingPayload) {
+    if (oldVendor.openingBalance && oldVendor.openingBalanceAt) {
+      await this.purchasesTransactionsLocking.transactionLockingGuard(
+        oldVendor.openingBalanceAt,
+      );
+    }
+    const newDate =
+      openingBalanceEditDTO.openingBalanceAt || oldVendor.openingBalanceAt;
+
+    if (openingBalanceEditDTO.openingBalance && newDate) {
+      await this.purchasesTransactionsLocking.transactionLockingGuard(newDate);
+    }
   }
 }

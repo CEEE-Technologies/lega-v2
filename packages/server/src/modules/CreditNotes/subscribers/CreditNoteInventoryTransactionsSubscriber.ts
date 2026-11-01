@@ -25,8 +25,9 @@ export class CreditNoteInventoryTransactionsSubscriber {
     creditNote,
     trx,
   }: ICreditNoteCreatedPayload) {
-    // Can't continue if the credit note is open yet.
-    if (!creditNote.isOpen) return;
+    // A draft moves no stock. (`isOpen` also needs credit left to apply,
+    // which says nothing about the returned goods.)
+    if (!creditNote.isPublished) return;
 
     await this.inventoryTransactions.createInventoryTransactions(
       creditNote,
@@ -42,14 +43,14 @@ export class CreditNoteInventoryTransactionsSubscriber {
   @OnEvent(events.creditNote.onEdited)
   public async rewriteInventoryTransactionsOnceEdited({
     creditNote,
+    oldCreditNote,
     trx,
   }: ICreditNoteEditedPayload) {
-    // Can't continue if the credit note is open yet.
-    if (!creditNote.isOpen) return;
-
-    await this.inventoryTransactions.editInventoryTransactions(
-      creditNote.id,
-      creditNote,
+    // The edited credit note is re-read: the saved graph has only the
+    // edited fields (no `openedAt`), so it always looked like a draft and
+    // an edit never moved stock.
+    await this.inventoryTransactions.rewriteInventoryTransactions(
+      creditNote?.id ?? oldCreditNote.id,
       trx,
     );
   }
@@ -63,8 +64,8 @@ export class CreditNoteInventoryTransactionsSubscriber {
     oldCreditNote,
     trx,
   }: ICreditNoteDeletedPayload) {
-    // Can't continue if the credit note is open yet.
-    if (!oldCreditNote.isOpen) return;
+    // Undoes the stock movement of any published credit note.
+    if (!oldCreditNote.isPublished) return;
 
     await this.inventoryTransactions.deleteInventoryTransactions(
       oldCreditNote.id,

@@ -4,18 +4,24 @@ import {
   Query,
   UsePipes,
   ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ExchangeRateApplication } from './ExchangeRates.application';
 import { ExchangeRateLatestQueryDto } from './dtos/ExchangeRateLatestQuery.dto';
 import { ExchangeRateLatestResponseDto } from './dtos/ExchangeRateLatestResponse.dto';
 
+import { AllowAnyMember } from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 @Controller('exchange-rates')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Exchange Rates')
 export class ExchangeRatesController {
   constructor(private readonly exchangeRateApp: ExchangeRateApplication) {}
 
   @Get('/latest')
+  @AllowAnyMember()
   @UsePipes(
     new ValidationPipe({
       transform: true,
@@ -51,8 +57,8 @@ export class ExchangeRatesController {
     @Query() query: ExchangeRateLatestQueryDto,
   ): Promise<ExchangeRateLatestResponseDto> {
     const exchangeRate = await this.exchangeRateApp.latest({
-      fromCurrency: query.from_currency,
-      toCurrency: query.to_currency,
+      fromCurrency: query.fromCurrency,
+      toCurrency: query.toCurrency,
     });
     return exchangeRate;
   }

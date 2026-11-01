@@ -26,6 +26,7 @@ export class OpenExchangeRate implements IExchangeRateService {
     // Validates the Open Exchange Rate api id early.
     this.validateApiIdExistance();
 
+    let rates: Record<string, number> | undefined;
     try {
       const result = await Axios.get(OPEN_EXCHANGE_RATE_LATEST_URL, {
         params: {
@@ -34,10 +35,21 @@ export class OpenExchangeRate implements IExchangeRateService {
           symbols: toCurrency,
         },
       });
-      return result.data.rates[toCurrency] || (1 as number);
+      rates = result.data?.rates;
     } catch (error) {
       this.handleLatestErrors(error);
     }
+    const rate = Number(rates?.[toCurrency]);
+
+    // A missing rate is an error, never a silent 1: a foreign document saved
+    // at rate 1 books the foreign amount as if it were base currency.
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new ServiceError(
+        EchangeRateErrors.EX_RATE_NOT_AVAILABLE,
+        `No exchange rate available for ${baseCurrency} to ${toCurrency}.`,
+      );
+    }
+    return rate;
   }
 
   /**

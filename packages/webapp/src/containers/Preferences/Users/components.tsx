@@ -11,7 +11,8 @@ import {
 import React from 'react';
 import intl from 'react-intl-universal';
 import type { User } from '@bigcapital/sdk-ts';
-import { FormattedMessage as T, Icon, If } from '@/components';
+import { Can, FormattedMessage as T, Icon, If } from '@/components';
+import { AbilitySubject, UserAction } from '@/constants/abilityOption';
 import { safeCallback, firstLettersArgs } from '@/utils';
 
 // The SDK User type is narrower than what the runtime exposes; preserve the
@@ -123,12 +124,14 @@ interface ActionsCellProps {
  */
 function ActionsCell(props: ActionsCellProps) {
   return (
-    <Popover
-      content={<ActionsMenu {...props} />}
-      position={Position.RIGHT_BOTTOM}
-    >
-      <Button icon={<Icon icon="more-h-16" iconSize={16} />} />
-    </Popover>
+    <Can I={UserAction.Manage} a={AbilitySubject.User}>
+      <Popover
+        content={<ActionsMenu {...props} />}
+        position={Position.RIGHT_BOTTOM}
+      >
+        <Button icon={<Icon icon="more-h-16" iconSize={16} />} />
+      </Popover>
+    </Can>
   );
 }
 

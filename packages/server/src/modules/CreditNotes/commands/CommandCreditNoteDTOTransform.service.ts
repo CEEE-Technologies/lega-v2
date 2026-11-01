@@ -62,14 +62,12 @@ export class CommandCreditNoteDTOTransform {
       })),
     )(creditNoteDTO.entries);
 
-    // Retrieves the next credit note number.
-    const autoNextNumber = this.creditNoteAutoIncrement.getNextCreditNumber();
-
-    // Determines the credit note number.
+    // Determines the credit note number, asking for the next one (awaited)
+    // only when none was given.
     const creditNoteNumber =
       creditNoteDTO.creditNoteNumber ||
       oldCreditNote?.creditNoteNumber ||
-      autoNextNumber;
+      (await this.creditNoteAutoIncrement.getNextCreditNumber());
 
     const initialDTO = {
       ...formatDateFields(omit(creditNoteDTO, ['open', 'attachments']), [
@@ -101,6 +99,21 @@ export class CommandCreditNoteDTOTransform {
     )(initialDTO)) as CreditNote;
 
     return asyncDto;
+  };
+
+  /**
+   * Validates the credit note is published (open): a draft isn't in the books,
+   * so it can't be applied or refunded.
+   * @param {CreditNote} creditNote
+   */
+  public validateCreditPublished = (creditNote: CreditNote) => {
+    if (creditNote.isDraft) {
+      throw new ServiceError(
+        ERRORS.CREDIT_NOTE_IS_DRAFT,
+        `Publish the credit note first: a draft credit note can't be applied or refunded.`,
+        { creditNoteNumber: creditNote.creditNoteNumber },
+      );
+    }
   };
 
   /**

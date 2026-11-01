@@ -156,4 +156,118 @@ describe('LandedCostGLEntriesService', () => {
       );
     });
   });
+
+  /**
+   * P7: landed cost from an unpaid bill counted on the cash basis straight
+   * away. It is now an accrual like the bill, and on the cash basis it
+   * follows the bill's payments.
+   */
+  describe('accounting basis', () => {
+    it('a landed cost from a bill is an accrual', () => {
+      const entries = service.getLandedCostGLEntries(
+        buildAllocatedLandedCost({ fromTransactionType: 'Bill' }),
+        bill,
+      );
+      entries.forEach((entry) => expect(entry.basis).toBe('accrual'));
+    });
+
+    it('a landed cost from an expense counts on both bases', () => {
+      const entries = service.getLandedCostGLEntries(
+        buildAllocatedLandedCost({ fromTransactionType: 'Expense' }),
+        bill,
+      );
+      entries.forEach((entry) => expect(entry.basis).toBeUndefined());
+    });
+  });
+
+  describe('getLandedCostCashGLEntries', () => {
+    // 2 lines: 30.005 x 2 -> 60.01 and 19.99 x 2 -> 39.98 (local 99.99).
+    const fromBill = () =>
+      buildAllocatedLandedCost({
+        fromTransactionType: 'Bill',
+        exchangeRate: 2,
+        costAccountId: 400,
+        allocateEntries: [
+          {
+            entryId: 1,
+            cost: 30.005,
+            itemEntry: {
+              itemId: 11,
+              item: { type: 'inventory', inventoryAccountId: 600 },
+            },
+          },
+          {
+            entryId: 2,
+            cost: 19.99,
+            itemEntry: {
+              itemId: 12,
+              item: { type: 'inventory', inventoryAccountId: 601 },
+            },
+          },
+        ],
+      });
+    const sum = (entries: any[], key: 'debit' | 'credit', accountId?: number) =>
+      Math.round(
+        entries
+          .filter((e) => accountId === undefined || e.accountId === accountId)
+          .reduce((acc, e) => acc + (e[key] || 0), 0) * 100,
+      ) / 100;
+
+    it('writes nothing while the bill is unpaid', () => {
+      expect(
+        service.getLandedCostCashGLEntries(fromBill(), bill, 1000, []),
+      ).toEqual([]);
+    });
+
+    it('moves the paid share at each payment date and ends exactly at the accrual lines', () => {
+      const entries = service.getLandedCostCashGLEntries(
+        fromBill(),
+        bill,
+        1000,
+        [
+          { date: '2023-02-01', amount: 333.33 },
+          { date: '2023-03-01', amount: 666.67 },
+        ],
+      );
+      const first = entries.filter((e) => e.date === '2023-02-01');
+      const second = entries.filter((e) => e.date === '2023-03-01');
+
+      expect(sum(first, 'debit')).toBe(sum(first, 'credit'));
+      expect(sum(second, 'debit')).toBe(sum(second, 'credit'));
+      expect(sum(first, 'debit')).toBe(33.33);
+      // Once fully paid each line ends at its accrual amount.
+      expect(sum(entries, 'debit', 600)).toBe(60.01);
+      expect(sum(entries, 'debit', 601)).toBe(39.98);
+      expect(sum(entries, 'credit', 400)).toBe(99.99);
+      entries.forEach((entry) => {
+        expect(entry.basis).toBe('cash');
+        expect(entry.transactionType).toBe('LandedCost');
+      });
+    });
+
+    it('ignores what is paid beyond the bill total', () => {
+      const entries = service.getLandedCostCashGLEntries(
+        fromBill(),
+        bill,
+        1000,
+        [
+          { date: '2023-02-01', amount: 1000 },
+          { date: '2023-03-01', amount: 50 },
+        ],
+      );
+      expect(entries.every((e) => e.date === '2023-02-01')).toBe(true);
+      expect(sum(entries, 'credit', 400)).toBe(99.99);
+    });
+
+    it('writes nothing for a landed cost from an expense (already paid)', () => {
+      expect(
+        service.getLandedCostCashGLEntries(
+          buildAllocatedLandedCost({ fromTransactionType: 'Expense' }),
+          bill,
+          1000,
+          [{ date: '2023-02-01', amount: 1000 }],
+        ),
+      ).toEqual([]);
+    });
+  });
 });

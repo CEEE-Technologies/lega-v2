@@ -50,43 +50,48 @@ export class SaleInvoicesCost {
   }
 
   /**
-   * Retrieve the max dated inventory transactions in the transactions that
-   * have the same item id.
+   * Retrieves the earliest dated inventory transaction of each item: the
+   * cost is recomputed from that date onwards, so a later date would skip
+   * the earlier movements.
    * @param {ModelObject<InventoryTransaction>[]} inventoryTransactions
    * @return {ModelObject<InventoryTransaction>[]}
    */
-  getMaxDateInventoryTransactions(
-    inventoryTransactions: ModelObject<InventoryTransaction>[],
-  ): ModelObject<InventoryTransaction>[] {
+  getEarliestDateInventoryTransactions(
+    inventoryTransactions: Pick<
+      ModelObject<InventoryTransaction>,
+      'itemId' | 'date'
+    >[],
+  ): Pick<ModelObject<InventoryTransaction>, 'itemId' | 'date'>[] {
     const reduced = inventoryTransactions.reduce(
-      (acc: Record<number, ModelObject<InventoryTransaction>>, transaction) => {
+      (acc, transaction) => {
         const existing = acc[transaction.itemId];
 
-        if (!existing || moment(existing.date).isBefore(transaction.date)) {
-          return {
-            ...acc,
-            [transaction.itemId]: {
-              ...transaction,
-            },
-          };
+        if (!existing || moment(transaction.date).isBefore(existing.date)) {
+          return { ...acc, [transaction.itemId]: { ...transaction } };
         }
         return acc;
       },
-      {} as Record<number, ModelObject<InventoryTransaction>>,
+      {} as Record<
+        number,
+        Pick<ModelObject<InventoryTransaction>, 'itemId' | 'date'>
+      >,
     );
     return Object.values(reduced);
   }
 
   /**
-   * Computes items costs by the given inventory transaction.
-   * @param {number} tenantId
-   * @param {IInventoryTransaction[]} inventoryTransactions
+   * Schedules the items cost compute of the given inventory transactions,
+   * each item from its earliest transaction date.
+   * @param {ModelObject<InventoryTransaction>[]} inventoryTransactions
    */
-  async computeItemsCostByInventoryTransactions(
-    inventoryTransactions: ModelObject<InventoryTransaction>[],
+  async scheduleComputeCostByInventoryTransactions(
+    inventoryTransactions: Pick<
+      ModelObject<InventoryTransaction>,
+      'itemId' | 'date'
+    >[],
   ) {
     const mutex = new Mutex();
-    const reducedTransactions = this.getMaxDateInventoryTransactions(
+    const reducedTransactions = this.getEarliestDateInventoryTransactions(
       inventoryTransactions,
     );
     const asyncOpers = reducedTransactions.map(async (transaction) => {
@@ -102,6 +107,18 @@ export class SaleInvoicesCost {
       }
     });
     await Promise.all([...asyncOpers]);
+  }
+
+  /**
+   * Computes items costs by the given inventory transaction.
+   * @param {IInventoryTransaction[]} inventoryTransactions
+   */
+  async computeItemsCostByInventoryTransactions(
+    inventoryTransactions: ModelObject<InventoryTransaction>[],
+  ) {
+    return this.scheduleComputeCostByInventoryTransactions(
+      inventoryTransactions,
+    );
   }
 
   /**

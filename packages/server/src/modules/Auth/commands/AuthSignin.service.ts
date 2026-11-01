@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { SystemUser } from '@/modules/System/models/SystemUser';
 import { TenantModel } from '@/modules/System/models/TenantModel';
 import { UserTenant } from '@/modules/System/models/UserTenant.model';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { TenantUser } from '@/modules/Tenancy/TenancyModels/models/TenantUser.model';
 import { ModelObject } from 'objection';
 import { JwtPayload } from '../Auth.interfaces';
 import { JWT_ISSUER, JWT_AUDIENCE } from '../Auth.constants';
@@ -24,6 +26,9 @@ export class AuthSigninService {
 
     private readonly jwtService: JwtService,
     private readonly clsService: ClsService,
+
+    @Inject(TenantUser.name)
+    private readonly tenantUserModel?: TenantModelProxy<typeof TenantUser>,
   ) {}
 
   /**
@@ -80,6 +85,7 @@ export class AuthSigninService {
    *  1. Their explicit default workspace (`defaultTenantId`).
    *  2. Their initial/legacy workspace (`tenantId`).
    *  3. The first active workspace they have a membership in.
+   * Workspaces where the user was deactivated are skipped.
    * Returns null when the user has no active workspace available.
    */
   async resolveSigninTenant(user: SystemUser): Promise<TenantModel | null> {
@@ -103,8 +109,42 @@ export class AuthSigninService {
       .withGraphFetched('tenant')
       .orderBy('id', 'asc');
 
-    const active = memberships.find((m) => m.tenant?.isActive);
-    return active?.tenant ?? null;
+    for (const membership of memberships) {
+      if (!membership.tenant?.isActive) continue;
+      if (await this.isUserActiveInTenant(user.id, membership.tenant)) {
+        return membership.tenant;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Whether the user is active in the given workspace. Deactivating a user
+   * blocks them in that workspace only. Requests are checked again by the
+   * tenancy guard; this only picks which workspace opens after sign-in.
+   * @param {number} userId - System user id.
+   * @param {TenantModel} tenant
+   * @returns {Promise<boolean>}
+   */
+  private async isUserActiveInTenant(
+    userId: number,
+    tenant: TenantModel,
+  ): Promise<boolean> {
+    if (!tenant.initializedAt || !this.tenantUserModel) return true;
+
+    const previousOrganizationId = this.clsService.get?.('organizationId');
+    this.clsService.set('organizationId', tenant.organizationId);
+    try {
+      const tenantUser = await this.tenantUserModel()
+        .query()
+        .findOne({ systemUserId: userId });
+
+      return !(tenantUser && tenantUser.active != null && !tenantUser.active);
+    } catch (_error) {
+      return true;
+    } finally {
+      this.clsService.set('organizationId', previousOrganizationId);
+    }
   }
 
   /**
@@ -121,6 +161,9 @@ export class AuthSigninService {
       .first();
 
     if (!membership?.tenant?.isActive) return null;
+    if (!(await this.isUserActiveInTenant(userId, membership.tenant))) {
+      return null;
+    }
     return membership.tenant;
   }
 

@@ -48,6 +48,7 @@ import { SmsNotificationDetailsResponseDto } from '@/common/dtos/SmsNotification
 import { SmsNotificationsFeatureGuard } from '../SMS/SmsNotificationsFeatureGuard';
 
 @Controller('sale-receipts')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Sale Receipts')
 @ApiExtraModels(SaleReceiptResponseDto)
 @ApiExtraModels(PaginatedResponseDto)
@@ -60,6 +61,7 @@ export class SaleReceiptsController {
   constructor(private saleReceiptApplication: SaleReceiptApplication) {}
 
   @Post('validate-bulk-delete')
+  @RequirePermission(SaleReceiptAction.Delete, AbilitySubject.SaleReceipt)
   @ApiOperation({
     summary:
       'Validates which sale receipts can be deleted and returns the results.',
@@ -81,6 +83,7 @@ export class SaleReceiptsController {
   }
 
   @Post('bulk-delete')
+  @RequirePermission(SaleReceiptAction.Delete, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Deletes multiple sale receipts.' })
   @ApiResponse({
     status: 200,
@@ -94,12 +97,14 @@ export class SaleReceiptsController {
   }
 
   @Post()
+  @RequirePermission(SaleReceiptAction.Create, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Create a new sale receipt.' })
   createSaleReceipt(@Body() saleReceiptDTO: CreateSaleReceiptDto) {
     return this.saleReceiptApplication.createSaleReceipt(saleReceiptDTO);
   }
 
   @Post(':id/mail')
+  @RequirePermission(SaleReceiptAction.Edit, AbilitySubject.SaleReceipt)
   @HttpCode(200)
   @ApiOperation({ summary: 'Send the sale receipt mail.' })
   @ApiParam({
@@ -116,6 +121,7 @@ export class SaleReceiptsController {
   }
 
   @Get('state')
+  @RequirePermission(SaleReceiptAction.View, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Retrieves the sale receipt state.' })
   @ApiResponse({
     status: 200,
@@ -129,6 +135,7 @@ export class SaleReceiptsController {
   }
 
   @Get(':id/mail')
+  @RequirePermission(SaleReceiptAction.View, AbilitySubject.SaleReceipt)
   @HttpCode(200)
   @ApiOperation({ summary: 'Retrieves the sale receipt mail.' })
   @ApiParam({
@@ -142,7 +149,7 @@ export class SaleReceiptsController {
   }
 
   @Post(':id/notify-by-sms')
-  @UseGuards(AuthorizationGuard, PermissionGuard, SmsNotificationsFeatureGuard)
+  @UseGuards(SmsNotificationsFeatureGuard)
   @RequirePermission(SaleReceiptAction.NotifyBySms, AbilitySubject.SaleReceipt)
   @HttpCode(200)
   @ApiOperation({ summary: 'Notify the given sale receipt by SMS.' })
@@ -161,7 +168,7 @@ export class SaleReceiptsController {
   }
 
   @Get(':id/sms-details')
-  @UseGuards(AuthorizationGuard, PermissionGuard, SmsNotificationsFeatureGuard)
+  @UseGuards(SmsNotificationsFeatureGuard)
   @RequirePermission(SaleReceiptAction.View, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Retrieves the sale receipt SMS details.' })
   @ApiResponse({
@@ -180,6 +187,7 @@ export class SaleReceiptsController {
   }
 
   @Put(':id')
+  @RequirePermission(SaleReceiptAction.Edit, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Edit the given sale receipt.' })
   @ApiParam({
     name: 'id',
@@ -195,6 +203,7 @@ export class SaleReceiptsController {
   }
 
   @Get(':id')
+  @RequirePermission(SaleReceiptAction.View, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Retrieves the sale receipt details.' })
   @ApiResponse({
     status: 200,
@@ -240,6 +249,7 @@ export class SaleReceiptsController {
   }
 
   @Get()
+  @RequirePermission(SaleReceiptAction.View, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Retrieves the sale receipts paginated list' })
   @ApiResponse({
     status: 200,
@@ -263,6 +273,7 @@ export class SaleReceiptsController {
   }
 
   @Delete(':id')
+  @RequirePermission(SaleReceiptAction.Delete, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Delete the given sale receipt.' })
   @ApiParam({
     name: 'id',
@@ -275,6 +286,7 @@ export class SaleReceiptsController {
   }
 
   @Post(':id/close')
+  @RequirePermission(SaleReceiptAction.Edit, AbilitySubject.SaleReceipt)
   @ApiOperation({ summary: 'Close the given sale receipt.' })
   @ApiParam({
     name: 'id',

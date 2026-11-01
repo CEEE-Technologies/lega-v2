@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
 import { AutoIncrementOrdersService } from '../../AutoIncrementOrders/AutoIncrementOrders.service';
 
@@ -16,11 +17,19 @@ export class BankTransactionAutoIncrement {
   };
 
   /**
-   * Increment the invoice next number.
+   * Picks the bank transaction number inside the bank transaction save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The bank transaction save transaction.
    */
-  public incrementNextTransactionNumber = () => {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveTransactionNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'cashflow',
+      givenNumber,
+      trx,
     );
-  };
+  }
 }

@@ -32,9 +32,10 @@ import { CreditNotesImportable } from './commands/CreditNotesImportable';
 import { CreditNoteInventoryTransactionsSubscriber } from './subscribers/CreditNoteInventoryTransactionsSubscriber';
 import { RefundSyncCreditNoteBalanceSubscriber } from './subscribers/RefundSyncCreditNoteBalanceSubscriber';
 import { DeleteCustomerLinkedCreditSubscriber } from './subscribers/DeleteCustomerLinkedCreditSubscriber';
-import { CreditNoteAutoSerialSubscriber } from './subscribers/CreditNoteAutoSerialSubscriber';
 import { CreditNoteInventoryTransactions } from './commands/CreditNotesInventoryTransactions';
 import { InventoryCostModule } from '../InventoryCost/InventoryCost.module';
+import { CreditNoteCostGLEntries } from './commands/CreditNoteCostGLEntries';
+import { CreditNoteCostGLEntriesSubscriber } from './subscribers/CreditNoteCostGLEntriesSubscriber';
 import { CreditNoteRefundsModule } from '../CreditNoteRefunds/CreditNoteRefunds.module';
 import { CreditNotesApplyInvoiceModule } from '../CreditNotesApplyInvoice/CreditNotesApplyInvoice.module';
 import { BulkDeleteCreditNotesService } from './BulkDeleteCreditNotes.service';
@@ -91,9 +92,10 @@ import { SendCreditNoteMailQueue } from './types/CreditNotes.types';
     CreditNotesImportable,
     CreditNoteInventoryTransactions,
     CreditNoteInventoryTransactionsSubscriber,
+    CreditNoteCostGLEntries,
+    CreditNoteCostGLEntriesSubscriber,
     RefundSyncCreditNoteBalanceSubscriber,
     DeleteCustomerLinkedCreditSubscriber,
-    CreditNoteAutoSerialSubscriber,
     BulkDeleteCreditNotesService,
     ValidateBulkDeleteCreditNotesService,
     SendCreditNoteMail,

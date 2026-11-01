@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
 import { AutoIncrementOrdersService } from '@/modules/AutoIncrementOrders/AutoIncrementOrders.service';
 
@@ -32,12 +33,19 @@ export class AutoIncrementManualJournal {
   };
 
   /**
-   * Increment the manual journal number.
-   * @param {number} tenantId
+   * Picks the manual journal number inside the manual journal save (see
+   * `AutoIncrementOrdersService.reserveNextNumber`).
+   * @param {string} givenNumber - The number the user typed, if any.
+   * @param {Knex.Transaction} trx - The manual journal save transaction.
    */
-  public incrementNextJournalNumber = () => {
-    return this.autoIncrementOrdersService.incrementSettingsNextNumber(
+  public reserveJournalNumber(
+    givenNumber: string | undefined,
+    trx: Knex.Transaction,
+  ): Promise<string> {
+    return this.autoIncrementOrdersService.reserveNextNumber(
       'manual_journals',
+      givenNumber,
+      trx,
     );
-  };
+  }
 }

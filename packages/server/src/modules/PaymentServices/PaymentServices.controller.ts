@@ -6,6 +6,7 @@ import {
   Param,
   Body,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -25,18 +26,28 @@ import {
   PaymentMethodMutationResponseDto,
 } from './types';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import {
+  AllowAnyMember,
+  RequirePermission,
+} from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { PreferencesAction } from '@/modules/Settings/Settings.types';
 @ApiTags('Payment Services')
 @ApiExtraModels(GetPaymentMethodsStateDto)
 @ApiExtraModels(PaymentMethodMutationResponseDto)
 @ApiExtraModels(PaymentIntegrationDto)
 @ApiCommonHeaders()
 @Controller('payment-services')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 export class PaymentServicesController {
   constructor(
     private readonly paymentServicesApp: PaymentServicesApplication,
   ) {}
 
   @Get('/')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves the payment services for the invoice.' })
   @ApiResponse({
     status: 200,
@@ -51,6 +62,7 @@ export class PaymentServicesController {
   }
 
   @Get('/state')
+  @AllowAnyMember()
   @ApiOperation({
     summary: 'Retrieves the payment methods state (Stripe, etc.).',
   })
@@ -64,6 +76,7 @@ export class PaymentServicesController {
   }
 
   @Get('/:paymentServiceId')
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Retrieves a specific payment service details.' })
   @ApiParam({
     name: 'paymentServiceId',
@@ -80,6 +93,7 @@ export class PaymentServicesController {
   }
 
   @Post('/:paymentMethodId')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @HttpCode(200)
   @ApiOperation({ summary: 'Updates the given payment method.' })
   @ApiParam({
@@ -111,6 +125,7 @@ export class PaymentServicesController {
   }
 
   @Delete('/:paymentMethodId')
+  @RequirePermission(PreferencesAction.Mutate, AbilitySubject.Preferences)
   @HttpCode(200)
   @ApiOperation({ summary: 'Deletes the given payment method.' })
   @ApiParam({

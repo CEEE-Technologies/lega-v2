@@ -12,6 +12,7 @@ import { ItemsEntriesService } from '@/modules/Items/ItemsEntries.service';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { VendorCreditDTOTransformService } from './VendorCreditDTOTransform.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { VendorCreditAutoIncrementService } from './VendorCreditAutoIncrement.service';
 import { CreateVendorCreditDto } from '../dtos/VendorCredit.dto';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class CreateVendorCreditService {
     private readonly uow: UnitOfWork,
     private readonly itemsEntriesService: ItemsEntriesService,
     private readonly eventPublisher: EventEmitter2,
+    private readonly vendorCreditIncrement: VendorCreditAutoIncrementService,
     private readonly vendorCreditDTOTransformService: VendorCreditDTOTransformService,
 
     @Inject(VendorCredit.name)
@@ -67,6 +69,14 @@ export class CreateVendorCreditService {
       );
     // Saves the vendor credit transactions under UOW environment.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // vendor credits saved at the same moment never share a number.
+      vendorCreditModel.vendorCreditNumber =
+        (await this.vendorCreditIncrement.reserveCreditNumber(
+          vendorCreditCreateDTO.vendorCreditNumber,
+          trx,
+        )) || vendorCreditModel.vendorCreditNumber;
+
       // Triggers `onVendorCreditCreating` event.
       await this.eventPublisher.emitAsync(events.vendorCredit.onCreating, {
         vendorCreditCreateDTO,

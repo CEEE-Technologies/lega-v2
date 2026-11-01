@@ -16,6 +16,7 @@ import { Customer } from '@/modules/Customers/models/Customer';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreateSaleInvoiceDto } from '../dtos/SaleInvoice.dto';
+import { SaleInvoiceIncrement } from './SaleInvoiceIncrement.service';
 
 @Injectable()
 export class CreateSaleInvoice {
@@ -37,6 +38,7 @@ export class CreateSaleInvoice {
     private readonly eventPublisher: EventEmitter2,
     private readonly commandEstimateValidators: SaleEstimateValidators,
     private readonly uow: UnitOfWork,
+    private readonly invoiceIncrement: SaleInvoiceIncrement,
 
     @Inject(SaleInvoice.name)
     private readonly saleInvoiceModel: TenantModelProxy<typeof SaleInvoice>,
@@ -90,14 +92,24 @@ export class CreateSaleInvoice {
       saleInvoiceDTO,
       // authorizedUser,
     );
-    // Validate sale invoice number uniquiness.
-    if (saleInvoiceObj.invoiceNo) {
-      await this.validators.validateInvoiceNumberUnique(
-        saleInvoiceObj.invoiceNo,
-      );
-    }
     // Creates a new sale invoice and associated transactions under unit of work env.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two invoices
+      // saved at the same moment never share a number.
+      saleInvoiceObj.invoiceNo =
+        (await this.invoiceIncrement.reserveInvoiceNumber(
+          saleInvoiceDTO.invoiceNo,
+          trx,
+        )) || saleInvoiceObj.invoiceNo;
+
+      // Validate sale invoice number uniquiness.
+      if (saleInvoiceObj.invoiceNo) {
+        await this.validators.validateInvoiceNumberUnique(
+          saleInvoiceObj.invoiceNo,
+          undefined,
+          trx,
+        );
+      }
       // Triggers `onSaleInvoiceCreating` event.
       await this.eventPublisher.emitAsync(events.saleInvoice.onCreating, {
         saleInvoiceDTO,

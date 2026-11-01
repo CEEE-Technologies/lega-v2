@@ -93,7 +93,12 @@ export function createHmacSignature(secretKey, body) {
 }
 
 export function compareSignatures(signature, comparison_signature) {
-  const source = Buffer.from(signature, 'utf8');
-  const comparison = Buffer.from(comparison_signature, 'utf8');
+  const source = Buffer.from(signature || '', 'utf8');
+  const comparison = Buffer.from(comparison_signature || '', 'utf8');
+
+  // timingSafeEqual throws on different lengths; a wrong length never matches.
+  if (source.length === 0 || source.length !== comparison.length) {
+    return false;
+  }
   return require('crypto').timingSafeEqual(source, comparison);
 }

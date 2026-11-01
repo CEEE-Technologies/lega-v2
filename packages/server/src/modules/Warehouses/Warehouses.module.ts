@@ -44,6 +44,7 @@ import { ActivateWarehousesSubscriber } from './ActivateWarehousesSubscriber';
 import { UpdateInventoryTransactionsWithWarehouse } from './UpdateInventoryTransactionsWithWarehouse';
 import { CreateInitialWarehousesItemsQuantity } from './CreateInitialWarehousesitemsQuantity';
 import { WarehousesItemsQuantitySync } from './Integrations/WarehousesItemsQuantitySync';
+import { WarehousesItemsQuantitySyncSubscriber } from './Integrations/WarehousesItemsQuantitySynSubscriber';
 import { WarehousesDTOValidators } from './Integrations/WarehousesDTOValidators';
 import { DeleteItemWarehousesQuantity } from './commands/DeleteItemWarehousesQuantity';
 import { InventoryTransactionsWarehouses } from './AccountsTransactionsWarehouses';
@@ -97,6 +98,8 @@ const models = [RegisterTenancyModel(Warehouse)];
     UpdateInventoryTransactionsWithWarehouse,
     CreateInitialWarehousesItemsQuantity,
     WarehousesItemsQuantitySync,
+    // Moves each warehouse's stock with the stock movements.
+    WarehousesItemsQuantitySyncSubscriber,
     EstimatesActivateWarehousesSubscriber,
     InventoryActivateWarehousesSubscriber,
     WarehousesDTOValidators,

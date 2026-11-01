@@ -46,8 +46,11 @@ function UserFormContentInner({
           name={'email'}
           label={intl.get('email')}
           labelInfo={<FieldRequiredHint />}
+          helperText={
+            isAuth ? undefined : 'Only the user can change their own email.'
+          }
         >
-          <FInputGroup name={'email'} />
+          <FInputGroup name={'email'} disabled={!isAuth} />
         </FFormGroup>
 
         {/* ----------- First name ----------- */}

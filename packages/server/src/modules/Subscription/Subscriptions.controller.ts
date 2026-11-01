@@ -6,6 +6,7 @@ import {
   Req,
   Next,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import { Request, NextFunction } from 'express';
 import {
@@ -27,7 +28,14 @@ import {
 } from './dtos/LemonSubscriptionResponse.dto';
 import { LemonSubscriptionsListResponseDto } from './dtos/LemonSubscriptionsListResponse.dto';
 
+import {
+  AllowAnyMember,
+  RequireAdmin,
+} from '@/modules/Roles/RequirePermission.decorator';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
 @Controller('subscription')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Subscriptions')
 @ApiExtraModels(
   SubscriptionResponseDto,
@@ -42,6 +50,7 @@ export class SubscriptionsController {
   constructor(private readonly subscriptionApp: SubscriptionApplication) {}
 
   @Get()
+  @AllowAnyMember()
   @ApiOperation({ summary: 'Get all subscriptions for the current tenant' })
   @ApiResponse({
     status: 200,
@@ -56,6 +65,7 @@ export class SubscriptionsController {
   }
 
   @Get('lemon')
+  @RequireAdmin()
   @ApiOperation({
     summary: 'Get Lemon Squeezy subscription details for the current tenant',
   })
@@ -73,6 +83,7 @@ export class SubscriptionsController {
   }
 
   @Post('lemon/checkout_url')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Get LemonSqueezy checkout URL' })
   @ApiBody({
@@ -99,6 +110,7 @@ export class SubscriptionsController {
   }
 
   @Post('cancel')
+  @RequireAdmin()
   @ApiOperation({ summary: 'Cancel the current organization subscription' })
   @ApiResponse({
     status: 200,
@@ -115,6 +127,7 @@ export class SubscriptionsController {
   }
 
   @Post('resume')
+  @RequireAdmin()
   @HttpCode(200)
   @ApiOperation({ summary: 'Resume the current organization subscription' })
   @ApiResponse({
@@ -132,6 +145,7 @@ export class SubscriptionsController {
   }
 
   @Post('change')
+  @RequireAdmin()
   @ApiOperation({
     summary: 'Change the subscription plan of the current organization',
   })

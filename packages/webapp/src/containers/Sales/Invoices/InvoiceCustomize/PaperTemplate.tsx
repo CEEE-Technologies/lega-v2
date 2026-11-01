@@ -17,7 +17,11 @@ export function PaperTemplate({
   ...restProps
 }: PaperTemplateProps) {
   return (
-    <Box {...restProps} className={clsx(styles.root, restProps?.className)}>
+    // `document-paper`: white paper in both themes (used by the theme audit).
+    <Box
+      {...restProps}
+      className={clsx('document-paper', styles.root, restProps?.className)}
+    >
       <style>{`:root { --invoice-primary-color: ${primaryColor}; --invoice-secondary-color: ${secondaryColor}; }`}</style>
       {children}
     </Box>

@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ItemCategoryApplication } from './ItemCategory.application';
 import { GetItemCategoriesResponse } from './ItemCategory.interfaces';
@@ -30,7 +31,13 @@ import {
 } from './dtos/BulkDeleteItemCategories.dto';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { ItemAction } from '@/interfaces/Item';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('item-categories')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Item Categories')
 @ApiExtraModels(ItemCategoryResponseDto)
 @ApiExtraModels(ValidateBulkDeleteItemCategoriesResponseDto)
@@ -41,12 +48,14 @@ export class ItemCategoryController {
   ) {}
 
   @Post()
+  @RequirePermission(ItemAction.CREATE, AbilitySubject.Item)
   @ApiOperation({ summary: 'Create a new item category.' })
   async createItemCategory(@Body() itemCategoryDTO: CreateItemCategoryDto) {
     return this.itemCategoryApplication.createItemCategory(itemCategoryDTO);
   }
 
   @Get()
+  @RequirePermission(ItemAction.VIEW, AbilitySubject.Item)
   @ApiOperation({ summary: 'Retrieves the item categories.' })
   @ApiResponse({
     status: 200,
@@ -63,6 +72,7 @@ export class ItemCategoryController {
   }
 
   @Put(':id')
+  @RequirePermission(ItemAction.EDIT, AbilitySubject.Item)
   @ApiOperation({ summary: 'Edit the given item category.' })
   async editItemCategory(
     @Param('id') id: number,
@@ -72,6 +82,7 @@ export class ItemCategoryController {
   }
 
   @Get(':id')
+  @RequirePermission(ItemAction.VIEW, AbilitySubject.Item)
   @ApiOperation({ summary: 'Retrieves the item category details.' })
   @ApiResponse({
     status: 200,
@@ -83,6 +94,7 @@ export class ItemCategoryController {
   }
 
   @Post('validate-bulk-delete')
+  @RequirePermission(ItemAction.DELETE, AbilitySubject.Item)
   @HttpCode(200)
   @ApiOperation({
     summary:
@@ -105,6 +117,7 @@ export class ItemCategoryController {
   }
 
   @Post('bulk-delete')
+  @RequirePermission(ItemAction.DELETE, AbilitySubject.Item)
   @HttpCode(200)
   @ApiOperation({ summary: 'Deletes multiple item categories in bulk.' })
   @ApiResponse({
@@ -121,6 +134,7 @@ export class ItemCategoryController {
   }
 
   @Delete(':id')
+  @RequirePermission(ItemAction.DELETE, AbilitySubject.Item)
   @ApiOperation({ summary: 'Delete the given item category.' })
   async deleteItemCategory(@Param('id') id: number) {
     return this.itemCategoryApplication.deleteItemCategory(id);

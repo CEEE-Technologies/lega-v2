@@ -10,6 +10,14 @@
     background-color: #F5F6F8;
     border: 0;
   }
+
+  :global(.bp4-dark) & {
+    border-color: rgba(255, 255, 255, 0.15);
+
+    &.isFeatured {
+      background-color: var(--color-dark-gray3);
+    }
+  }
 }
 .featuredBox {
   background-color: #A3ACBA;
@@ -29,12 +37,19 @@
   font-size: 16px;
   font-weight: 600;
   color: #2F343C;
-  
+
+  :global(.bp4-dark) & {
+    color: var(--color-light-gray5);
+  }
 }
 .description{
   font-size: 14px;
   color: #687385;
   line-height: 1.5;
+
+  :global(.bp4-dark) & {
+    color: var(--color-muted-text);
+  }
 }
 .buttonCTA {
   min-height: 34px;
@@ -51,17 +66,29 @@
   line-height: 1;
   font-weight: 500;
   color: #252A31;
+
+  :global(.bp4-dark) & {
+    color: var(--color-light-gray5);
+  }
 }
 
-.pricePer{ 
+.pricePer{
   color: #738091;
   font-size: 12px;
   line-height: 1;
+
+  :global(.bp4-dark) & {
+    color: var(--color-muted-text);
+  }
 }
 
-.featureItem{ 
+.featureItem{
   flex: 1;
   color: #1C2127;
+
+  :global(.bp4-dark) & {
+    color: var(--color-light-gray4);
+  }
 }
 
 .featurePopover :global .bp4-popover-content{

@@ -120,6 +120,7 @@ export class SaleInvoicesController {
   }
 
   @Post(':id/mail')
+  @RequirePermission(SaleInvoiceAction.Edit, AbilitySubject.SaleInvoice)
   @HttpCode(200)
   @ApiOperation({ summary: 'Send the sale invoice mail.' })
   @ApiResponse({

@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { moneyLt } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { SaleInvoice } from '../models/SaleInvoice';
@@ -30,9 +31,10 @@ export class CommandSaleInvoiceValidators {
   public async validateInvoiceNumberUnique(
     invoiceNumber: string,
     notInvoiceId?: number,
+    trx?: Knex.Transaction,
   ) {
     const saleInvoice = await this.saleInvoiceModel()
-      .query()
+      .query(trx)
       .findOne('invoice_no', invoiceNumber)
       .onBuild((builder) => {
         if (notInvoiceId) {

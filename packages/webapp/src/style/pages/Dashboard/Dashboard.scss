@@ -235,6 +235,10 @@ $dashboard-views-bar-height: 44px;
         &.bp4-disabled {
           background: transparent;
           color: rgba(50, 48, 74, 0.4);
+
+          .bp4-dark & {
+            color: rgba(211, 216, 222, 0.45);
+          }
         }
         &.has-active-filters {
           &,
@@ -260,6 +264,10 @@ $dashboard-views-bar-height: 44px;
           }
           &.bp4-disabled {
             color: rgb(194, 48, 48, 0.6);
+
+            .bp4-dark & {
+              color: rgba(250, 153, 156, 0.6);
+            }
           }
         }
         &.#{$ns}-minimal.#{$ns}-intent-success {

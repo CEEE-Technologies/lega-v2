@@ -25,8 +25,14 @@ import { BillLandedCostTransactionDto } from './dtos/BillLandedCostTransaction.d
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 import { LandedCostFeatureGuard } from './LandedCostFeatureGuard';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { BillAction } from '@/modules/Bills/Bills.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @ApiTags('Landed Cost')
 @Controller('landed-cost')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @UseGuards(LandedCostFeatureGuard)
 @ApiExtraModels(BillLandedCostTransactionDto)
 @ApiCommonHeaders()
@@ -39,6 +45,7 @@ export class BillAllocateLandedCostController {
   ) {}
 
   @Get('/transactions')
+  @RequirePermission(BillAction.View, AbilitySubject.Bill)
   @ApiOperation({ summary: 'Get landed cost transactions' })
   @ApiResponse({
     status: 200,
@@ -54,6 +61,7 @@ export class BillAllocateLandedCostController {
   }
 
   @Post('/bills/:billId/allocate')
+  @RequirePermission(BillAction.Edit, AbilitySubject.Bill)
   @ApiOperation({ summary: 'Allocate landed cost to bill items' })
   @ApiResponse({
     status: 201,
@@ -74,6 +82,7 @@ export class BillAllocateLandedCostController {
   }
 
   @Delete('/:allocatedLandedCostId')
+  @RequirePermission(BillAction.Edit, AbilitySubject.Bill)
   @ApiOperation({ summary: 'Delete allocated landed cost' })
   @ApiResponse({
     status: 200,
@@ -92,6 +101,7 @@ export class BillAllocateLandedCostController {
   }
 
   @Get('/bills/:billId/transactions')
+  @RequirePermission(BillAction.View, AbilitySubject.Bill)
   @ApiOperation({ summary: 'Get bill landed cost transactions' })
   @ApiResponse({
     status: 200,

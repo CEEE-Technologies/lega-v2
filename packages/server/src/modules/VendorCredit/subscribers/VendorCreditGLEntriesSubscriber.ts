@@ -72,12 +72,15 @@ export class VendorCreditGlEntriesSubscriber {
   public async revertGLEntriesOnceDeleted({
     vendorCreditId,
     oldVendorCredit,
+    trx,
   }: IVendorCreditDeletedPayload): Promise<void> {
     // Can't continue of the vendor credit is not open yet.
     if (!oldVendorCredit.isPublished) return;
 
+    // Inside the delete transaction, so a failed delete keeps the journal.
     await this.vendorCreditGLEntries.revertVendorCreditGLEntries(
       vendorCreditId,
+      trx,
     );
   }
 }

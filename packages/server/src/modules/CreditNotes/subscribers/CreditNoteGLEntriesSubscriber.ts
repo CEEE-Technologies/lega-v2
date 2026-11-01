@@ -53,28 +53,32 @@ export class CreditNoteGLEntriesSubscriber {
   public async revertGLEntriesOnceCreditNoteDeleted({
     oldCreditNote,
     creditNoteId,
-    trx: _trx,
+    trx,
   }: ICreditNoteDeletedPayload) {
     // Can't continue if the credit note is not published yet.
     if (!oldCreditNote.isPublished) return;
 
-    await this.creditNoteGLEntries.revertVendorCreditGLEntries(creditNoteId);
+    // Inside the delete transaction, so a failed delete keeps the journal.
+    await this.creditNoteGLEntries.revertVendorCreditGLEntries(
+      creditNoteId,
+      trx,
+    );
   }
 
   /**
-   * Edits vendor credit associated GL entries once the transaction edited.
+   * Rewrites the credit note GL entries once the transaction edited. The
+   * published state is read from the stored credit note: the saved graph
+   * has no `openedAt` unless the edit publishes it.
    * @param {ICreditNoteEditedPayload} payload -
    */
   @OnEvent(events.creditNote.onEdited)
   public async editVendorCreditGLEntriesOnceEdited({
     creditNote,
+    oldCreditNote,
     trx,
   }: ICreditNoteEditedPayload) {
-    // Can't continue if the credit note is not published yet.
-    if (!creditNote.isPublished) return;
-
-    await this.creditNoteGLEntries.editVendorCreditGLEntries(
-      creditNote.id,
+    await this.creditNoteGLEntries.rewriteCreditNoteGLEntries(
+      creditNote?.id ?? oldCreditNote.id,
       trx,
     );
   }

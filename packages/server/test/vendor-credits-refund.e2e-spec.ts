@@ -12,6 +12,8 @@ const createVendorCreditRequest = () => ({
   exchangeRate: 1,
   vendorCreditNumber: faker.string.uuid(),
   vendorCreditDate: '2025-01-01',
+  // Only an open (published) vendor credit can be applied or refunded.
+  open: true,
   entries: [
     {
       index: 1,
@@ -40,6 +42,13 @@ const findDepositAccount = (accounts) => {
 
 describe('Vendor Credits Refund (e2e)', () => {
   beforeAll(async () => {
+    // The vendor credit below is open, so a lock left by another spec would refuse it.
+    await request(app.getHttpServer())
+      .put('/transactions-locking/cancel-lock')
+      .set('organization-id', orgainzationId)
+      .set('Authorization', AuthorizationHeader)
+      .send({ reason: 'Cancel lock for e2e test' });
+
     await request(app.getHttpServer())
       .put('/transactions-locking/cancel-lock')
       .set('organization-id', orgainzationId)

@@ -183,6 +183,14 @@ export class CreateWarehouseTransfer {
 
     // Create warehouse transfer under unit-of-work.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // transfers saved at the same moment never share a number.
+      warehouseTransferModel.transactionNumber =
+        (await this.autoIncrementOrders.reserveTransferNumber(
+          warehouseTransferDTO.transactionNumber,
+          trx,
+        )) || warehouseTransferModel.transactionNumber;
+
       // Triggers `onWarehouseTransferCreate` event.
       await this.eventPublisher.emitAsync(events.warehouseTransfer.onCreate, {
         trx,

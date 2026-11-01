@@ -19,7 +19,8 @@ beforeAll(async () => {
     imports: [AppModule],
   }).compile();
 
-  app = moduleFixture.createNestApplication();
+  // As in main.ts: webhooks check signatures against the raw body.
+  app = moduleFixture.createNestApplication({ rawBody: true });
   await app.init();
 
   const signinResponse = await request(app.getHttpServer())

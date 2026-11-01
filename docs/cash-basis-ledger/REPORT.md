@@ -4,6 +4,14 @@ Branch: `fix/cash-basis-ledger` (cut from `develop` at 1bf807710). **Nothing is 
 Date: 2026-10-25, updated 2026-10-26 (opening balance as an open item + usability fixes, sections 9–10).
 Tenant checked: **CEEET** (`96rherk78imvmvdogt`, PAY-0002 / customer SLTC).
 
+> **Update 1 Nov 2026 (inventory package, P6): the rebuild now runs by itself after a deploy.**
+> Migration `20261101120100_flag_cash_basis_rebuild` flags every company that has payments or refunds
+> (`settings`: `accounting_basis` / `cash_rebuild_needed`). On startup the server queues
+> `tenants:rebuild-cash-basis` for each flagged company (one job per company) and clears the flag once the
+> rebuild checks clean; a company with problems keeps the flag and is retried on the next startup. Deploying is
+> now just `tenants:migrate:latest` + restarting the server. Set `CASH_BASIS_AUTO_REBUILD=false` to keep the old
+> manual way; `tenants:rebuild-cash-basis --check -o <org>` still reports a company's state.
+
 ## Summary
 
 | # | Issue | Status | Evidence |

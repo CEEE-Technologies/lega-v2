@@ -27,8 +27,13 @@ export class ExchangeRatesService {
     const fromCurrency = exchangeRateLatestDTO.fromCurrency || baseCurrency;
     const toCurrency = exchangeRateLatestDTO.toCurrency || baseCurrency;
 
-    const exchange = new ExchangeRate(ExchangeRateServiceType.OpenExchangeRate);
-    const exchangeRate = await exchange.latest(fromCurrency, toCurrency);
+    // The same currency is always 1; no rate provider is needed.
+    const exchangeRate =
+      fromCurrency === toCurrency
+        ? 1
+        : await new ExchangeRate(
+            ExchangeRateServiceType.OpenExchangeRate,
+          ).latest(fromCurrency, toCurrency);
 
     return {
       baseCurrency: fromCurrency,

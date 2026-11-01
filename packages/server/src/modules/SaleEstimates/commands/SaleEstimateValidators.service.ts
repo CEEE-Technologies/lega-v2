@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import * as moment from 'moment';
 import { ERRORS } from '../constants';
@@ -30,9 +31,10 @@ export class SaleEstimateValidators {
   public async validateEstimateNumberExistance(
     estimateNumber: string,
     notEstimateId?: number,
+    trx?: Knex.Transaction,
   ) {
     const foundSaleEstimate = await this.saleEstimateModel()
-      .query()
+      .query(trx)
       .findOne('estimate_number', estimateNumber)
       .onBuild((builder) => {
         if (notEstimateId) {

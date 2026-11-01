@@ -4,6 +4,8 @@
  *
  * Run: pnpm exec playwright test -c playwright.theme-audit.config.ts
  * Report: test-results/theme-audit/<theme>__<page>.json (+ screenshots).
+ * Each finding has a `kind`: low-contrast text, a panel painted for the other
+ * theme, an invisible or harsh border, or an unreadable disabled button.
  */
 import fs from "fs";
 import path from "path";
@@ -19,7 +21,12 @@ import {
   fetchAccounts,
   readApiAuth,
 } from "../_api";
-import { findLowContrastText, findWrongThemeSurfaces } from "./contrast";
+import {
+  findBorderIssues,
+  findLowContrastText,
+  findUnreadableDisabledButtons,
+  findWrongThemeSurfaces,
+} from "./contrast";
 import { API_BASE } from "../_env";
 
 const OUT = path.resolve(__dirname, "../../test-results/theme-audit");
@@ -96,6 +103,17 @@ const PAGES = [
   "/preferences/sms-message",
 ];
 
+/**
+ * Reports whose light design draws a grey rule above the double-underlined
+ * total (the other reports use a black rule there on purpose).
+ */
+const GREY_TOTAL_RULE_REPORTS = [
+  "/financial-reports/customers-balance-summary",
+  "/financial-reports/vendors-balance-summary",
+  "/financial-reports/sales-by-items",
+  "/financial-reports/purchases-by-items",
+];
+
 /** List pages whose first row opens a detail drawer. */
 const DRAWERS = [
   "/invoices",
@@ -135,9 +153,54 @@ async function post(pathname: string, body: unknown) {
   return json;
 }
 
+/** Uploads a CSV through the import flow (upload, map columns, import). */
+async function importCsv(
+  resource: string,
+  csv: string,
+  mapping: Array<{ from: string; to: string }>,
+  params: Record<string, unknown> = {},
+) {
+  const auth = readApiAuth();
+  const headers = {
+    authorization: `Bearer ${auth.accessToken}`,
+    "organization-id": auth.organizationId,
+  };
+  const form = new FormData();
+  form.append("file", new Blob([csv], { type: "text/csv" }), "audit.csv");
+  form.append("resource", resource);
+  form.append("params", JSON.stringify(params));
+  const res = await fetch(`${API_BASE}/api/import/file`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const json: any = await res.json().catch(() => null);
+  const importId = json?.import?.importId ?? json?.import?.import_id;
+  if (!res.ok || !importId) {
+    console.warn(`[theme-audit] import upload failed`, res.status, json);
+    return;
+  }
+  await post(`/import/${importId}/mapping`, { mapping });
+  await post(`/import/${importId}/import`, {});
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
-async function seed() {
+/** Ids created by the seed, kept on disk because workers restart. */
+interface SeedInfo {
+  bankAccountId?: number;
+}
+const seedInfoPath = () =>
+  path.join(OUT, `.seeded-${readApiAuth().organizationId}`);
+const readSeedInfo = (): SeedInfo => {
+  try {
+    return JSON.parse(fs.readFileSync(seedInfoPath(), "utf8") || "{}");
+  } catch {
+    return {};
+  }
+};
+
+async function seed(): Promise<SeedInfo> {
   const auth = readApiAuth();
   const accounts = await fetchAccounts(API_BASE, auth);
   const accountId = (name: string) => accounts.find((a) => a.name === name)!.id;
@@ -236,6 +299,69 @@ async function seed() {
       entries: [{ billId, paymentAmount: 30 }],
     });
   }
+
+  // Sales/Purchases by Items list inventory items only.
+  const stockItem = await createItemViaApi(API_BASE, auth, {
+    name: "Audit Stock Item",
+    type: "inventory",
+    sellPrice: 90,
+    costPrice: 40,
+  });
+  await createOpenedBillViaApi(API_BASE, auth, {
+    vendorId: vendor.id,
+    itemId: stockItem.id,
+    rate: 40,
+    quantity: 5,
+    billNumber: "AUDIT-BILL-2",
+  });
+  await createDeliveredInvoiceViaApi(API_BASE, auth, {
+    customerId: customer.id,
+    itemId: stockItem.id,
+    rate: 90,
+    quantity: 2,
+  });
+
+  // A foreign-currency vendor with an opening balance shows the exchange-rate
+  // line in its "Edit opening balance" dialog.
+  const currencies = await fetch(`${API_BASE}/api/currencies`, {
+    headers: {
+      authorization: `Bearer ${auth.accessToken}`,
+      "organization-id": auth.organizationId,
+    },
+  })
+    .then((res) => res.json())
+    .catch(() => []);
+  const list = Array.isArray(currencies) ? currencies : currencies?.data ?? [];
+  if (!list.some((c: any) => (c.currencyCode ?? c.currency_code) === "USD")) {
+    await post("/currencies", {
+      currencyCode: "USD",
+      currencyName: "US Dollar",
+      currencySign: "$",
+    });
+  }
+  await post("/vendors", {
+    displayName: "Audit USD Vendor",
+    currencyCode: "USD",
+    openingBalance: 100,
+    openingBalanceExchangeRate: 3.67,
+    openingBalanceAt: today(),
+  });
+
+  // An imported bank-statement line that matches the 50.00 payment above, so
+  // the bank "match" panel has an item to select.
+  await importCsv(
+    "uncategorized_bank_transaction",
+    `Date,Payee,Description,Reference No.,Amount\n${today()},Audit Customer,Audit deposit,AUDIT-DEP-1,50\n`,
+    [
+      { from: "Date", to: "date" },
+      { from: "Payee", to: "payee" },
+      { from: "Description", to: "description" },
+      { from: "Reference No.", to: "referenceNo" },
+      { from: "Amount", to: "amount" },
+    ],
+    { accountId: bank },
+  );
+  return { bankAccountId: bank };
 }
 
 async function open(page: Page, route: string, theme: string) {
@@ -257,11 +383,13 @@ async function open(page: Page, route: string, theme: string) {
   await page.waitForTimeout(800);
 }
 
-async function audit(page: Page, key: string) {
+async function audit(page: Page, key: string, greyTotalRules = false) {
   const theme = key.startsWith("dark") ? "dark" : "light";
   const issues = [
     ...(await findLowContrastText(page)),
     ...(await findWrongThemeSurfaces(page, theme)),
+    ...(await findBorderIssues(page, theme, greyTotalRules)),
+    ...(await findUnreadableDisabledButtons(page)),
   ];
   fs.writeFileSync(
     path.join(OUT, `${key}.json`),
@@ -274,10 +402,9 @@ test.beforeAll(async () => {
   test.setTimeout(10 * 60_000);
   fs.mkdirSync(OUT, { recursive: true });
   // Workers restart after a failure; seed only once per run.
-  const marker = path.join(OUT, `.seeded-${readApiAuth().organizationId}`);
-  if (!fs.existsSync(marker)) {
-    await seed();
-    fs.writeFileSync(marker, "");
+  if (!fs.existsSync(seedInfoPath())) {
+    const info = await seed();
+    fs.writeFileSync(seedInfoPath(), JSON.stringify(info));
   }
 });
 
@@ -285,7 +412,11 @@ for (const theme of THEMES) {
   for (const route of PAGES) {
     test(`${theme} ${route}`, async ({ page }) => {
       await open(page, route, theme);
-      await audit(page, `${theme}__${slug(route)}`);
+      await audit(
+        page,
+        `${theme}__${slug(route)}`,
+        GREY_TOTAL_RULE_REPORTS.includes(route),
+      );
     });
   }
 
@@ -318,8 +449,36 @@ for (const theme of THEMES) {
   }
 }
 
-/** Popovers, menus and secondary drawers reached through UI actions. */
-const INTERACTIONS: Array<[string, string, (page: Page) => Promise<void>]> = [
+/** Right-clicks the first table row and picks an item from its menu. */
+async function rowMenu(page: Page, item: string, row = page.locator(".tbody .tr").first()) {
+  await row.waitFor({ timeout: 20_000 });
+  await row.click({ button: "right" });
+  await page.locator(".bp4-menu").getByText(item, { exact: true }).click();
+  await page.locator(".bp4-dialog").first().waitFor({ timeout: 20_000 });
+}
+
+/** Opens a list page's "Customize Templates" and its first template. */
+async function openCustomizeTemplate(page: Page) {
+  await page.locator('.dashboard__actions-bar .bp4-button:has([data-icon="cog-16"])').click();
+  await page.getByText(/^Customize Templates?$/).click();
+  const row = page.locator(".bp4-drawer .tbody .tr").first();
+  await row.waitFor({ timeout: 20_000 });
+  await row.locator(".td").first().click();
+  // The paper preview's big title ("Invoice", "Estimate", ...).
+  await page.locator(".bp4-drawer h1").first().waitFor({ timeout: 20_000 });
+}
+
+/** Ticks the first row's checkbox so the bulk-actions toolbar shows. */
+async function selectFirstRow(page: Page) {
+  const checkbox = page.locator(".tbody .tr").first().locator(".bp4-checkbox");
+  await checkbox.waitFor({ timeout: 20_000 });
+  await checkbox.click();
+}
+
+/** Popovers, menus, dialogs and secondary drawers reached through UI actions. */
+const INTERACTIONS: Array<
+  [string, string | (() => string), (page: Page) => Promise<void>]
+> = [
   [
     "invoice_send_mail",
     "/invoices",
@@ -352,12 +511,126 @@ const INTERACTIONS: Array<[string, string, (page: Page) => Promise<void>]> = [
       await page.locator(".bp4-button:has(.user-text)").first().click();
     },
   ],
+  // T1: changing a tax rate shows a "Please note" warning.
+  [
+    "tax_rate_edit_warning",
+    "/tax-rates",
+    async (page) => {
+      await rowMenu(page, "Edit Tax Rate");
+      await page.locator('.bp4-dialog input[name="rate"]').fill("7");
+      await page.getByText("Please Note:").waitFor({ timeout: 10_000 });
+    },
+  ],
+  // T2: "remaining credit" in the reconcile dialogs.
+  [
+    "reconcile_credit_note",
+    "/credit-notes",
+    async (page) => rowMenu(page, "Reconcile with Invoices"),
+  ],
+  [
+    "reconcile_vendor_credit",
+    "/vendor-credits",
+    async (page) => rowMenu(page, "Reconcile with Bills"),
+  ],
+  // T3: the shared "1 USD = X AED" exchange-rate line.
+  [
+    "vendor_opening_balance_exchange_rate",
+    "/vendors",
+    async (page) => {
+      await page
+        .locator(".tbody .tr", { hasText: "Audit USD Vendor" })
+        .locator(".td")
+        .nth(2)
+        .click();
+      const drawer = page.locator(".bp4-drawer").first();
+      await drawer.locator('.bp4-button:has([data-icon="more-vert"])').click();
+      await page.getByText("Edit Opening Balance").click();
+      await page.locator(".bp4-dialog").getByText(/^1 /).first().waitFor({
+        timeout: 20_000,
+      });
+    },
+  ],
+  // T5: a selected item in the bank "match" panel.
+  [
+    "bank_match_selected",
+    () =>
+      `/cashflow-accounts/${readSeedInfo().bankAccountId}/transactions?filter=uncategorized`,
+    async (page) => {
+      await page.locator(".tbody .tr .td").nth(2).click();
+      await page.getByRole("tab", { name: "Matching Transaction" }).click();
+      // Each match item shows "Date: ..."; clicking it selects the item.
+      await page.getByText(/^Date: /).first().click();
+    },
+  ],
+  // T7: the bulk delete dialog's note divider.
+  [
+    "bulk_delete_dialog",
+    "/invoices",
+    async (page) => {
+      await selectFirstRow(page);
+      await page.locator(".dashboard__actions-bar").getByText("Delete").click();
+      await page.locator(".bp4-dialog").first().waitFor({ timeout: 20_000 });
+    },
+  ],
+  // T8: the bulk Delete button is disabled while the server checks the
+  // selection. Hold that check so the disabled state can be measured.
+  [
+    "toolbar_disabled_delete",
+    "/invoices",
+    async (page) => {
+      await page.route("**/validate-bulk-delete**", () => undefined);
+      await selectFirstRow(page);
+      await page.locator(".dashboard__actions-bar").getByText("Delete").click();
+      await page
+        .locator(".dashboard__actions-bar .bp4-button.bp4-disabled")
+        .waitFor({ timeout: 10_000 });
+    },
+  ],
+  // T8: no toolbar keeps a plain (non-danger) button disabled for long, so
+  // disable one the way Blueprint does to measure the toolbar's own style.
+  [
+    "toolbar_disabled_button",
+    "/invoices",
+    async (page) => {
+      await page.evaluate(() => {
+        const button = Array.from(
+          document.querySelectorAll(".dashboard__actions-bar .bp4-button"),
+        ).find((b) => (b.textContent || "").trim() && !b.className.includes("intent"));
+        button?.classList.add("bp4-disabled");
+        button?.setAttribute("disabled", "");
+      });
+    },
+  ],
+  // T9: muted text on the white "paper" of the customization previews.
+  ...(
+    [
+      ["invoice", "/invoices"],
+      ["estimate", "/estimates"],
+      ["receipt", "/receipts"],
+      ["credit_note", "/credit-notes"],
+    ] as const
+  ).map(
+    ([name, route]) =>
+      [
+        `${name}_customize_preview`,
+        route,
+        async (page: Page) => openCustomizeTemplate(page),
+      ] as [string, string, (page: Page) => Promise<void>],
+  ),
+  [
+    "invoice_customize_payment_page",
+    "/invoices",
+    async (page) => {
+      await openCustomizeTemplate(page);
+      await page.getByText("Payment page").click();
+    },
+  ],
 ];
 
 for (const theme of THEMES) {
   for (const [name, route, act] of INTERACTIONS) {
     test(`${theme} interaction ${name}`, async ({ page }) => {
-      await open(page, route, theme);
+      await open(page, typeof route === "function" ? route() : route, theme);
       await act(page);
       await page
         .waitForLoadState("networkidle", { timeout: 8_000 })

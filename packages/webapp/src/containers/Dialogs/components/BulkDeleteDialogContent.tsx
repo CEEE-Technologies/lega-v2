@@ -1,4 +1,5 @@
 import { Classes, Intent, Tag } from '@blueprintjs/core';
+import { css } from '@emotion/css';
 import { x } from '@xstyled/emotion';
 import React from 'react';
 import { FormattedMessage as T } from '@/components';
@@ -60,11 +61,7 @@ export function BulkDeleteDialogContent({
         />
       </x.p>
 
-      <x.div
-        pt={'12px'}
-        mt={'16px'}
-        borderTop="1px solid rgba(255, 255, 255, 0.2)"
-      >
+      <x.div pt={'12px'} mt={'16px'} className={noteDividerClassName}>
         <x.span fontWeight="bold">
           <T id={'note'} />
           {':'}
@@ -79,3 +76,11 @@ export function BulkDeleteDialogContent({
     </div>
   );
 }
+
+const noteDividerClassName = css`
+  border-top: 1px solid rgba(17, 20, 24, 0.15);
+
+  .bp4-dark & {
+    border-top-color: rgba(255, 255, 255, 0.2);
+  }
+`;

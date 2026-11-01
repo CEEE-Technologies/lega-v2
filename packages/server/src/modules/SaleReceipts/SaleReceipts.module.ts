@@ -45,7 +45,6 @@ import { SaleReceiptsExportable } from './commands/SaleReceiptsExportable';
 import { SaleReceiptsImportable } from './commands/SaleReceiptsImportable';
 import { GetSaleReceiptMailStateService } from './queries/GetSaleReceiptMailState.service';
 import { GetSaleReceiptMailTemplateService } from './queries/GetSaleReceiptMailTemplate.service';
-import { SaleReceiptAutoIncrementSubscriber } from './subscribers/SaleReceiptAutoIncrementSubscriber';
 import { SaleReceiptSmsNotificationSubscriber } from './subscribers/SaleReceiptSmsNotificationSubscriber';
 import { SaleReceiptCostGLEntriesSubscriber } from './subscribers/SaleReceiptCostGLEntriesSubscriber';
 import { SaleReceiptCostGLEntries } from './SaleReceiptCostGLEntries';
@@ -103,7 +102,6 @@ import { ValidateBulkDeleteSaleReceiptsService } from './ValidateBulkDeleteSaleR
     SaleReceiptsImportable,
     GetSaleReceiptMailStateService,
     GetSaleReceiptMailTemplateService,
-    SaleReceiptAutoIncrementSubscriber,
     SaleReceiptSmsNotificationSubscriber,
     SaleReceiptCostGLEntries,
     SaleReceiptCostGLEntriesSubscriber,

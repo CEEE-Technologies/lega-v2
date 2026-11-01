@@ -17,6 +17,14 @@ import {
   SaleReceiptAction,
   VendorAction,
   VendorCreditAction,
+  UserAction,
+  CashflowAction,
+  TaxRateAction,
+  PreferencesAbility,
+  AuditLogAction,
+  WarehouseAction,
+  RoleAction,
+  AttachmentAction,
 } from './abilityOption';
 
 export const ModulePermissionsStyle = {
@@ -125,6 +133,35 @@ export const getPermissionsSchema = (): PermissionModule[] => [
             key: ItemAction.Delete,
             relatedColumn: PermissionColumn.Delete,
             depend: [{ key: ItemAction.Edit }],
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.warehouses').d('Warehouses and transfers'),
+        subject: AbilitySubject.Warehouse,
+        permissions: [
+          {
+            label: intl.get('permissions.column.view'),
+            key: WarehouseAction.View,
+            relatedColumn: PermissionColumn.View,
+          },
+          {
+            label: intl.get('permissions.column.create'),
+            key: WarehouseAction.Create,
+            relatedColumn: PermissionColumn.Create,
+            depend: [{ key: WarehouseAction.View }],
+          },
+          {
+            label: intl.get('permissions.column.edit'),
+            key: WarehouseAction.Edit,
+            relatedColumn: PermissionColumn.Edit,
+            depend: [{ key: WarehouseAction.Create }],
+          },
+          {
+            label: intl.get('permissions.column.delete'),
+            key: WarehouseAction.Delete,
+            relatedColumn: PermissionColumn.Delete,
+            depend: [{ key: WarehouseAction.Edit }],
           },
         ],
       },
@@ -246,6 +283,10 @@ export const getPermissionsSchema = (): PermissionModule[] => [
             key: SaleInvoiceAction.Writeoff,
             depend: [{ key: SaleInvoiceAction.Edit }],
           },
+          {
+            label: intl.get('permissions.notify_by_sms').d('Notify by SMS'),
+            key: SaleInvoiceAction.NotifyBySms,
+          },
         ],
       },
       {
@@ -275,6 +316,10 @@ export const getPermissionsSchema = (): PermissionModule[] => [
             relatedColumn: PermissionColumn.Delete,
             depend: [{ key: SaleEstimateAction.Edit }],
           },
+          {
+            label: intl.get('permissions.notify_by_sms').d('Notify by SMS'),
+            key: SaleEstimateAction.NotifyBySms,
+          },
         ],
       },
       {
@@ -303,6 +348,10 @@ export const getPermissionsSchema = (): PermissionModule[] => [
             key: SaleReceiptAction.Delete,
             relatedColumn: PermissionColumn.Delete,
             depend: [{ key: SaleReceiptAction.Edit }],
+          },
+          {
+            label: intl.get('permissions.notify_by_sms').d('Notify by SMS'),
+            key: SaleReceiptAction.NotifyBySms,
           },
         ],
       },
@@ -366,6 +415,10 @@ export const getPermissionsSchema = (): PermissionModule[] => [
             key: PaymentReceiveAction.Delete,
             relatedColumn: PermissionColumn.Delete,
             depend: [{ key: PaymentReceiveAction.Edit }],
+          },
+          {
+            label: intl.get('permissions.notify_by_sms').d('Notify by SMS'),
+            key: PaymentReceiveAction.NotifyBySms,
           },
         ],
       },
@@ -580,6 +633,58 @@ export const getPermissionsSchema = (): PermissionModule[] => [
           },
         ],
       },
+      {
+        label: intl.get('permissions.cashflow').d('Cash flow and banking'),
+        subject: AbilitySubject.Cashflow,
+        permissions: [
+          {
+            label: intl.get('permissions.column.view'),
+            key: CashflowAction.View,
+            relatedColumn: PermissionColumn.View,
+          },
+          {
+            label: intl.get('permissions.column.create'),
+            key: CashflowAction.Create,
+            relatedColumn: PermissionColumn.Create,
+            depend: [{ key: CashflowAction.View }],
+          },
+          {
+            label: intl.get('permissions.column.delete'),
+            key: CashflowAction.Delete,
+            relatedColumn: PermissionColumn.Delete,
+            depend: [{ key: CashflowAction.Create }],
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.tax_rates').d('Tax rates'),
+        subject: AbilitySubject.TaxRate,
+        permissions: [
+          {
+            label: intl.get('permissions.column.view'),
+            key: TaxRateAction.View,
+            relatedColumn: PermissionColumn.View,
+          },
+          {
+            label: intl.get('permissions.column.create'),
+            key: TaxRateAction.Create,
+            relatedColumn: PermissionColumn.Create,
+            depend: [{ key: TaxRateAction.View }],
+          },
+          {
+            label: intl.get('permissions.column.edit'),
+            key: TaxRateAction.Edit,
+            relatedColumn: PermissionColumn.Edit,
+            depend: [{ key: TaxRateAction.Create }],
+          },
+          {
+            label: intl.get('permissions.column.delete'),
+            key: TaxRateAction.Delete,
+            relatedColumn: PermissionColumn.Delete,
+            depend: [{ key: TaxRateAction.Edit }],
+          },
+        ],
+      },
     ],
   },
   {
@@ -663,6 +768,83 @@ export const getPermissionsSchema = (): PermissionModule[] => [
           {
             label: intl.get('permissions.sales_tax_liability_summary'),
             key: ReportsAction.READ_SALES_TAX_LIABILITY_SUMMARY,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: intl.get('permissions.administration').d('Administration'),
+    type: ModulePermissionsStyle.Vertical,
+    serviceFullAccess: true,
+    services: [
+      {
+        label: intl.get('permissions.preferences').d('Preferences'),
+        subject: AbilitySubject.Preferences,
+        permissions: [
+          {
+            label: intl
+              .get('permissions.mutate_preferences')
+              .d(
+                'Change organization settings, currencies and payment services',
+              ),
+            key: PreferencesAbility.Mutate,
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.users').d('Users'),
+        subject: AbilitySubject.User,
+        permissions: [
+          {
+            label: intl
+              .get('permissions.manage_users')
+              .d('Manage users (invite, edit, deactivate and remove)'),
+            key: UserAction.Manage,
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.roles').d('Roles'),
+        subject: AbilitySubject.Role,
+        permissions: [
+          { label: intl.get('permissions.column.view'), key: RoleAction.View },
+          {
+            label: intl.get('permissions.column.create'),
+            key: RoleAction.Create,
+          },
+          { label: intl.get('permissions.column.edit'), key: RoleAction.Edit },
+          {
+            label: intl.get('permissions.column.delete'),
+            key: RoleAction.Delete,
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.attachments').d('Attachments'),
+        subject: AbilitySubject.Attachment,
+        permissions: [
+          {
+            label: intl.get('permissions.column.view'),
+            key: AttachmentAction.View,
+          },
+          {
+            label: intl.get('permissions.column.create'),
+            key: AttachmentAction.Create,
+          },
+          {
+            label: intl.get('permissions.column.delete'),
+            key: AttachmentAction.Delete,
+          },
+        ],
+      },
+      {
+        label: intl.get('permissions.audit_log').d('Audit log'),
+        subject: AbilitySubject.AuditLog,
+        permissions: [
+          {
+            label: intl.get('permissions.column.view'),
+            key: AuditLogAction.View,
           },
         ],
       },

@@ -45,11 +45,11 @@ export class CreateManualJournalService {
     const amount = sumBy(manualJournalDTO.entries, 'credit') || 0;
     const date = moment(manualJournalDTO.date).format('YYYY-MM-DD');
 
-    // Retrieve the next manual journal number.
-    const autoNextNumber = this.autoIncrement.getNextJournalNumber();
-
-    // The manual or auto-increment journal number.
-    const journalNumber = manualJournalDTO.journalNumber || autoNextNumber;
+    // The manual or auto-increment journal number (the final auto number is
+    // picked inside the save, see `makeJournalEntries`).
+    const journalNumber =
+      manualJournalDTO.journalNumber ||
+      (await this.autoIncrement.getNextJournalNumber());
 
     const tenant = await this.tenancyContext.getTenant(true);
     const authorizedUser = await this.tenancyContext.getSystemUser();
@@ -98,12 +98,8 @@ export class CreateManualJournalService {
     await this.validator.validateAccountsExistance(manualJournalDTO);
 
     // Validate manual journal number require when auto-increment not enabled.
-    this.validator.validateJournalNoRequireWhenAutoNotEnabled(
-      manualJournalDTO.journalNumber,
-    );
-    // Validate manual journal uniquiness on the storage.
-    if (manualJournalDTO.journalNumber) {
-      await this.validator.validateManualJournalNoUnique(
+    if (!(await this.autoIncrement.autoIncrementEnabled())) {
+      this.validator.validateJournalNoRequireWhenAutoNotEnabled(
         manualJournalDTO.journalNumber,
       );
     }
@@ -137,6 +133,22 @@ export class CreateManualJournalService {
     // Creates a manual journal transactions with associated transactions
     // under unit-of-work envirement.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Picks the number inside the save, one save at a time, so two
+      // journals saved at the same moment never share a number.
+      manualJournalObj.journalNumber =
+        (await this.autoIncrement.reserveJournalNumber(
+          manualJournalDTO.journalNumber,
+          trx,
+        )) || manualJournalObj.journalNumber;
+
+      // Validate manual journal uniquiness on the storage.
+      if (manualJournalObj.journalNumber) {
+        await this.validator.validateManualJournalNoUnique(
+          manualJournalObj.journalNumber,
+          undefined,
+          trx,
+        );
+      }
       // Triggers `onManualJournalCreating` event.
       await this.eventPublisher.emitAsync(events.manualJournals.onCreating, {
         manualJournalDTO,

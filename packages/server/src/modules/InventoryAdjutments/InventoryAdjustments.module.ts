@@ -25,6 +25,7 @@ const models = [
   RegisterTenancyModel(InventoryAdjustment),
   RegisterTenancyModel(InventoryAdjustmentEntry),
 ];
+import { InventoryAdjustmentCostGLEntries } from './commands/ledger/InventoryAdjustmentCostGLEntries';
 @Module({
   imports: [
     TenancyModule,
@@ -46,6 +47,7 @@ const models = [
     InventoryAdjustmentsApplicationService,
     InventoryAdjustmentsGLSubscriber,
     InventoryAdjustmentsGLEntries,
+    InventoryAdjustmentCostGLEntries,
     InventoryAdjustmentInventoryTransactionsSubscriber,
     InventoryAdjustmentInventoryTransactions,
   ],

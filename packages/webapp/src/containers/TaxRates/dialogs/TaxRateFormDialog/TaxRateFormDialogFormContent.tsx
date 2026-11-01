@@ -106,7 +106,7 @@ function ConfirmEditingTaxRate() {
 
   return (
     <EditWarningWrap>
-      <Text color={'#766f58'}>Please Note:</Text>
+      <EditWarningTitle>Please Note:</EditWarningTitle>
       <ConfirmEditFormGroup name={'confirmEdit'} helperText={''}>
         <FCheckbox
           name={'confirmEdit'}
@@ -136,6 +136,19 @@ const EditWarningWrap = styled(`div`)`
   margin-top: 8px;
   border-top: 1px solid #f2eddf;
   border-bottom: 1px solid #f2eddf;
+
+  .bp4-dark & {
+    background: rgba(200, 118, 25, 0.12);
+    border-color: rgba(236, 154, 60, 0.25);
+  }
+`;
+
+const EditWarningTitle = styled(Text)`
+  color: #766f58;
+
+  .bp4-dark & {
+    color: #fbb360;
+  }
 `;
 
 const ConfirmEditFormGroup = styled(FFormGroup)`

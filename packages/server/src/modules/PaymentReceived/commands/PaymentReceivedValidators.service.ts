@@ -56,9 +56,10 @@ export class PaymentReceivedValidators {
   public async validatePaymentReceiveNoExistance(
     paymentReceiveNo: string,
     notPaymentReceiveId?: number,
+    trx?: Knex.Transaction,
   ): Promise<void> {
     const paymentReceive = await this.paymentReceiveModel()
-      .query()
+      .query(trx)
       .findOne('payment_receive_no', paymentReceiveNo)
       .onBuild((builder) => {
         if (notPaymentReceiveId) {

@@ -7,19 +7,14 @@ import {
   IManualJournalEventDeletedPayload,
 } from '../types/ManualJournals.types';
 import { ManualJournalGLEntries } from './ManualJournalGLEntries';
-import { AutoIncrementManualJournal } from './AutoIncrementManualJournal.service';
 import { events } from '@/common/events/events';
 
 @Injectable()
 export class ManualJournalWriteGLSubscriber {
   /**
    * @param {ManualJournalGLEntries} manualJournalGLEntries - The manual journal GL entries service.
-   * @param {AutoIncrementManualJournal} manualJournalAutoIncrement - The manual journal auto increment service.
    */
-  constructor(
-    private manualJournalGLEntries: ManualJournalGLEntries,
-    private manualJournalAutoIncrement: AutoIncrementManualJournal,
-  ) {}
+  constructor(private manualJournalGLEntries: ManualJournalGLEntries) {}
 
   /**
    * Handle manual journal created event.
@@ -38,16 +33,6 @@ export class ManualJournalWriteGLSubscriber {
       manualJournal.id,
       trx,
     );
-  }
-
-  /**
-   * Handles the manual journal next number increment once the journal be created.
-   * @param {IManualJournalEventCreatedPayload} payload -
-   * @return {Promise<void>}
-   */
-  @OnEvent(events.manualJournals.onCreated)
-  public async handleJournalNumberIncrement({}: IManualJournalEventCreatedPayload) {
-    await this.manualJournalAutoIncrement.incrementNextJournalNumber();
   }
 
   /**

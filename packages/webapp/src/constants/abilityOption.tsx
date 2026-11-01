@@ -22,6 +22,10 @@ export const AbilitySubject = {
   TaxRate: 'TaxRate',
   BankRule: 'BankRule',
   AuditLog: 'AuditLog',
+  User: 'User',
+  Warehouse: 'Warehouse',
+  Role: 'Role',
+  Attachment: 'Attachment',
 } as const;
 
 export const ItemAction = {
@@ -51,7 +55,7 @@ export const SaleInvoiceAction = {
   Create: 'Create',
   Edit: 'Edit',
   Delete: 'Delete',
-  Writeoff: 'bad-debt',
+  Writeoff: 'Writeoff',
   NotifyBySms: 'NotifyBySms',
 } as const;
 
@@ -198,4 +202,29 @@ export const BankRuleAction = {
 
 export const AuditLogAction = {
   View: 'View',
+} as const;
+
+/** Invite, edit, deactivate and remove users. */
+export const UserAction = {
+  Manage: 'Manage',
+} as const;
+
+export const WarehouseAction = {
+  View: 'View',
+  Create: 'Create',
+  Edit: 'Edit',
+  Delete: 'Delete',
+} as const;
+
+export const RoleAction = {
+  View: 'View',
+  Create: 'Create',
+  Edit: 'Edit',
+  Delete: 'Delete',
+} as const;
+
+export const AttachmentAction = {
+  View: 'View',
+  Create: 'Create',
+  Delete: 'Delete',
 } as const;

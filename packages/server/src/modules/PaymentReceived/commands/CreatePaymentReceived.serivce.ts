@@ -16,6 +16,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreatePaymentReceivedDto } from '../dtos/PaymentReceived.dto';
 import { ContactOpeningBalancePayment } from '@/modules/Contacts/ContactOpeningBalancePayment.service';
+import { PaymentReceivedIncrement } from './PaymentReceivedIncrement.service';
 
 @Injectable()
 export class CreatePaymentReceivedService {
@@ -26,6 +27,7 @@ export class CreatePaymentReceivedService {
     private transformer: PaymentReceiveDTOTransformer,
     private tenancyContext: TenancyContext,
     private openingBalancePayment: ContactOpeningBalancePayment,
+    private paymentIncrement: PaymentReceivedIncrement,
 
     @Inject(PaymentReceived.name)
     private paymentReceived: TenantModelProxy<typeof PaymentReceived>,
@@ -103,9 +105,19 @@ export class CreatePaymentReceivedService {
       paymentCustomer,
       paymentReceiveDTO,
     );
+    // Picks the number inside the save, one save at a time, so two payments
+    // saved at the same moment never share a number.
+    paymentReceiveObj.paymentReceiveNo =
+      (await this.paymentIncrement.reservePaymentReceiveNumber(
+        paymentReceiveDTO.paymentReceiveNo,
+        trx,
+      )) || paymentReceiveObj.paymentReceiveNo;
+
     // Validate payment receive number uniquiness.
     await this.validators.validatePaymentReceiveNoExistance(
       paymentReceiveObj.paymentReceiveNo,
+      undefined,
+      trx,
     );
     // Validate the deposit account existance and type.
     const depositAccount = await this.validators.getDepositAccountOrThrowError(

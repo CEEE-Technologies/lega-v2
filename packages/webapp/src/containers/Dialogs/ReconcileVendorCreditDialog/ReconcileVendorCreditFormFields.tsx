@@ -109,6 +109,10 @@ const CreditRemainingBalance = styled.span`
   font-weight: 600;
   color: #343463;
   margin-left: 5px;
+
+  .bp4-dark & {
+    color: var(--color-light-gray1);
+  }
 `;
 
 export const ReconcileVendorCreditTotalLinesRoot = styled.div`

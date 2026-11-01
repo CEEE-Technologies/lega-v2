@@ -36,6 +36,10 @@ export class ActivateUserService {
     // Retrieve the user or throw not found service error.
     const tenantUser = await this.tenantUserModel().query().findById(userId);
 
+    if (!tenantUser) {
+      throw new ServiceError(ERRORS.USER_NOT_FOUND);
+    }
+
     // Throw serivce error if the user is already activated.
     this.throwErrorIfUserActive(tenantUser);
 

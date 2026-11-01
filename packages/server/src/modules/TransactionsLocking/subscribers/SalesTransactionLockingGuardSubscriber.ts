@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import {
   ISaleInvoiceCreatingPaylaod,
   ISaleInvoiceDeletePayload,
+  ISaleInvoiceDeliveringPayload,
   ISaleInvoiceEditingPayload,
   ISaleInvoiceWriteoffCreatePayload,
   ISaleInvoiceWrittenOffCancelPayload,
@@ -24,6 +25,7 @@ import { IRefundCreditNoteCreatingPayload } from '@/modules/CreditNoteRefunds/ty
 import {
   ICreditNoteCreatingPayload,
   ICreditNoteDeletingPayload,
+  ICreditNoteOpeningPayload,
 } from '@/modules/CreditNotes/types/CreditNotes.types';
 import { ICreditNoteEditingPayload } from '@/modules/CreditNotes/types/CreditNotes.types';
 import {
@@ -32,6 +34,7 @@ import {
   ISaleReceiptEditingPayload,
 } from '@/modules/SaleReceipts/types/SaleReceipts.types';
 import { ISaleReceiptEventClosingPayload } from '@/modules/SaleReceipts/types/SaleReceipts.types';
+import { ICustomerOpeningBalanceEditingPayload } from '@/modules/Customers/types/Customers.types';
 
 @Injectable()
 export class SalesTransactionLockingGuardSubscriber {
@@ -93,6 +96,20 @@ export class SalesTransactionLockingGuardSubscriber {
     // Can't continue if the old invoice not published.
     if (!oldSaleInvoice.isDelivered) return;
 
+    await this.salesLockingGuard.transactionLockingGuard(
+      oldSaleInvoice.invoiceDate,
+    );
+  }
+
+  /**
+   * Transaction locking guard on delivering a draft invoice (Deliver, or
+   * sending it by email), which puts it into the books on its date.
+   * @param {ISaleInvoiceDeliveringPayload} payload
+   */
+  @OnEvent(events.saleInvoice.onDelivering, { suppressErrors: false })
+  public async transactionLockingGuardOnInvoiceDelivering({
+    oldSaleInvoice,
+  }: ISaleInvoiceDeliveringPayload) {
     await this.salesLockingGuard.transactionLockingGuard(
       oldSaleInvoice.invoiceDate,
     );
@@ -254,6 +271,20 @@ export class SalesTransactionLockingGuardSubscriber {
   }
 
   /**
+   * Transaction locking guard on opening a draft credit note, which puts it
+   * into the books on its date.
+   * @param {ICreditNoteOpeningPayload} payload -
+   */
+  @OnEvent(events.creditNote.onOpening, { suppressErrors: false })
+  public async transactionLockingGuardOnCreditOpening({
+    oldCreditNote,
+  }: ICreditNoteOpeningPayload) {
+    await this.salesLockingGuard.transactionLockingGuard(
+      oldCreditNote.creditNoteDate,
+    );
+  }
+
+  /**
    * Transaction locking guard on payment deleting.
    * @param {IRefundCreditNoteDeletingPayload} paylaod -
    */
@@ -383,5 +414,34 @@ export class SalesTransactionLockingGuardSubscriber {
     await this.salesLockingGuard.transactionLockingGuard(
       oldPaymentReceive.paymentDate,
     );
+  }
+
+  /**
+   * ---------------------------------------------
+   * CUSTOMER OPENING BALANCE.
+   * ---------------------------------------------
+   */
+
+  /**
+   * Transaction locking guard on editing a customer's opening balance: its
+   * entries are rewritten on the old and the new opening balance date.
+   * @param {ICustomerOpeningBalanceEditingPayload} payload
+   */
+  @OnEvent(events.customers.onOpeningBalanceChanging, { suppressErrors: false })
+  public async transactionLockingGuardOnCustomerOpeningBalanceChanging({
+    oldCustomer,
+    openingBalanceEditDTO,
+  }: ICustomerOpeningBalanceEditingPayload) {
+    if (oldCustomer.openingBalance && oldCustomer.openingBalanceAt) {
+      await this.salesLockingGuard.transactionLockingGuard(
+        oldCustomer.openingBalanceAt,
+      );
+    }
+    const newDate =
+      openingBalanceEditDTO.openingBalanceAt || oldCustomer.openingBalanceAt;
+
+    if (openingBalanceEditDTO.openingBalance && newDate) {
+      await this.salesLockingGuard.transactionLockingGuard(newDate);
+    }
   }
 }

@@ -62,7 +62,20 @@ export function InviteAcceptForm() {
       })
       .catch((response: ApiError) => {
         const errors =
-          (response.data?.errors as Array<{ type?: string }> | undefined) ?? [];
+          (response.data?.errors as
+            | Array<{ type?: string; message?: string }>
+            | undefined) ?? [];
+
+        // The email already has a login: its current password is needed.
+        const passwordMismatch = errors.find(
+          (e) => e.type === 'EXISTING_LOGIN_PASSWORD_MISMATCH',
+        );
+        if (passwordMismatch) {
+          AppToaster.show({
+            message: passwordMismatch.message,
+            intent: Intent.DANGER,
+          });
+        }
 
         if (errors.find((e) => e.type === 'INVITE_TOKEN_INVALID')) {
           AppToaster.show({

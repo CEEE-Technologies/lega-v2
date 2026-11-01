@@ -1,56 +1,110 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ClsService } from 'nestjs-cls';
 import {
   compareSignatures,
-  configureLemonSqueezy,
   createHmacSignature,
   webhookHasData,
   webhookHasMeta,
 } from '../utils';
 import { Plan } from '../models/Plan';
 import { SubscriptionApplication } from '../SubscriptionApplication';
+import { TenantModel } from '@/modules/System/models/TenantModel';
 
 @Injectable()
 export class LemonSqueezyWebhooks {
   constructor(
     private readonly subscriptionApp: SubscriptionApplication,
     private readonly configService: ConfigService,
+    private readonly clsService: ClsService,
 
     @Inject(Plan.name)
     private readonly planModel: typeof Plan,
+
+    @Inject(TenantModel.name)
+    private readonly tenantModel: typeof TenantModel,
   ) {}
 
   /**
    * Handles the Lemon Squeezy webhooks.
-   * @param {string} rawBody
-   * @param {string} signature
+   * Checks the signature first, then processes the event for the
+   * organization named in the event's custom data.
+   * @param {Buffer|string} rawData - The raw request body, as signed.
+   * @param {string} signature - The `X-Signature` header.
    * @returns {Promise<void>}
    */
   public async handlePostWebhook(
-    rawData: any,
-    data: Record<string, any>,
+    rawData: Buffer | string | undefined,
     signature: string,
   ): Promise<void> {
-    configureLemonSqueezy();
+    // No Lemon Squeezy API call is made here, so the API key isn't needed.
+    const secret = this.configService.get('lemonsqueezy.webhookSecret');
 
-    if (!this.configService.get('lemonSqueezy.webhookSecret')) {
-      throw new Error('Lemon Squeezy Webhook Secret not set in .env');
+    if (!secret) {
+      throw new InternalServerErrorException(
+        'Lemon Squeezy webhook secret is not configured.',
+      );
     }
-    if (!signature) {
-      throw new Error('Request signature is required.');
+    if (!signature || !rawData) {
+      throw new BadRequestException('Invalid signature');
     }
-    const secret = this.configService.get('lemonSqueezy.webhookSecret');
     const hmacSignature = createHmacSignature(secret, rawData);
 
     if (!compareSignatures(hmacSignature, signature)) {
-      throw new Error('Invalid signature');
+      throw new BadRequestException('Invalid signature');
     }
-    // Type guard to check if the object has a 'meta' property.
-    if (webhookHasMeta(data)) {
-      // Non-blocking call to process the webhook event.
-      void this.processWebhookEvent(data);
-    } else {
-      throw new Error('Data invalid');
+    // Process the body exactly as signed. The parsed request body has had
+    // its keys renamed (snake_case to camelCase) by the global interceptor.
+    let data: Record<string, any>;
+    try {
+      data = JSON.parse(rawData.toString());
+    } catch (_error) {
+      throw new BadRequestException('Data invalid');
+    }
+    const eventName = data?.meta?.event_name;
+
+    if (typeof eventName !== 'string') {
+      throw new BadRequestException('Data invalid');
+    }
+    // Only subscription events change anything, and they need the
+    // organization. Order and license events are acknowledged and ignored.
+    if (!eventName.startsWith('subscription_')) {
+      return;
+    }
+    if (!webhookHasMeta(data)) {
+      throw new BadRequestException('Data invalid');
+    }
+    await this.setTenantContext(data);
+    await this.processWebhookEvent(data);
+  }
+
+  /**
+   * Sets the organization (and user) of the event as the current context,
+   * so the subscription is updated for that organization.
+   * @param {Record<string, any>} eventBody
+   */
+  private async setTenantContext(eventBody: Record<string, any>) {
+    const tenantId = Number(eventBody.meta?.custom_data?.tenant_id);
+    const userId = Number(eventBody.meta?.custom_data?.user_id);
+
+    const tenant = tenantId
+      ? await this.tenantModel.query().findById(tenantId)
+      : null;
+
+    if (!tenant) {
+      throw new BadRequestException(
+        'The webhook event is not linked to a known organization.',
+      );
+    }
+    this.clsService.set('organizationId', tenant.organizationId);
+
+    if (userId) {
+      this.clsService.set('userId', userId);
     }
   }
 
@@ -62,8 +116,6 @@ export class LemonSqueezyWebhooks {
   private async processWebhookEvent(eventBody): Promise<void> {
     const webhookEvent = eventBody.meta.event_name;
 
-    const _userId = eventBody.meta.custom_data?.user_id;
-    const _tenantId = eventBody.meta.custom_data?.tenant_id;
     const subscriptionSlug = 'main';
 
     if (!webhookHasMeta(eventBody)) {

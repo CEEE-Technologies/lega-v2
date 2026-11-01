@@ -13,6 +13,7 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { BankRulesApplication } from './BankRulesApplication';
 import { CreateBankRuleDto } from './dtos/BankRule.dto';
@@ -20,7 +21,13 @@ import { EditBankRuleDto } from './dtos/BankRule.dto';
 import { BankRuleResponseDto } from './dtos/BankRuleResponse.dto';
 import { ApiCommonHeaders } from '@/common/decorators/ApiCommonHeaders';
 
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { AuthorizationGuard } from '@/modules/Roles/Authorization.guard';
+import { CashflowAction } from '@/modules/BankingTransactions/types/BankingTransactions.types';
+import { PermissionGuard } from '@/modules/Roles/Permission.guard';
+import { RequirePermission } from '@/modules/Roles/RequirePermission.decorator';
 @Controller('banking/rules')
+@UseGuards(AuthorizationGuard, PermissionGuard)
 @ApiTags('Bank Rules')
 @ApiExtraModels(BankRuleResponseDto)
 @ApiCommonHeaders()
@@ -28,6 +35,7 @@ export class BankRulesController {
   constructor(private readonly bankRulesApplication: BankRulesApplication) {}
 
   @Post()
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Create a new bank rule.' })
   @ApiResponse({
     status: 201,
@@ -43,6 +51,7 @@ export class BankRulesController {
   }
 
   @Put(':id')
+  @RequirePermission(CashflowAction.Create, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Edit the given bank rule.' })
   async editBankRule(
     @Param('id') ruleId: number,
@@ -52,6 +61,7 @@ export class BankRulesController {
   }
 
   @Delete(':id')
+  @RequirePermission(CashflowAction.Delete, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Delete the given bank rule.' })
   @ApiResponse({
     status: 200,
@@ -62,6 +72,7 @@ export class BankRulesController {
   }
 
   @Get(':id')
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Retrieves the bank rule details.' })
   @ApiResponse({
     status: 200,
@@ -73,6 +84,7 @@ export class BankRulesController {
   }
 
   @Get()
+  @RequirePermission(CashflowAction.View, AbilitySubject.Cashflow)
   @ApiOperation({ summary: 'Retrieves the bank rules.' })
   @ApiResponse({
     status: 200,

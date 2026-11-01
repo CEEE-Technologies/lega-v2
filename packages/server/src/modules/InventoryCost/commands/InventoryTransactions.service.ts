@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { uniqBy } from 'lodash';
 import { Inject, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -46,14 +47,29 @@ export class InventoryTransactionsService {
     override: boolean = false,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    const bulkInsertOpers = [];
+    // Undo the old movements of each document once, before writing the new
+    // ones. Undoing them once per line (and in parallel) reverted the same
+    // movements several times, so every re-save added stock again.
+    if (override) {
+      const documents = uniqBy(
+        transactions,
+        (t) => `${t.transactionType}-${t.transactionId}`,
+      );
+      for (const document of documents) {
+        await this.deleteInventoryTransactions(
+          document.transactionId,
+          document.transactionType,
+          trx,
+        );
+      }
+    }
+    const inventoryTransactions: InventoryTransaction[] = [];
 
-    transactions.forEach((transaction: IInventoryTransactionRecord) => {
-      const oper = this.recordInventoryTransaction(transaction, override, trx);
-      bulkInsertOpers.push(oper);
-    });
-    const inventoryTransactions = await Promise.all(bulkInsertOpers);
-
+    for (const transaction of transactions) {
+      inventoryTransactions.push(
+        await this.recordInventoryTransaction(transaction, false, trx),
+      );
+    }
     // Triggers `onInventoryTransactionsCreated` event.
     await this.eventEmitter.emitAsync(
       events.inventory.onInventoryTransactionsCreated,
@@ -104,8 +120,15 @@ export class InventoryTransactionsService {
     override: boolean = false,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    // Can't continue if there is no entries has inventory items in the invoice.
+    // No stock lines (any more): an edit still undoes the old movements.
     if (transaction.entries.length <= 0) {
+      if (override) {
+        await this.deleteInventoryTransactions(
+          transaction.transactionId,
+          transaction.transactionType,
+          trx,
+        );
+      }
       return;
     }
     // Inventory transactions.
