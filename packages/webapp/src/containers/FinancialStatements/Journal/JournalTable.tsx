@@ -82,11 +82,17 @@ function JournalTableInner({
 export const JournalTable = FF.pipe(JournalTableInner, withDrawerActions);
 
 const JournalDataTable = styled(ReportDataTable)`
-  --color-table-text-color: var(--color-light-gray1);
-  --color-table-total-text-color: var(--color-light-gray4);
-  --color-table-border-color: var(--color-dark-gray4);
+  --color-table-text-color: #000;
+  --color-table-total-text-color: inherit;
+  --color-table-border-color: #ececec;
   --color-table-total-border-color: #dbdbdb;
-  --color-table-total-border-color: var(--color-table-border-color);
+
+  .bp4-dark & {
+    --color-table-text-color: var(--color-light-gray1);
+    --color-table-total-text-color: var(--color-light-gray4);
+    --color-table-border-color: var(--color-dark-gray4);
+    --color-table-total-border-color: var(--color-table-border-color);
+  }
 
   .table {
     .tbody {

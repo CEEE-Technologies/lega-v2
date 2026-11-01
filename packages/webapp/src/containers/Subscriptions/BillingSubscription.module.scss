@@ -5,6 +5,12 @@
   border-radius: 5px;
   box-shadow:  0 -6px 0 0px #ccd6dd;
   border: 1px solid #d2dde1;
+
+  :global(.bp4-dark) & {
+    background: var(--color-card-background);
+    box-shadow: 0 -6px 0 0px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
   min-height: 420px;
   display: flex;  
   flex-direction: column;

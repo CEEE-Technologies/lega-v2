@@ -14,6 +14,7 @@
     "test:watch": "lerna run test:watch",
     "test:e2e": "lerna run test:e2e --scope \"@bigcapital/server\"",
     "e2e:webapp": "playwright test",
+    "e2e:theme-audit": "playwright test -c playwright.theme-audit.config.ts",
     "screenshot:webapp": "playwright test --config playwright.screenshots.config.ts",
     "dev:debug": "lerna run dev:debug",
     "prepare": "husky install",

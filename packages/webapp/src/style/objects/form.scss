@@ -7,6 +7,11 @@
     padding: 14px 18px;
     border-top: 1px solid #ececec;
 
+    .bp4-dark & {
+      background: var(--color-dark-gray1);
+      border-top-color: rgba(255, 255, 255, 0.1);
+    }
+
     .has-mini-sidebar & {
       left: 50px;
     }

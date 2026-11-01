@@ -1,7 +1,7 @@
 // Users/Roles List.
 // ---------------------------------
 .preferences-page__inside-content--users {
-  --color-avatar-background: #b7bfc6;
+  --color-avatar-background: #6b7f78;
   --color-avatar-text: #fff;
 
   .bp4-dark & {
@@ -18,7 +18,7 @@
         background: var(--color-avatar-background);
         border-radius: 50%;
         line-height: 28px;
-        color: #fff;
+        color: var(--color-avatar-text);
         text-transform: uppercase;
         margin-left: 10px;
       }
