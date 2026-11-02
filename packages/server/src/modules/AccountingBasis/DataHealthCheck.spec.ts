@@ -18,6 +18,7 @@ const clean = (): IDataHealthResult => ({
   numberTypesChecked: ['SaleInvoice', 'CreditNote'],
   ownerMemberships: [],
   untaggedLandedCosts: [],
+  landedCostsWithoutCashSet: [],
   lotCostDifferences: [],
 });
 
@@ -25,8 +26,8 @@ describe('DataHealthCheck output', () => {
   it('prints "none" under every section of a clean company', () => {
     const lines = formatDataHealth(clean(), 'LKR');
     const titles = lines.filter((line) => /^ {2}H\d/.test(line));
-    expect(titles).toHaveLength(9);
-    expect(lines.filter((line) => line === '      none')).toHaveLength(9);
+    expect(titles).toHaveLength(10);
+    expect(lines.filter((line) => line === '      none')).toHaveLength(10);
     expect(lines).toContain(
       '      Unique number index (P3, D5): can be added for all 2 document types',
     );

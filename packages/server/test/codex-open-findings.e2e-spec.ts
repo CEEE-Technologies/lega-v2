@@ -4,7 +4,11 @@ import { knex as knexFactory, Knex } from 'knex';
 import { knexSnakeCaseMappers } from 'objection';
 import { app } from './init-app-test';
 import { as, Company, createCompany } from './_utils/security';
+import { getQueueToken } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { CashBasisAutoRebuildService } from '../src/modules/AccountingBasis/CashBasisAutoRebuild.service';
+import { CASH_BASIS_REBUILD_QUEUE } from '../src/modules/AccountingBasis/AccountingBasis.constants';
+import { checkDataHealth } from '../src/modules/AccountingBasis/DataHealthCheck';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const tagOldLandedCosts = require('../src/database/tenant/migrations/20261102120000_tag_old_landed_costs_accrual');
@@ -152,6 +156,7 @@ describe('Codex open findings (e2e)', () => {
       fromTransactionType: 'Bill' | 'Expense',
       fromTransactionId: number,
       amount: number,
+      basis: string | null = null,
     ) => {
       const [id] = await db('bill_located_costs').insert({
         amount,
@@ -183,7 +188,7 @@ describe('Codex open findings (e2e)', () => {
           currencyCode: 'USD',
           exchangeRate: 1,
           index,
-          basis: null,
+          basis,
         });
       }
       return id as number;
@@ -201,6 +206,59 @@ describe('Codex open findings (e2e)', () => {
           (row) => row.basis === null || row.basis === 'cash',
         ),
       );
+
+    /** The bases of its rows, accrual/untagged first. */
+    const basesOf = async (landedCostId: number) =>
+      (await rowsOf(landedCostId))
+        .map((row) => row.basis)
+        .sort((a, b) => (a ?? '').localeCompare(b ?? ''));
+
+    const net = (amount: number) => ({
+      [accounts['cost-of-goods-sold']]: amount,
+      [accounts['other-expenses']]: -amount,
+    });
+
+    /** A cash set as the code before this fix wrote it next to old rows. */
+    const insertCashSet = async (landedCostId: number, amount: number) => {
+      for (const [accountId, debit, credit, index] of [
+        [accounts['cost-of-goods-sold'], amount, 0, 1],
+        [accounts['other-expenses'], 0, amount, 1],
+      ]) {
+        await db('accounts_transactions').insert({
+          referenceType: 'LandedCost',
+          referenceId: landedCostId,
+          accountId,
+          debit,
+          credit,
+          date: PAY_DATE,
+          currencyCode: 'USD',
+          exchangeRate: 1,
+          index,
+          basis: 'cash',
+        });
+      }
+    };
+
+    const rebuildQueue = () =>
+      app.get<Queue>(getQueueToken(CASH_BASIS_REBUILD_QUEUE));
+
+    /** Queues the startup rebuild and waits for the job to finish. */
+    const runRebuildOnce = async (autoRebuild: CashBasisAutoRebuildService) => {
+      await autoRebuild.queueRebuild(company.organizationId);
+      const jobId = `cash-basis-auto-rebuild-${company.organizationId}`;
+      const started = Date.now();
+      while (await rebuildQueue().getJob(jobId)) {
+        if (Date.now() - started > 120000) throw new Error('rebuild timed out');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    };
+
+    const rebuildUntilFlagCleared = async (
+      autoRebuild: CashBasisAutoRebuildService,
+    ) => {
+      await runRebuildOnce(autoRebuild);
+      expect(await autoRebuild.isFlagged(company.organizationId)).toBe(false);
+    };
 
     beforeAll(async () => {
       vendorId = await createVendor();
@@ -253,55 +311,120 @@ describe('Codex open findings (e2e)', () => {
       });
     });
 
-    it('the migration tags old bill landed costs, flags the rebuild, and the rebuild writes their cash set', async () => {
+    it('the migration tags only double-counted ones; the rebuild does the rest', async () => {
       const autoRebuild = app.get(CashBasisAutoRebuildService);
       await db('settings').where(FLAG).delete();
 
+      // Counted twice: a payment wrote a cash set next to the untagged rows.
+      const doubleBillId = await createBill(50);
+      await payBill(doubleBillId, 50);
+      const doubleId = await insertOldLandedCost('Bill', doubleBillId, 50);
+      await insertCashSet(doubleId, 50);
       // Paid before the release: no cash set was ever written for it.
       const paidBillId = await createBill(80);
       await payBill(paidBillId, 80);
-      const paidLandedCostId = await insertOldLandedCost(
-        'Bill',
-        paidBillId,
-        80,
-      );
+      const paidId = await insertOldLandedCost('Bill', paidBillId, 80);
+      // Not paid yet: nothing on the cash basis once done.
+      const unpaidBillId = await createBill(60);
+      const unpaidId = await insertOldLandedCost('Bill', unpaidBillId, 60);
       // An expense is paid already: it counts the same on both bases.
-      const expenseLandedCostId = await insertOldLandedCost(
-        'Expense',
-        999999,
-        30,
-      );
+      const expenseId = await insertOldLandedCost('Expense', 999999, 30);
+
+      expect(await cashBasisNet(doubleId)).toEqual(net(100));
 
       await tagOldLandedCosts.up(db);
 
-      const paidRows = await rowsOf(paidLandedCostId);
-      expect(paidRows.map((row) => row.basis)).toEqual(['accrual', 'accrual']);
-      const expenseRows = await rowsOf(expenseLandedCostId);
-      expect(expenseRows.map((row) => row.basis)).toEqual([null, null]);
+      expect(await basesOf(doubleId)).toEqual([
+        'accrual',
+        'accrual',
+        'cash',
+        'cash',
+      ]);
+      expect(await cashBasisNet(doubleId)).toEqual(net(50));
+      // Left for the rebuild: still counted once, never dropped.
+      expect(await basesOf(paidId)).toEqual([null, null]);
+      expect(await cashBasisNet(paidId)).toEqual(net(80));
+      expect(await basesOf(unpaidId)).toEqual([null, null]);
+      expect(await basesOf(expenseId)).toEqual([null, null]);
       expect((await db('settings').where(FLAG).first())?.value).toBe('true');
 
       // Running it again changes nothing.
       await tagOldLandedCosts.up(db);
-      expect((await rowsOf(expenseLandedCostId)).map((r) => r.basis)).toEqual([
-        null,
-        null,
-      ]);
+      expect(await basesOf(paidId)).toEqual([null, null]);
+      expect(await basesOf(expenseId)).toEqual([null, null]);
 
-      // The startup rebuild (queued as on a deploy) writes the cash set and
-      // clears the flag once the company checks clean.
-      await autoRebuild.queueRebuild(company.organizationId);
-      const started = Date.now();
-      while (await autoRebuild.isFlagged(company.organizationId)) {
-        if (Date.now() - started > 120000) throw new Error('rebuild timed out');
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      // The startup rebuild (queued as on a deploy) tags them, writes their
+      // cash sets and clears the flag.
+      await rebuildUntilFlagCleared(autoRebuild);
+
+      expect(await basesOf(paidId)).toEqual([
+        'accrual',
+        'accrual',
+        'cash',
+        'cash',
+      ]);
+      expect(await cashBasisNet(paidId)).toEqual(net(80));
+      expect(await basesOf(unpaidId)).toEqual(['accrual', 'accrual']);
+      expect(await cashBasisNet(unpaidId)).toEqual({});
+      expect(await cashBasisNet(doubleId)).toEqual(net(50));
+      expect(await basesOf(expenseId)).toEqual([null, null]);
+    });
+
+    it('one paid in a locked period stays untagged and keeps the flag until the period opens', async () => {
+      const autoRebuild = app.get(CashBasisAutoRebuildService);
+      await db('settings').where(FLAG).delete();
+
+      const billId = await createBill(70);
+      await payBill(billId, 70);
+      const landedCostId = await insertOldLandedCost('Bill', billId, 70);
+      await tagOldLandedCosts.up(db);
+      expect((await db('settings').where(FLAG).first())?.value).toBe('true');
+
+      await api
+        .put('/transactions-locking/lock')
+        .send({ module: 'all', lockToDate: '2026-06-30', reason: 'codex e2e' })
+        .expect(200);
+      try {
+        await runRebuildOnce(autoRebuild);
+
+        // Left as it was: counted once on the cash basis, still flagged.
+        expect(await basesOf(landedCostId)).toEqual([null, null]);
+        expect(await cashBasisNet(landedCostId)).toEqual(net(70));
+        expect(await autoRebuild.isFlagged(company.organizationId)).toBe(true);
+      } finally {
+        await api
+          .put('/transactions-locking/cancel-lock')
+          .send({ module: 'all', reason: 'codex e2e' })
+          .expect(200);
       }
-      expect(await cashBasisNet(paidLandedCostId)).toEqual({
-        [accounts['cost-of-goods-sold']]: 80,
-        [accounts['other-expenses']]: -80,
-      });
+
+      // Once the period opens the next (startup) rebuild finishes it.
+      await rebuildUntilFlagCleared(autoRebuild);
+      expect(await basesOf(landedCostId)).toEqual([
+        'accrual',
+        'accrual',
+        'cash',
+        'cash',
+      ]);
+      expect(await cashBasisNet(landedCostId)).toEqual(net(70));
+    });
+
+    it('the health check lists a landed cost from a paid bill with no cash set', async () => {
+      const billId = await createBill(40);
+      await payBill(billId, 40);
+      // Tagged accrual, but its cash set is missing.
+      const landedCostId = await insertOldLandedCost(
+        'Bill',
+        billId,
+        40,
+        'accrual',
+      );
+
+      const result = await checkDataHealth(db, 'USD');
       expect(
-        (await rowsOf(expenseLandedCostId)).filter((r) => r.basis === 'cash'),
-      ).toHaveLength(0);
+        result.landedCostsWithoutCashSet.map((row) => row.landedCostId),
+      ).toEqual([landedCostId]);
+      expect(result.untaggedLandedCosts).toEqual([]);
     });
   });
 

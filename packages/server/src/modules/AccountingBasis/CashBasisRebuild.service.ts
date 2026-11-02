@@ -182,16 +182,29 @@ export class CashBasisRebuildService {
       ]),
     );
     for (const [fromBillId, landedCostsIds] of bySourceBill) {
-      // The cash set is dated at the source bill's payments: left as it is
-      // when one of them is in a locked period.
+      // The cash set is dated at the source bill's payments, and an old
+      // landed cost's untagged entries (at the bill date) leave the cash
+      // basis once tagged: left as they are when any of those dates is in a
+      // locked period. An old one then stays untagged (counted once, at the
+      // bill date) and the company stays flagged (see
+      // `countPendingLandedCosts`), so it is done once the period opens.
       const payments: { date: any }[] = await knex(
         'bills_payments_entries as e',
       )
         .join('bills_payments as p', 'p.id', 'e.bill_payment_id')
         .where('e.bill_id', fromBillId)
         .select('p.payment_date as date');
+      const untagged: { date: any }[] = await knex('accounts_transactions')
+        .where('reference_type', 'LandedCost')
+        .whereIn('reference_id', landedCostsIds)
+        .whereNull('basis')
+        .distinct('date');
 
-      if (payments.some(({ date }) => isLocked(date, 'LandedCost'))) {
+      if (
+        [...payments, ...untagged].some(({ date }) =>
+          isLocked(date, 'LandedCost'),
+        )
+      ) {
         landedCostsIds.forEach((referenceId) =>
           result.lockedSkipped.push({
             referenceType: 'LandedCost',
@@ -218,6 +231,25 @@ export class CashBasisRebuildService {
         );
       }
     }
+  }
+
+  /**
+   * Counts the landed costs from bills that still have untagged entries:
+   * the rebuild couldn't do them yet (a locked period, or a failure). The
+   * startup rebuild keeps the company flagged while there are any, so they
+   * are retried on the next startup.
+   * @returns {Promise<number>}
+   */
+  public async countPendingLandedCosts(): Promise<number> {
+    const knex = this.tenantKnex();
+    const row: any = await knex('accounts_transactions as t')
+      .join('bill_located_costs as lc', 'lc.id', 't.reference_id')
+      .where('t.reference_type', 'LandedCost')
+      .where('lc.from_transaction_type', 'Bill')
+      .whereNull('t.basis')
+      .countDistinct('t.reference_id as count')
+      .first();
+    return Number(row?.count || 0);
   }
 
   /**
