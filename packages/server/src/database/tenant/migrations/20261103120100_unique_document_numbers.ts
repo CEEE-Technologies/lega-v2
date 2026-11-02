@@ -19,6 +19,11 @@
  *    are changed.
  * 5. The unique index is added to each document table.
  *
+ * A new number never gets longer than the shortest column it is written
+ * to (read from information_schema; VARCHAR(255) today): the start of a
+ * long number is cut to make room for the `-2` suffix, and uniqueness is
+ * checked on the cut value.
+ *
  * Numbers count as the same the way the unique index compares them (the
  * column's collation: case and trailing spaces ignored), as health check H5
  * does. Every change is printed.
@@ -193,6 +198,47 @@ const indexExists = async (knex: any, table: string, name: string) => {
   return rows.length > 0;
 };
 
+/**
+ * The longest number (in characters) the document column and every column
+ * the number is copied to can hold. A new number must fit all of them, or
+ * the update fails with "data too long" in strict SQL mode.
+ */
+const columnLength = async (knex: any, table: string, column: string) => {
+  const [rows] = await knex.raw(
+    'SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND UPPER(TABLE_NAME) = ? AND UPPER(COLUMN_NAME) = ?',
+    [table.toUpperCase(), column.toUpperCase()],
+  );
+  const length = Number(rows?.[0]?.len);
+  return Number.isFinite(length) && length > 0 ? length : null;
+};
+
+const maxNumberLength = async (knex: any, kind: DocumentKind) => {
+  const columns: Array<[string, string]> = [[kind.table, kind.column]];
+  if (kind.ledgerTypes.length > 0 || (kind.childLedgerRows || []).length > 0) {
+    columns.push(['accounts_transactions', 'transaction_number']);
+  }
+  if (kind.inventoryType) {
+    columns.push(['inventory_transaction_meta', 'transaction_number']);
+  }
+  const lengths: number[] = [];
+  for (const [table, column] of columns) {
+    const length = await columnLength(knex, table, column);
+    if (length) lengths.push(length);
+  }
+  return lengths.length > 0 ? Math.min(...lengths) : 255;
+};
+
+/**
+ * `head` + `tail`, cutting `head` so the result is at most `max` characters
+ * (the tail, e.g. `-2` or the number, is kept whole).
+ */
+const fitNumber = (head: string, tail: string, max: number) => {
+  const tailChars = Array.from(tail);
+  if (tailChars.length >= max) return tailChars.slice(0, max).join('');
+  const room = max - tailChars.length;
+  return Array.from(head).slice(0, room).join('').replace(/\s+$/, '') + tail;
+};
+
 const numberInUse = async (knex: any, kind: DocumentKind, value: string) =>
   !!(await knex(kind.table).where(kind.column, value).first('id'));
 
@@ -263,6 +309,7 @@ const renameDocument = async (
 
 const repairKind = async (knex: any, kind: DocumentKind, log: string[]) => {
   const { table, column } = kind;
+  const max = await maxNumberLength(knex, kind);
 
   // 1. Empty numbers become NULL.
   const blanks = await knex(table)
@@ -291,18 +338,18 @@ const repairKind = async (knex: any, kind: DocumentKind, log: string[]) => {
     for (const row of broken) {
       let newNumber: string;
       if (useSequence) {
-        newNumber = `${settings.prefix}${next}`;
+        newNumber = fitNumber(settings.prefix, next, max);
         while (await numberInUse(knex, kind, newNumber)) {
           next = increment(next);
-          newNumber = `${settings.prefix}${next}`;
+          newNumber = fitNumber(settings.prefix, next, max);
         }
         next = increment(next);
       } else {
         const prefix = settings?.prefix || kind.defaultPrefix;
-        newNumber = `${prefix}${row.id}`;
+        newNumber = fitNumber(prefix, `${row.id}`, max);
         let suffix = 2;
         while (await numberInUse(knex, kind, newNumber)) {
-          newNumber = `${prefix}${row.id}-${suffix++}`;
+          newNumber = fitNumber(prefix, `${row.id}-${suffix++}`, max);
         }
       }
       await renameDocument(knex, kind, row.id, row.number, newNumber);
@@ -348,9 +395,10 @@ const repairKind = async (knex: any, kind: DocumentKind, log: string[]) => {
 
     for (const row of others) {
       const base = String(row.number).replace(/\s+$/, '');
-      let newNumber = `${base}-${suffix++}`;
+      // The base is cut so base + suffix fits the shortest column.
+      let newNumber = fitNumber(base, `-${suffix++}`, max);
       while (await numberInUse(knex, kind, newNumber)) {
-        newNumber = `${base}-${suffix++}`;
+        newNumber = fitNumber(base, `-${suffix++}`, max);
       }
       await renameDocument(knex, kind, row.id, row.number, newNumber);
       log.push(
@@ -401,3 +449,8 @@ exports.down = async function (knex: any) {
     await knex.raw('ALTER TABLE ?? DROP INDEX ??', [kind.table, name]);
   }
 };
+
+// For tests.
+exports.fitNumber = fitNumber;
+exports.maxNumberLength = maxNumberLength;
+exports.KINDS = KINDS;
