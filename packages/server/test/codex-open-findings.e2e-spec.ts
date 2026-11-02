@@ -409,6 +409,47 @@ describe('Codex open findings (e2e)', () => {
       expect(await cashBasisNet(landedCostId)).toEqual(net(70));
     });
 
+    it('a payment in an open period leaves an old landed cost dated in a locked period as it is', async () => {
+      const autoRebuild = app.get(CashBasisAutoRebuildService);
+      await db('settings').where(FLAG).delete();
+
+      // Old landed cost at the bill date (1 Jun), flagged by the migration.
+      const billId = await createBill(65);
+      const landedCostId = await insertOldLandedCost('Bill', billId, 65);
+      await tagOldLandedCosts.up(db);
+      expect((await db('settings').where(FLAG).first())?.value).toBe('true');
+
+      await api
+        .put('/transactions-locking/lock')
+        .send({ module: 'all', lockToDate: '2026-06-10', reason: 'codex e2e' })
+        .expect(200);
+      try {
+        // The payment (15 Jun) is in the open period.
+        await payBill(billId, 65);
+
+        // Not converted: the locked period still shows it once, and no cash
+        // set was written next to the untagged rows (no double count).
+        expect(await basesOf(landedCostId)).toEqual([null, null]);
+        expect(await cashBasisNet(landedCostId)).toEqual(net(65));
+        expect(await autoRebuild.isFlagged(company.organizationId)).toBe(true);
+      } finally {
+        await api
+          .put('/transactions-locking/cancel-lock')
+          .send({ module: 'all', reason: 'codex e2e' })
+          .expect(200);
+      }
+
+      // Once the period opens the rebuild converts it.
+      await rebuildUntilFlagCleared(autoRebuild);
+      expect(await basesOf(landedCostId)).toEqual([
+        'accrual',
+        'accrual',
+        'cash',
+        'cash',
+      ]);
+      expect(await cashBasisNet(landedCostId)).toEqual(net(65));
+    });
+
     it('the health check lists a landed cost from a paid bill with no cash set', async () => {
       const billId = await createBill(40);
       await payBill(billId, 40);
