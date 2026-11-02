@@ -5,7 +5,7 @@ import { SystemUser } from '@/modules/System/models/SystemUser';
 import { PasswordReset } from '../models/PasswordReset';
 import { ServiceError } from '@/modules/Items/ServiceError';
 import { ERRORS } from '../Auth.constants';
-import { hashPassword } from '../Auth.utils';
+import { hashPassword, hashPasswordResetToken } from '../Auth.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
 import { IAuthResetedPasswordEventPayload } from '../Auth.interfaces';
@@ -36,10 +36,12 @@ export class AuthResetPasswordService {
    * @return {Promise<void>}
    */
   public async resetPassword(token: string, password: string): Promise<void> {
-    // Finds the password reset token.
-    const tokenModel = await this.passwordResetModel
-      .query()
-      .findOne('token', token);
+    // Finds the password reset token. Only its hash is stored.
+    const tokenModel = token
+      ? await this.passwordResetModel
+          .query()
+          .findOne('tokenHash', hashPasswordResetToken(token))
+      : null;
 
     // In case the password reset token not found throw token invalid error..
     if (!tokenModel) {
@@ -86,6 +88,6 @@ export class AuthResetPasswordService {
    * @returns {Promise}
    */
   private async deletePasswordResetToken(email: string) {
-    return PasswordReset.query().where('email', email).delete();
+    return this.passwordResetModel.query().where('email', email).delete();
   }
 }

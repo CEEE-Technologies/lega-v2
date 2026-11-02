@@ -85,6 +85,11 @@ export class VendorCredit extends TenantBaseModel {
   static get tableName() {
     return 'vendor_credits';
   }
+
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['vendorCreditNumber'];
+  }
   /**
    * Vendor credit amount in local currency.
    * @returns {number}

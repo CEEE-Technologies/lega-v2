@@ -45,14 +45,19 @@ export function runAfterTransaction(trx, callback) {
   waitForTransaction(trx).then(
     () => {
       // If transaction success, then run action
-      return Promise.resolve(callback()).catch((error) => {
-        setTimeout(() => {
-          throw error;
+      // Log instead of re-throwing: an error thrown from a timer is an
+      // uncaught exception and would stop the whole server.
+      return Promise.resolve()
+        .then(() => callback())
+        .catch((error) => {
+          console.error(
+            '[runAfterTransaction] after-commit hook failed:',
+            error,
+          );
         });
-      });
     },
     () => {
-      // Ignore transaction error
+      // The transaction was rolled back: skip the hook.
     },
   );
 }

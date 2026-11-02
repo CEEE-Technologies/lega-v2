@@ -427,6 +427,29 @@ describe('Data health check (H1–H8)', () => {
   it('H5 lists a credit note number used twice (case ignored, like a unique index)', async () => {
     const customerId = await customer();
     const number = `CN-HC-${tag}`.toUpperCase();
+    const creditNote = (creditNoteNumber: string) =>
+      insert('credit_notes', {
+        customerId,
+        creditNoteNumber,
+        creditNoteDate: '2026-05-03',
+        amount: 10,
+        currencyCode: 'USD',
+        exchangeRate: 1,
+      });
+    // The unique number index (migration 20261103120100) refuses a second
+    // credit note with the same number, in any case.
+    const first = await creditNote(number);
+    await expect(creditNote(number.toLowerCase())).rejects.toThrow(
+      /Duplicate entry/,
+    );
+    await db('credit_notes').where('id', first).delete();
+
+    // Old data from before the index: drop it in this test company to write
+    // the duplicates the check has to find.
+    await db.raw('ALTER TABLE ?? DROP INDEX ??', [
+      'credit_notes',
+      'credit_notes_doc_number_unique',
+    ]);
     const ids: number[] = [];
     for (const creditNoteNumber of [number, number, number.toLowerCase()]) {
       ids.push(
@@ -465,7 +488,7 @@ describe('Data health check (H1–H8)', () => {
       email,
     );
     const ids: number[] = [];
-    for (const variant of [email, email.toUpperCase()]) {
+    const addLogin = async (variant: string) => {
       const [id] = await sys('users').insert({
         firstName: 'HC',
         email: variant,
@@ -473,8 +496,43 @@ describe('Data health check (H1–H8)', () => {
       });
       ids.push(id);
       systemUserIds.push(id);
+    };
+    // With the unique login email index (migration 20261103120300) the
+    // database refuses a second login with the email, in any case. The
+    // index is shared by every company, so it is dropped only for the few
+    // statements that write the old-style duplicate, and the duplicate is
+    // removed again before the index is put back.
+    const [indexRows] = await sys.raw('SHOW INDEX FROM ?? WHERE Key_name = ?', [
+      'users',
+      'USERS_EMAIL_UNIQUE',
+    ]);
+    const hasIndex = indexRows.length > 0;
+    await addLogin(email);
+    let after: Awaited<ReturnType<typeof checkSystemDataHealth>>;
+    if (hasIndex) {
+      await expect(addLogin(email.toUpperCase())).rejects.toThrow(
+        /Duplicate entry/,
+      );
+      await sys.raw('ALTER TABLE ?? DROP INDEX ??', [
+        'users',
+        'users_email_unique',
+      ]);
     }
-    const after = await checkSystemDataHealth(readOnlySystemDb);
+    try {
+      await addLogin(email.toUpperCase());
+      after = await checkSystemDataHealth(readOnlySystemDb);
+    } finally {
+      if (hasIndex) {
+        await sys('users')
+          .where('id', ids[ids.length - 1])
+          .delete();
+        await sys.raw('ALTER TABLE ?? ADD UNIQUE INDEX ?? (??)', [
+          'users',
+          'users_email_unique',
+          'email',
+        ]);
+      }
+    }
     const row = after.duplicateLoginEmails.find((r) => r.email === email);
     expect(row?.users.map((user) => user.id)).toEqual(ids);
     expect(formatSystemDataHealth(after)).toContain(

@@ -27,7 +27,7 @@ export class ValidateBulkDeleteItemsService {
   }> {
     // Create a transaction that will be rolled back
     const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read uncommitted',
+      isolationLevel: 'read committed',
     });
 
     try {

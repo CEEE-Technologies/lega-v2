@@ -384,6 +384,11 @@ export class Bill extends TenantBaseModel {
     return 'bills';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['billNumber'];
+  }
+
   /**
    * Model modifiers.
    */

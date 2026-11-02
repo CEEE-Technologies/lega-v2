@@ -113,6 +113,11 @@ export class SaleInvoice extends TenantBaseModel {
     return 'sales_invoices';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['invoiceNo'];
+  }
+
   /**
    * Timestamps columns.
    */

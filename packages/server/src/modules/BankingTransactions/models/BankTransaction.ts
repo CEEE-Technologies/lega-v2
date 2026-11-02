@@ -47,6 +47,11 @@ export class BankTransaction extends BaseModel {
     return 'cashflow_transactions';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['transactionNumber'];
+  }
+
   /**
    * Timestamps columns.
    * @returns {Array<string>}

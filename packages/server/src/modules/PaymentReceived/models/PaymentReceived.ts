@@ -46,6 +46,11 @@ export class PaymentReceived extends TenantBaseModel {
     return 'payment_receives';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['paymentReceiveNo'];
+  }
+
   /**
    * Timestamps columns.
    */

@@ -30,14 +30,10 @@ describe('Mail jobs carry ids only (S4)', () => {
       queue() as any,
     );
 
-    await subscriber.handleSendResetPasswordMail({
-      user,
-      token: 'reset-code-456',
-    } as any);
+    await subscriber.handleSendResetPasswordMail({ user } as any);
 
     const [, data, options] = resetQueue.add.mock.calls[0];
     expect(data).toEqual({ userId: 7 });
-    expect(JSON.stringify(data)).not.toContain('reset-code-456');
     expect(JSON.stringify(data)).not.toContain(user.password);
     expect(options.removeOnComplete).toBe(true);
   });
@@ -98,37 +94,41 @@ describe('Mail processors read what they need when they run', () => {
     return { query: () => builder, builder };
   };
 
-  it('the reset password mail uses the newest stored reset code', async () => {
+  it('the reset password mail creates the token when it is sent', async () => {
     const mails = {
       sendResetPasswordMail: jest.fn(),
       sendSignupVerificationMail: jest.fn(),
     };
     const users = chain(user);
-    const resets = chain({ email: user.email, token: 'reset-code-456' });
+    const resetTokens = {
+      issueResetToken: jest.fn().mockResolvedValue('reset-code-456'),
+    };
     const processor = new SendResetPasswordMailProcessor(
       mails as any,
       {} as any,
       users as any,
-      resets as any,
+      resetTokens as any,
     );
     await processor.process({ data: { userId: 7 } } as any);
 
-    expect(resets.builder.where).toHaveBeenCalledWith('email', user.email);
+    expect(resetTokens.issueResetToken).toHaveBeenCalledWith(user.email);
     expect(mails.sendResetPasswordMail).toHaveBeenCalledWith(
       user,
       'reset-code-456',
     );
   });
 
-  it('skips the mail when the user or code is gone', async () => {
+  it('skips the mail when the user is gone', async () => {
     const mails = { sendResetPasswordMail: jest.fn() };
+    const resetTokens = { issueResetToken: jest.fn() };
     const processor = new SendResetPasswordMailProcessor(
       mails as any,
       {} as any,
       chain(undefined) as any,
-      chain(undefined) as any,
+      resetTokens as any,
     );
     await processor.process({ data: { userId: 7 } } as any);
+    expect(resetTokens.issueResetToken).not.toHaveBeenCalled();
     expect(mails.sendResetPasswordMail).not.toHaveBeenCalled();
   });
 

@@ -77,6 +77,11 @@ export class SaleReceipt extends ExtendedModel {
     return 'sales_receipts';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['receiptNumber'];
+  }
+
   /**
    * Timestamps columns.
    */

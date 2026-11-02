@@ -10,6 +10,7 @@ import { DEFAULT_VIEWS } from '../constants';
 @InjectModelMeta(WarehouseTransferMeta)
 @InjectModelDefaultViews(DEFAULT_VIEWS)
 export class WarehouseTransfer extends TenantBaseModel {
+  public transactionNumber!: string | null;
   public date!: Date;
   public transferInitiatedAt!: Date;
   public transferDeliveredAt!: Date;
@@ -25,6 +26,11 @@ export class WarehouseTransfer extends TenantBaseModel {
    */
   static get tableName() {
     return 'warehouses_transfers';
+  }
+
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['transactionNumber'];
   }
 
   /**

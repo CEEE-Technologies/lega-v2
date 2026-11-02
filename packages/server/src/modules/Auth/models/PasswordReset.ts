@@ -2,7 +2,8 @@ import { SystemModel } from '@/modules/System/models/SystemModel';
 
 export class PasswordReset extends SystemModel {
   readonly email: string;
-  readonly token: string;
+  /** SHA-256 hash of the reset token (the raw token is only in the mail). */
+  readonly tokenHash: string;
   readonly createdAt: Date;
 
   /**

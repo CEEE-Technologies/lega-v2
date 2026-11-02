@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PasswordReset } from '../models/PasswordReset';
 import { SystemUser } from '@/modules/System/models/SystemUser';
 import { events } from '@/common/events/events';
+import { hashPasswordResetToken } from '../Auth.utils';
 
 @Injectable()
 export class AuthSendResetPasswordService {
@@ -27,7 +28,8 @@ export class AuthSendResetPasswordService {
   ) {}
 
   /**
-   * Sends the given email reset password email.
+   * Sends the given email reset password email. The mail job creates the
+   * reset token (`issueResetToken`) when it sends the mail.
    * @param {string} email - Email address.
    */
   async sendResetPassword(email: string): Promise<void> {
@@ -35,25 +37,35 @@ export class AuthSendResetPasswordService {
 
     if (!user) return;
 
-    const token: string = crypto.randomBytes(32).toString('hex');
-
     // Triggers sending reset password event.
     await this.eventPublisher.emitAsync(events.auth.sendingResetPassword, {
       user,
-      token,
     } as IAuthSendingResetPassword);
+
+    // Triggers sent reset password event (queues the mail job).
+    await this.eventPublisher.emitAsync(events.auth.sendResetPassword, {
+      user,
+    } as IAuthSendedResetPassword);
+  }
+
+  /**
+   * Creates a new reset token for the email and replaces any older one.
+   * Only the token's SHA-256 hash is stored; the raw token is returned so
+   * it can be put in the mail, and is not kept anywhere else.
+   * @param {string} email - Email address.
+   * @returns {Promise<string>} The raw token.
+   */
+  async issueResetToken(email: string): Promise<string> {
+    const token: string = crypto.randomBytes(32).toString('hex');
 
     // Delete all stored tokens of reset password that associate to the give email.
     await this.deletePasswordResetToken(email);
 
-    // Creates a new password reset row with unique token.
-    await this.resetPasswordModel.query().insert({ email, token });
+    await this.resetPasswordModel
+      .query()
+      .insert({ email, tokenHash: hashPasswordResetToken(token) });
 
-    // Triggers sent reset password event.
-    await this.eventPublisher.emitAsync(events.auth.sendResetPassword, {
-      user,
-      token,
-    } as IAuthSendedResetPassword);
+    return token;
   }
 
   /**

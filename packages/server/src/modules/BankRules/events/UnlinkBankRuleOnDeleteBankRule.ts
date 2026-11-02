@@ -17,9 +17,15 @@ export class UnlinkBankRuleOnDeleteBankRuleSubscriber {
   @OnEvent(events.bankRules.onDeleting)
   public async unlinkBankRuleOutRecognizedTransactionsOnRuleDeleting({
     oldBankRule,
+    trx,
   }: IBankRuleEventDeletingPayload) {
+    // Runs inside the delete's transaction. Opening a second transaction
+    // here would wait on rows the delete has locked (until the lock wait
+    // timeout) when an account with bank rules is deleted.
     await this.revertRecognizedTransactionsService.revertRecognizedTransactions(
       oldBankRule.id,
+      undefined,
+      trx,
     );
   }
 }

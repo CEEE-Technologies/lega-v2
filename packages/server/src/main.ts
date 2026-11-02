@@ -5,11 +5,15 @@ import * as path from 'path';
 import './utils/moment-mysql';
 import { AppModule } from './modules/App/App.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { registerUnhandledRejectionLogger } from './utils/unhandled-rejection-logger';
 
 global.__public_dirname = path.join(__dirname, '..', 'public');
 global.__static_dirname = path.join(__dirname, '../static');
 global.__views_dirname = path.join(global.__static_dirname, '/views');
 global.__images_dirname = path.join(global.__static_dirname, '/images');
+
+// Log stray promise rejections instead of letting one stop the server.
+registerUnhandledRejectionLogger();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
