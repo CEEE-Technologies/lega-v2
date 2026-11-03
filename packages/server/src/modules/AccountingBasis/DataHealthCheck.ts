@@ -21,7 +21,8 @@ import { getLockedPeriods } from './MoneyHealthCheck';
  * - H7 owner memberships of people who didn't create the company (the
  *   March user_tenants backfill),
  * - H8 landed costs from bills posted before the inventory fix (untagged,
- *   so on both bases) and bill stock costed at the raw line price (I3).
+ *   so on both bases), landed costs from paid bills with no cash basis
+ *   entries, and bill stock costed at the raw line price (I3).
  * H6 (duplicate login emails, decides the S1 index) reads the system
  * database once for all companies: `checkSystemDataHealth`.
  *
@@ -110,6 +111,16 @@ export interface IDataHealthUntaggedLandedCost {
   rows: number;
 }
 
+export interface IDataHealthLandedCostNoCashSet {
+  landedCostId: number;
+  amount: number;
+  fromBillId: number;
+  fromBillNo: string;
+  billId: number;
+  billNo: string;
+  date: string | null;
+}
+
 export interface IDataHealthLotCost {
   source: 'movement' | 'lot';
   billId: number;
@@ -143,6 +154,7 @@ export interface IDataHealthResult {
   ownerMemberships: IDataHealthOwnerMembership[] | null;
   /** H8 */
   untaggedLandedCosts: IDataHealthUntaggedLandedCost[];
+  landedCostsWithoutCashSet: IDataHealthLandedCostNoCashSet[];
   lotCostDifferences: IDataHealthLotCost[];
 }
 
@@ -948,8 +960,12 @@ export const getOwnerMemberships = async (
 /**
  * H8 (a). Landed costs from a bill whose ledger rows aren't tagged with a
  * basis. Since PR 11 they are tagged accrual and the cash basis follows the
- * bill's payments; older ones still count on both bases, so the cash basis
- * shows them before the bill is paid.
+ * bill's payments; older ones count on both bases, so the cash basis shows
+ * them at the bill date, paid or not. The tenant migration
+ * 20261102120000_tag_old_landed_costs_accrual flags the cash basis rebuild,
+ * which tags them and writes their cash set; one listed here hasn't been
+ * done yet (the migration or the rebuild hasn't run, or a date of it is in
+ * a locked period: unlock and run the rebuild).
  */
 const getUntaggedLandedCosts = async (
   knex: Knex,
@@ -986,6 +1002,60 @@ const getUntaggedLandedCosts = async (
     billNo: row.billNo || `#${row.billId}`,
     date: day(row.date),
     rows: num(row.untaggedRows),
+  }));
+};
+
+/**
+ * H8 (c). Landed costs from a bill that is paid (in part or in full) but
+ * that have no cash basis entries: the cash basis misses the cost moved
+ * into stock. The cash basis rebuild writes them.
+ */
+const getLandedCostsWithoutCashSet = async (
+  knex: Knex,
+): Promise<IDataHealthLandedCostNoCashSet[]> => {
+  const rowsOfBasis = (basis: string | null) =>
+    function (this: Knex.QueryBuilder) {
+      this.select(knex.raw('1'))
+        .from('accounts_transactions as t')
+        .whereRaw('?? = ??', ['t.reference_id', 'lc.id'])
+        .where('t.reference_type', 'LandedCost');
+      if (basis === null) this.whereNull('t.basis');
+      else this.where('t.basis', basis);
+    };
+  const rows: any[] = await knex
+    .queryBuilder()
+    .from('bill_located_costs as lc')
+    .leftJoin('bills as fb', 'fb.id', 'lc.from_transaction_id')
+    .leftJoin('bills as b', 'b.id', 'lc.bill_id')
+    .where('lc.from_transaction_type', 'Bill')
+    .whereExists(function () {
+      this.select(knex.raw('1'))
+        .from('bills_payments_entries as e')
+        .whereRaw('?? = ??', ['e.bill_id', 'lc.from_transaction_id'])
+        .where('e.payment_amount', '>', 0);
+    })
+    .whereExists(rowsOfBasis('accrual'))
+    .whereNotExists(rowsOfBasis(null))
+    .whereNotExists(rowsOfBasis('cash'))
+    .select(
+      'lc.id as landedCostId',
+      'lc.amount as amount',
+      'lc.from_transaction_id as fromBillId',
+      'fb.bill_number as fromBillNo',
+      'lc.bill_id as billId',
+      'b.bill_number as billNo',
+      'b.bill_date as date',
+    )
+    .orderBy('lc.id');
+
+  return rows.map((row) => ({
+    landedCostId: row.landedCostId,
+    amount: roundMoney(num(row.amount)),
+    fromBillId: row.fromBillId,
+    fromBillNo: row.fromBillNo || `#${row.fromBillId}`,
+    billId: row.billId,
+    billNo: row.billNo || `#${row.billId}`,
+    date: day(row.date),
   }));
 };
 
@@ -1102,6 +1172,7 @@ export const checkDataHealth = async (
     ? await getOwnerMemberships(knex, system.systemKnex, system.tenantId)
     : null;
   const untaggedLandedCosts = await getUntaggedLandedCosts(knex);
+  const landedCostsWithoutCashSet = await getLandedCostsWithoutCashSet(knex);
   const lotCostDifferences = await getLotCostDifferences(knex);
 
   return {
@@ -1116,6 +1187,7 @@ export const checkDataHealth = async (
     numberTypesChecked: numbers.checked,
     ownerMemberships,
     untaggedLandedCosts,
+    landedCostsWithoutCashSet,
     lotCostDifferences,
   };
 };
@@ -1181,6 +1253,7 @@ export const isDataHealthClean = (result: IDataHealthResult) =>
   result.duplicateNumbers.length === 0 &&
   (result.ownerMemberships ?? []).length === 0 &&
   result.untaggedLandedCosts.length === 0 &&
+  result.landedCostsWithoutCashSet.length === 0 &&
   result.lotCostDifferences.length === 0;
 
 /** Whether the system data is clean (H6). */
@@ -1333,10 +1406,18 @@ export const formatDataHealth = (
 
   section(
     lines,
-    'H8 Landed costs from bills posted before the inventory fix (untagged, on both bases)',
+    'H8 Landed costs from bills posted before the inventory fix (untagged, on both bases; run the cash basis rebuild)',
     result.untaggedLandedCosts.map(
       (row) =>
         `Landed cost #${row.landedCostId}: ${money(row.amount)} from bill ${row.fromBillNo} (#${row.fromBillId}) onto bill ${row.billNo} (#${row.billId}), ${row.date ?? 'no date'}: ${row.rows} untagged ledger rows`,
+    ),
+  );
+  section(
+    lines,
+    'H8 Landed costs from paid bills with no cash basis entries (run the cash basis rebuild)',
+    result.landedCostsWithoutCashSet.map(
+      (row) =>
+        `Landed cost #${row.landedCostId}: ${money(row.amount)} from bill ${row.fromBillNo} (#${row.fromBillId}) onto bill ${row.billNo} (#${row.billId}), ${row.date ?? 'no date'}`,
     ),
   );
   const reasons = {

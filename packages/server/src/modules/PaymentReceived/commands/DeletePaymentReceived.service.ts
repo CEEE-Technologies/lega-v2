@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
+import { NotFoundError } from 'objection';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { events } from '@/common/events/events';
@@ -49,15 +50,18 @@ export class DeletePaymentReceivedService {
     paymentReceiveId: number,
     trx?: Knex.Transaction,
   ) {
-    // Retreive payment receive or throw not found service error.
-    const oldPaymentReceive = await this.paymentReceiveModel()
-      .query()
-      .withGraphFetched('entries')
-      .findById(paymentReceiveId)
-      .throwIfNotFound();
-
     // Delete payment receive transaction and associate transactions under UOW env.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Retrieves the payment inside the transaction and locks its row, so
+      // a second delete of the same payment waits for this one and then
+      // finds it gone (instead of reverting it a second time).
+      const oldPaymentReceive = await this.paymentReceiveModel()
+        .query(trx)
+        .withGraphFetched('entries')
+        .findById(paymentReceiveId)
+        .forUpdate()
+        .throwIfNotFound();
+
       // Triggers `onPaymentReceiveDeleting` event.
       await this.eventPublisher.emitAsync(events.paymentReceive.onDeleting, {
         oldPaymentReceive,
@@ -71,10 +75,15 @@ export class DeletePaymentReceivedService {
         .delete();
 
       // Deletes the payment receive transaction.
-      await this.paymentReceiveModel()
+      const deleted = await this.paymentReceiveModel()
         .query(trx)
         .findById(paymentReceiveId)
         .delete();
+
+      // Nothing deleted: someone else deleted it; nothing to revert.
+      if (!deleted) {
+        throw new NotFoundError({ modelClass: PaymentReceived });
+      }
 
       // Triggers `onPaymentReceiveDeleted` event.
       await this.eventPublisher.emitAsync(events.paymentReceive.onDeleted, {

@@ -65,12 +65,16 @@ describe('Cash basis rebuild after deploy', () => {
       data: any,
       check: any,
       failures: any[] = [],
+      pendingLandedCosts = 0,
     ): Promise<jest.Mock> => {
       const clearFlag = jest.fn().mockResolvedValue(undefined);
       const processor = new CashBasisRebuildProcessor(
         {
           rebuild: jest.fn().mockResolvedValue({ failures }),
           check: jest.fn().mockResolvedValue(check),
+          countPendingLandedCosts: jest
+            .fn()
+            .mockResolvedValue(pendingLandedCosts),
         } as any,
         { clearFlag } as any,
         { set: jest.fn() } as any,
@@ -111,6 +115,16 @@ describe('Cash basis rebuild after deploy', () => {
       const clearFlag = await run(
         { organizationId: 'org-a', clearRebuildFlag: true },
         { ...clean, unbalancedSets: [{ referenceType: 'BillPayment' }] },
+      );
+      expect(clearFlag).not.toHaveBeenCalled();
+    });
+
+    it('keeps the flag while old landed costs wait for a locked period', async () => {
+      const clearFlag = await run(
+        { organizationId: 'org-a', clearRebuildFlag: true },
+        clean,
+        [],
+        2,
       );
       expect(clearFlag).not.toHaveBeenCalled();
     });

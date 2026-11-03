@@ -11,6 +11,8 @@ import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
+import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import { IOpeningBalancePaidBefore } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
 export class PaymentReceivedAccrualGL {
   private readonly paymentReceived: PaymentReceived;
@@ -18,6 +20,7 @@ export class PaymentReceivedAccrualGL {
   private exchangeGainOrLossAccountId: number;
   private baseCurrencyCode: string;
   private paidBefore: Record<number, number> = {};
+  private openingBalance: IOpeningBalancePaidBefore | null = null;
 
   /**
    * Constructor method.
@@ -34,6 +37,16 @@ export class PaymentReceivedAccrualGL {
    */
   setPaidBefore(paidBefore: Record<number, number>) {
     this.paidBefore = paidBefore || {};
+    return this;
+  }
+
+  /**
+   * Sets the rate the customer opening balance was posted at and what the
+   * earlier payments paid of it, for the opening balance line's A/R relief.
+   * @param {IOpeningBalancePaidBefore | null} openingBalance
+   */
+  setOpeningBalance(openingBalance: IOpeningBalancePaidBefore | null) {
+    this.openingBalance = openingBalance;
     return this;
   }
 
@@ -82,25 +95,45 @@ export class PaymentReceivedAccrualGL {
       sumMoneyBy(entries, 'paymentAmount'),
       this.paymentReceived.exchangeRate,
     );
+    // The A/R relief at the document rate is a running total: (paid so
+    // far, this payment included) at the rate less (paid before) at the
+    // rate. Rounding each payment alone left a cent on A/R once a foreign
+    // currency invoice was paid in parts.
+    const relief = (amount: number, before: number, rate: number) =>
+      subtractMoney(
+        multiplyMoney(sumMoney(before, amount), rate),
+        multiplyMoney(before, rate),
+      );
     const paidAtInvoiceRates = sumMoneyBy(entries, (entry) => {
-      // Opening balance lines have no invoice: no exchange difference
-      // (foreign currency opening balances are not handled here).
+      // An opening balance line relieves A/R at the rate the opening
+      // balance was posted at, so a different payment rate posts an
+      // exchange gain/loss like an invoice line does.
+      if (isOpeningBalanceEntry(entry)) {
+        if (!this.openingBalance) {
+          return multiplyMoney(
+            entry.paymentAmount,
+            this.paymentReceived.exchangeRate,
+          );
+        }
+        return relief(
+          entry.paymentAmount,
+          this.openingBalance.paidBefore,
+          this.openingBalance.exchangeRate,
+        );
+      }
+      // A line whose invoice is gone: no exchange difference.
       if (!entry.invoice) {
         return multiplyMoney(
           entry.paymentAmount,
           this.paymentReceived.exchangeRate,
         );
       }
-      // The A/R relief at the invoice rate is a running total: (paid so
-      // far, this payment included) at the rate less (paid before) at the
-      // rate. Rounding each payment alone left a cent on A/R once a
-      // foreign currency invoice was paid in parts.
       const rate =
         entry.invoice.exchangeRate ?? this.paymentReceived.exchangeRate;
-      const before = this.paidBefore[entry.invoiceId] ?? 0;
-      return subtractMoney(
-        multiplyMoney(sumMoney(before, entry.paymentAmount), rate),
-        multiplyMoney(before, rate),
+      return relief(
+        entry.paymentAmount,
+        this.paidBefore[entry.invoiceId] ?? 0,
+        rate,
       );
     });
     return subtractMoney(paidAtPaymentRate, paidAtInvoiceRates);

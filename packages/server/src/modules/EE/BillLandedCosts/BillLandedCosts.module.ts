@@ -56,5 +56,6 @@ const models = [
     LandedCostsBridgeProvider,
   ],
   controllers: [BillAllocateLandedCostController],
+  exports: [LandedCostGLEntriesService],
 })
 export class BillLandedCostsModule {}

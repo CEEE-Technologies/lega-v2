@@ -82,20 +82,27 @@ export class PaymentReceivedOpeningBalanceSubscriber {
 
   /**
    * Rewrites the cash entries of the customer payments that pay the opening
-   * balance, since they post to the opening balance account.
+   * balance, since they post to the opening balance account. With a foreign
+   * opening balance their accrual entries too: they relieve A/R at the
+   * opening balance rate, which may have changed.
    */
   @OnEvent(events.customers.onOpeningBalanceChanged)
   async handleOpeningBalanceChanged({
     customer,
+    oldCustomer,
     trx,
   }: ICustomerOpeningBalanceEditedPayload) {
     const payments = await this.getOpeningBalancePayments(customer.id, trx);
-
+    const isForeign = [customer, oldCustomer].some(
+      (contact) => Number(contact?.openingBalanceExchangeRate ?? 1) !== 1,
+    );
     for (const payment of payments) {
-      await this.paymentReceivedGLEntries.rewritePaymentCashGLEntries(
-        payment.id,
-        trx,
-      );
+      await (isForeign
+        ? this.paymentReceivedGLEntries.rewritePaymentGLEntries(payment.id, trx)
+        : this.paymentReceivedGLEntries.rewritePaymentCashGLEntries(
+            payment.id,
+            trx,
+          ));
     }
   }
 

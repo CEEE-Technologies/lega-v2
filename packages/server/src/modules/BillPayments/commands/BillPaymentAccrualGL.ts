@@ -12,6 +12,8 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
+import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
+import { IOpeningBalancePaidBefore } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
 /**
  * Records the accrual basis journal entries of the bill payment.
@@ -24,6 +26,7 @@ export class BillPaymentAccrualGL {
   private gainLossAccountId: number;
   private baseCurrency: string;
   private paidBefore: Record<number, number> = {};
+  private openingBalance: IOpeningBalancePaidBefore | null = null;
 
   constructor(billPayment: BillPayment) {
     this.billPayment = billPayment;
@@ -36,6 +39,16 @@ export class BillPaymentAccrualGL {
    */
   setPaidBefore(paidBefore: Record<number, number>) {
     this.paidBefore = paidBefore || {};
+    return this;
+  }
+
+  /**
+   * Sets the rate the vendor opening balance was posted at and what the
+   * earlier payments paid of it, for the opening balance line's A/P relief.
+   * @param {IOpeningBalancePaidBefore | null} openingBalance
+   */
+  setOpeningBalance(openingBalance: IOpeningBalancePaidBefore | null) {
+    this.openingBalance = openingBalance;
     return this;
   }
 
@@ -114,22 +127,42 @@ export class BillPaymentAccrualGL {
       sumMoneyBy(entries, 'paymentAmount'),
       this.billPayment.exchangeRate,
     );
+    // The A/P relief at the document rate is a running total (see the
+    // payment received accrual GL): no cent left once paid in parts.
+    const relief = (amount: number, before: number, rate: number) =>
+      subtractMoney(
+        multiplyMoney(sumMoney(before, amount), rate),
+        multiplyMoney(before, rate),
+      );
     const paidAtBillRates = sumMoneyBy(entries, (entry) => {
-      // Opening balance lines have no bill: no exchange difference
-      // (foreign currency opening balances are not handled here).
+      // An opening balance line relieves A/P at the rate the opening
+      // balance was posted at, so a different payment rate posts an
+      // exchange gain/loss like a bill line does.
+      if (isOpeningBalanceEntry(entry)) {
+        if (!this.openingBalance) {
+          return multiplyMoney(
+            entry.paymentAmount,
+            this.billPayment.exchangeRate,
+          );
+        }
+        return relief(
+          entry.paymentAmount,
+          this.openingBalance.paidBefore,
+          this.openingBalance.exchangeRate,
+        );
+      }
+      // A line whose bill is gone: no exchange difference.
       if (!entry.bill) {
         return multiplyMoney(
           entry.paymentAmount,
           this.billPayment.exchangeRate,
         );
       }
-      // The A/P relief at the bill rate is a running total (see the
-      // payment received accrual GL): no cent left once paid in parts.
       const rate = entry.bill.exchangeRate ?? this.billPayment.exchangeRate;
-      const before = this.paidBefore[entry.billId] ?? 0;
-      return subtractMoney(
-        multiplyMoney(sumMoney(before, entry.paymentAmount), rate),
-        multiplyMoney(before, rate),
+      return relief(
+        entry.paymentAmount,
+        this.paidBefore[entry.billId] ?? 0,
+        rate,
       );
     });
     return subtractMoney(paidAtBillRates, paidAtPaymentRate);

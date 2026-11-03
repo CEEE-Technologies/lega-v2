@@ -12,6 +12,7 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { BillPaymentEntry } from '@/modules/BillPayments/models/BillPaymentEntry';
+import { getLockedPeriodChecker } from '@/modules/AccountingBasis/MoneyHealthCheck';
 import {
   allocateCumulativeShare,
   roundMoney,
@@ -358,6 +359,65 @@ export class LandedCostGLEntriesService extends BaseLandedCostService {
   };
 
   /**
+   * Retrieves the old landed costs (with untagged entries) that can't be
+   * converted now: tagging their entries takes them off the cash basis at
+   * their date, and their cash set is dated at the source bill's payments,
+   * so any of those dates in a locked period would change that period's
+   * cash basis reports. They stay untagged (counted once, at their date),
+   * with no cash set next to them, and the cash basis rebuild converts them
+   * once the period opens (the same rule as `CashBasisRebuildService`).
+   * Landed costs already tagged aren't affected.
+   * @param {BillLandedCost[]} landedCosts - Landed costs from bills.
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<Set<number>>} Their ids.
+   */
+  private getLockedOldLandedCosts = async (
+    landedCosts: BillLandedCost[],
+    trx?: Knex.Transaction,
+  ): Promise<Set<number>> => {
+    const knex = trx ?? this.billLandedCostModel().knex();
+    const untagged: { referenceId: number; date: any }[] = await knex(
+      'accounts_transactions',
+    )
+      .where('reference_type', 'LandedCost')
+      .whereIn(
+        'reference_id',
+        landedCosts.map((landedCost) => landedCost.id),
+      )
+      .whereNull('basis')
+      .select('reference_id as referenceId', 'date');
+    if (untagged.length === 0) return new Set();
+
+    const isLocked = await getLockedPeriodChecker(knex as Knex);
+    const payments: { billId: number; date: any }[] = await knex(
+      'bills_payments_entries as e',
+    )
+      .join('bills_payments as p', 'p.id', 'e.bill_payment_id')
+      .whereIn(
+        'e.bill_id',
+        landedCosts.map((landedCost) => landedCost.fromTransactionId),
+      )
+      .select('e.bill_id as billId', 'p.payment_date as date');
+
+    const locked = new Set<number>();
+    landedCosts.forEach((landedCost) => {
+      const rows = untagged.filter((row) => row.referenceId === landedCost.id);
+      if (rows.length === 0) return;
+
+      const dates = [
+        ...rows,
+        ...payments.filter(
+          (payment) => payment.billId === landedCost.fromTransactionId,
+        ),
+      ];
+      if (dates.some(({ date }) => isLocked(date, 'LandedCost'))) {
+        locked.add(landedCost.id);
+      }
+    });
+    return locked;
+  };
+
+  /**
    * Rewrites the cash basis entries of the landed costs that come from the
    * given bills, once their payments (or the bills) change.
    * @param {number[]} billsIds - The bills the landed costs come from.
@@ -377,7 +437,27 @@ export class LandedCostGLEntriesService extends BaseLandedCostService {
       .withGraphFetched('bill')
       .withGraphFetched('allocateEntries.itemEntry.item');
 
-    for (const landedCost of landedCosts) {
+    if (landedCosts.length === 0) return;
+
+    // Old landed costs whose conversion would change a locked period are
+    // left as they are (see `getLockedOldLandedCosts`).
+    const locked = await this.getLockedOldLandedCosts(landedCosts, trx);
+    const rewritable = landedCosts.filter(
+      (landedCost) => !locked.has(landedCost.id),
+    );
+    if (rewritable.length === 0) return;
+
+    // Landed costs posted before the basis tagging have untagged entries,
+    // which count on both bases: a cash set next to them would count the
+    // cost twice on the cash basis. Their entries are the accrual set.
+    await this.ledgerStorage.tagUntaggedByReference(
+      rewritable.map((landedCost) => landedCost.id),
+      'LandedCost',
+      AccountingBasis.Accrual,
+      trx,
+    );
+
+    for (const landedCost of rewritable) {
       await this.ledgerStorage.deleteByReference(
         landedCost.id,
         'LandedCost',
