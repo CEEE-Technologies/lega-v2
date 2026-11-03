@@ -48,12 +48,14 @@ export interface IAuthResetedPasswordEventPayload {
 
 export interface IAuthSendingResetPassword {
   user: SystemUser;
-  token: string;
 }
 
+/**
+ * The reset token isn't in the payload: the mail job creates it, stores its
+ * hash and mails the raw token, so the raw token is never stored.
+ */
 export interface IAuthSendedResetPassword {
   user: SystemUser;
-  token: string;
 }
 
 export interface IAuthGetMetaPOJO {

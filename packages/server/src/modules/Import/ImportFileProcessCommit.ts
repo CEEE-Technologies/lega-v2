@@ -39,7 +39,7 @@ export class ImportFileProcessCommit {
    */
   public async commitAlsRun(importId: string): Promise<ImportFilePreviewPOJO> {
     const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read uncommitted',
+      isolationLevel: 'read committed',
     });
     const meta = await this.importFile.import(importId, trx);
 

@@ -45,7 +45,12 @@ export default class InviteSendMainNotificationSubscribe {
         userId,
         organizationId,
       } as SendInviteUserMailJobPayload,
-      { removeOnComplete: true, removeOnFail: { age: 24 * 3600 } },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 30_000 },
+        removeOnComplete: true,
+        removeOnFail: { age: 24 * 3600 },
+      },
     );
   }
 }

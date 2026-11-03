@@ -45,6 +45,11 @@ export class ManualJournal extends TenantBaseModel {
     return 'manual_journals';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['journalNumber'];
+  }
+
   /**
    * Model timestamps.
    */

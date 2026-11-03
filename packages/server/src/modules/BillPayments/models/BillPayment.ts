@@ -46,6 +46,11 @@ export class BillPayment extends TenantBaseModel {
     return 'bills_payments';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['paymentNumber'];
+  }
+
   /**
    * Timestamps columns.
    */

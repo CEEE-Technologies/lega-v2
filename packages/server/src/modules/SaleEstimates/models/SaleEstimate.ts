@@ -70,6 +70,11 @@ export class SaleEstimate extends TenantBaseModel {
     return 'sales_estimates';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['estimateNumber'];
+  }
+
   /**
    * Timestamps columns.
    */

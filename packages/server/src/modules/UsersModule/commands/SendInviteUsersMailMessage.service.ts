@@ -49,6 +49,8 @@ export class SendInviteUsersMailMessage {
         email: fromUser.email,
         organizationName: tenant.metadata.name,
       });
-    this.mailTransporter.send(mail);
+    // Awaited so a mail failure fails the queue job (which retries and logs
+    // it) instead of becoming an unhandled rejection that stops the server.
+    await this.mailTransporter.send(mail);
   }
 }

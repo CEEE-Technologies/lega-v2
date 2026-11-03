@@ -104,6 +104,30 @@ export class BaseModel extends mixin(Model, [withDateSessionMixin]) {
   public readonly id: number;
   public readonly tableName: string;
 
+  /**
+   * Columns saved as NULL when given an empty string. Document numbers have
+   * a unique index (D5): many documents may have no number (NULL), but two
+   * empty-string numbers would collide.
+   */
+  static get blankAsNullColumns(): string[] {
+    return [];
+  }
+
+  $formatDatabaseJson(json: Record<string, any>) {
+    const formatted = super.$formatDatabaseJson(json);
+    const columns = (this.constructor as typeof BaseModel).blankAsNullColumns;
+
+    for (const column of columns) {
+      if (
+        typeof formatted[column] === 'string' &&
+        formatted[column].trim() === ''
+      ) {
+        formatted[column] = null;
+      }
+    }
+    return formatted;
+  }
+
   QueryBuilderType!: BaseQueryBuilder<this>;
   static QueryBuilder = BaseQueryBuilder;
 }

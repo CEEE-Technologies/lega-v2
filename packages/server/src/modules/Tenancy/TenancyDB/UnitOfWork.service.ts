@@ -12,33 +12,45 @@ export class UnitOfWork {
   ) {}
 
   /**
+   * Runs the given work inside a database transaction.
+   *
+   * When `trx` is given, the work joins that transaction and the caller
+   * commits or rolls it back. Otherwise a new transaction is opened, and it
+   * is committed (or rolled back on error) before this method returns, so a
+   * caller never reports success for a save that has not been committed.
+   *
+   * Defaults to READ COMMITTED: other requests never see rows this
+   * transaction has not committed yet.
    * @param {function} work - The work to be done in the transaction.
+   * @param {Transaction} trx - An outer transaction to join.
    * @param {IsolationLevel} isolationLevel
-   * @returns {}
    */
   public withTransaction = async <T>(
     work: (knex: Knex.Transaction) => Promise<T> | T,
     trx?: Transaction,
-    isolationLevel: IsolationLevel = IsolationLevel.READ_UNCOMMITTED,
+    isolationLevel: IsolationLevel = IsolationLevel.READ_COMMITTED,
   ): Promise<T> => {
-    const knex = this.tenantKex();
-    let _trx = trx;
-
-    if (!_trx) {
-      _trx = await knex.transaction({ isolationLevel });
+    if (trx) {
+      return work(trx);
     }
-    try {
-      const result = await work(_trx);
+    const knex = this.tenantKex();
+    const ownTrx = await knex.transaction({ isolationLevel });
 
-      if (!trx) {
-        _trx.commit();
-      }
-      return result;
+    let result: T;
+    try {
+      result = await work(ownTrx);
     } catch (error) {
-      if (!trx) {
-        _trx.rollback();
+      if (!ownTrx.isCompleted()) {
+        // Passing the error makes after-commit hooks (`runAfterTransaction`)
+        // skip this transaction instead of running as if it had succeeded.
+        await ownTrx.rollback(error).catch(() => undefined);
       }
       throw error;
     }
+    // knex resolves `commit()` even when COMMIT fails; the failure only
+    // shows up on `executionPromise`, so wait on that too.
+    await ownTrx.commit();
+    await ownTrx.executionPromise;
+    return result;
   };
 }

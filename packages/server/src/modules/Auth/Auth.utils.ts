@@ -37,3 +37,13 @@ export const hashApiKey = (apiKey: string): string => {
 export const getApiKeyPrefix = (apiKey: string): string => {
   return apiKey.substring(0, AuthApiKeyPrefixLength);
 };
+
+/**
+ * Hashes a password reset token with SHA-256. Only the hash is stored, so
+ * someone who reads the database can't use a pending reset link.
+ * @param {string} token - The raw token sent in the reset link.
+ * @returns {string} Hex encoded SHA-256 hash of the token.
+ */
+export const hashPasswordResetToken = (token: string): string => {
+  return createHash('sha256').update(String(token)).digest('hex');
+};

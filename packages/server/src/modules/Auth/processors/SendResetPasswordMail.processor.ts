@@ -5,7 +5,7 @@ import { SendResetPasswordMailQueue } from '../Auth.constants';
 import { AuthenticationMailMesssages } from '../AuthMailMessages.esrvice';
 import { MailTransporter } from '@/modules/Mail/MailTransporter.service';
 import { SystemUser } from '@/modules/System/models/SystemUser';
-import { PasswordReset } from '../models/PasswordReset';
+import { AuthSendResetPasswordService } from '../commands/AuthSendResetPassword.service';
 
 @Processor({
   name: SendResetPasswordMailQueue,
@@ -19,33 +19,25 @@ export class SendResetPasswordMailProcessor extends WorkerHost {
     @Inject(SystemUser.name)
     private readonly systemUserModel: typeof SystemUser,
 
-    @Inject(PasswordReset.name)
-    private readonly passwordResetModel: typeof PasswordReset,
+    private readonly sendResetPasswordService: AuthSendResetPasswordService,
   ) {
     super();
   }
 
   /**
-   * The job holds only the user id. The reset code is read when the mail is
-   * sent, so it is never stored in the queue.
+   * The job holds only the user id. The reset token is created here, when
+   * the mail is sent: only its hash is stored, and the raw token goes in
+   * the mail only, so it is never in the database or the queue.
    */
   async process(job: Job<SendResetPasswordMailJobPayload>) {
     try {
       const user = await this.systemUserModel.query().findById(job.data.userId);
       if (!user) return;
 
-      const passwordReset = await this.passwordResetModel
-        .query()
-        .where('email', user.email)
-        .orderBy('createdAt', 'desc')
-        .orderBy('id', 'desc')
-        .first();
-      if (!passwordReset) return;
-
-      await this.authMailMesssages.sendResetPasswordMail(
-        user,
-        passwordReset.token,
+      const token = await this.sendResetPasswordService.issueResetToken(
+        user.email,
       );
+      await this.authMailMesssages.sendResetPasswordMail(user, token);
     } catch (error) {
       console.log('Error occured during send reset password mail', error);
     }

@@ -26,7 +26,7 @@ export class ValidateBulkDeleteAccountsService {
     nonDeletableIds: number[];
   }> {
     const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read uncommitted',
+      isolationLevel: 'read committed',
     });
 
     try {

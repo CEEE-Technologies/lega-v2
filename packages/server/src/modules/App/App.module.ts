@@ -47,6 +47,7 @@ import { ToJsonInterceptor } from '@/common/interceptors/to-json.interceptor';
 import { ValidationPipe } from '@/common/pipes/ClassValidation.pipe';
 import { ServiceErrorFilter } from '@/common/filters/service-error.filter';
 import { ModelHasRelationsFilter } from '@/common/filters/model-has-relations.filter';
+import { DuplicateDocumentNumberFilter } from '@/common/filters/duplicate-document-number.filter';
 import { ChromiumlyTenancyModule } from '../ChromiumlyTenancy/ChromiumlyTenancy.module';
 import { CustomersModule } from '../Customers/Customers.module';
 import { VendorsModule } from '../Vendors/Vendors.module';
@@ -307,6 +308,10 @@ import { AppThrottleModule } from './AppThrottle.module';
     {
       provide: APP_FILTER,
       useClass: ModelHasRelationsFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: DuplicateDocumentNumberFilter,
     },
     AppService,
   ],

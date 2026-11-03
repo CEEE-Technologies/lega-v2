@@ -83,6 +83,11 @@ export class CreditNote extends TenantBaseModel {
     return 'credit_notes';
   }
 
+  /** An empty number is saved as NULL (see BaseModel.blankAsNullColumns). */
+  static get blankAsNullColumns() {
+    return ['creditNoteNumber'];
+  }
+
   /**
    * Timestamps columns.
    */
