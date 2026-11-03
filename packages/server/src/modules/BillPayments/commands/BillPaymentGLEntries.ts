@@ -1,9 +1,16 @@
-import { isDocumentEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import {
+  isDocumentEntry,
+  isOpeningBalanceEntry,
+} from '@/modules/Contacts/ContactOpeningBalance.constants';
+import {
+  BILL_PAYMENT_OPENING_BALANCE,
   BILL_PAYMENT_PAID_BEFORE,
   getDocumentsAccrualLines,
   getDocumentsPaidBefore,
+  getLaterOpeningBalancePayments,
   getLaterPayments,
+  getOpeningBalancePaidBefore,
+  IOpeningBalancePaidBefore,
   rewritePaymentsInOrder,
 } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 import { Knex } from 'knex';
@@ -164,8 +171,15 @@ export class BillPaymentGLEntries {
         .map((entry) => entry.billId),
       !!trx,
     );
+    // The vendor opening balance rate and what the earlier payments paid of
+    // it: the opening balance line relieves A/P at that rate.
+    const openingBalance = await this.getPaymentOpeningBalancePaidBefore(
+      billPayment,
+      trx,
+    );
     const billPaymentAccrualGL = new BillPaymentAccrualGL(billPayment)
       .setPaidBefore(paidBefore)
+      .setOpeningBalance(openingBalance)
       .setAPAccountId(APAccount.id)
       .setGainLossAccountId(EXGainLossAccount.id)
       .setBaseCurrency(baseCurrency);
@@ -254,6 +268,70 @@ export class BillPaymentGLEntries {
     }
     return billPaymentCashGL.getLedger();
   };
+  /**
+   * Retrieves the vendor opening balance rate and what the payments before
+   * this one paid of it, when the payment pays the opening balance. Locks
+   * the vendor in a transaction.
+   * @param {BillPayment} billPayment - Bill payment.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   * @returns {Promise<IOpeningBalancePaidBefore | null>}
+   */
+  public getPaymentOpeningBalancePaidBefore = async (
+    billPayment: BillPayment,
+    trx?: Knex.Transaction,
+  ): Promise<IOpeningBalancePaidBefore | null> => {
+    if (!(billPayment.entries || []).some(isOpeningBalanceEntry)) {
+      return null;
+    }
+    return getOpeningBalancePaidBefore(
+      trx ?? this.billPaymentModel().knex(),
+      BILL_PAYMENT_OPENING_BALANCE,
+      {
+        id: billPayment.id,
+        date: billPayment.paymentDate,
+        contactId: billPayment.vendorId,
+      },
+      !!trx,
+    );
+  };
+
+  /**
+   * Rewrites the payments of the vendor that pay its opening balance and
+   * come after the given position, in order: their A/P relief at the
+   * opening balance rate is a running total. Only needed with a foreign
+   * opening balance (in the base currency the relief is the amount itself).
+   * Payments in a locked period are skipped (and logged).
+   * @param {number} vendorId - The vendor.
+   * @param {{ id: number; date: any }} after - The position to start after.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public rewriteLaterOpeningBalancePayments = async (
+    vendorId: number,
+    after: { id: number; date: any },
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const knex = trx ?? this.billPaymentModel().knex();
+    const { exchangeRate } = await getOpeningBalancePaidBefore(
+      knex,
+      BILL_PAYMENT_OPENING_BALANCE,
+      { ...after, contactId: vendorId },
+    );
+    if (exchangeRate === 1) return;
+
+    const laterPayments = await getLaterOpeningBalancePayments(
+      knex,
+      BILL_PAYMENT_OPENING_BALANCE,
+      vendorId,
+      after,
+    );
+    await rewritePaymentsInOrder(
+      knex,
+      laterPayments.filter((payment) => payment.id !== after.id),
+      'BillPayment',
+      (paymentId) => this.rewritePaymentGLEntries(paymentId, trx),
+    );
+  };
+
   /**
    * Rebuilds the cash basis entries of the payments of the given bills
    * that come after the given position (date, then id), one at a time and

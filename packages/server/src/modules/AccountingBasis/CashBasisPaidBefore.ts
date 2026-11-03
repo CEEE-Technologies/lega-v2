@@ -126,6 +126,133 @@ export const getDocumentsPaidBefore = async (
 };
 
 /**
+ * The tables of a kind of payment that pays a contact opening balance.
+ */
+export interface IOpeningBalancePaidBeforeKind {
+  paymentsTable: string;
+  entriesTable: string;
+  entryPaymentId: string;
+  contactColumn: string;
+}
+
+export const PAYMENT_RECEIVED_OPENING_BALANCE: IOpeningBalancePaidBeforeKind = {
+  paymentsTable: 'payment_receives',
+  entriesTable: 'payment_receives_entries',
+  entryPaymentId: 'payment_receive_id',
+  contactColumn: 'customer_id',
+};
+
+export const BILL_PAYMENT_OPENING_BALANCE: IOpeningBalancePaidBeforeKind = {
+  paymentsTable: 'bills_payments',
+  entriesTable: 'bills_payments_entries',
+  entryPaymentId: 'bill_payment_id',
+  contactColumn: 'vendor_id',
+};
+
+/**
+ * What a payment's opening balance line relieves against: the rate the
+ * contact opening balance was posted at, and how much of it the contact's
+ * payments before this one (by date, then id) paid. The A/R (A/P) relief
+ * is a running total at that rate, like an invoice line's, so once the
+ * opening balance is fully paid it ends exactly at the posted amount.
+ */
+export interface IOpeningBalancePaidBefore {
+  /** The opening balance exchange rate (1 when not set). */
+  exchangeRate: number;
+  /** Paid by the earlier payments (contact currency). */
+  paidBefore: number;
+}
+
+/**
+ * Retrieves the opening balance rate of the contact and what its earlier
+ * payments paid of the opening balance. In a transaction the contact row is
+ * locked first (FOR UPDATE), so two payments saved at the same time can't
+ * both read the same "paid before".
+ * @param {Knex} knex - Tenant knex (snake case mappers) or a transaction.
+ * @param {IOpeningBalancePaidBeforeKind} kind - The payment tables.
+ * @param {{ id: number; date: any; contactId: number }} payment
+ * @param {boolean} lock - Whether to lock the contact row.
+ * @returns {Promise<IOpeningBalancePaidBefore>}
+ */
+export const getOpeningBalancePaidBefore = async (
+  knex: Knex | Knex.Transaction,
+  kind: IOpeningBalancePaidBeforeKind,
+  payment: { id: number; date: moment.MomentInput; contactId: number },
+  lock = false,
+): Promise<IOpeningBalancePaidBefore> => {
+  const contactQuery = knex('contacts')
+    .where('id', payment.contactId)
+    .first('opening_balance_exchange_rate as rate');
+  if (lock) contactQuery.forUpdate();
+  const contact = await contactQuery;
+
+  const date = moment(payment.date).format('YYYY-MM-DD');
+  const row = await knex(`${kind.entriesTable} as e`)
+    .join(`${kind.paymentsTable} as p`, 'p.id', `e.${kind.entryPaymentId}`)
+    .where('e.entry_type', 'opening_balance')
+    .where(`p.${kind.contactColumn}`, payment.contactId)
+    .where((builder) =>
+      builder
+        .where('p.payment_date', '<', date)
+        .orWhere((b) =>
+          b.where('p.payment_date', date).where('p.id', '<', payment.id),
+        ),
+    )
+    .sum('e.payment_amount as paidAmount')
+    .first();
+
+  return {
+    exchangeRate: Number(contact?.rate) || 1,
+    paidBefore: roundMoney(Number(row?.paidAmount) || 0),
+  };
+};
+
+/**
+ * Retrieves the payments of the contact that pay its opening balance and
+ * come after the given position (date, then id), in that order: their A/R
+ * (A/P) relief at the opening balance rate is a running total, so it moves
+ * when an earlier one is created, edited or deleted.
+ * @param {Knex} knex - Tenant knex or a transaction.
+ * @param {IOpeningBalancePaidBeforeKind} kind - The payment tables.
+ * @param {number} contactId - The contact.
+ * @param {{ id: number; date: any }} after - The position to start after.
+ * @returns {Promise<IOrderedPayment[]>}
+ */
+export const getLaterOpeningBalancePayments = async (
+  knex: Knex | Knex.Transaction,
+  kind: IOpeningBalancePaidBeforeKind,
+  contactId: number,
+  after: { id: number; date: moment.MomentInput },
+): Promise<IOrderedPayment[]> => {
+  if (!contactId) return [];
+  const date = moment(after.date).format('YYYY-MM-DD');
+
+  const rows: Array<{ id: number; date: any }> = await knex(
+    `${kind.entriesTable} as e`,
+  )
+    .join(`${kind.paymentsTable} as p`, 'p.id', `e.${kind.entryPaymentId}`)
+    .where('e.entry_type', 'opening_balance')
+    .where(`p.${kind.contactColumn}`, contactId)
+    .where((builder) =>
+      builder
+        .where('p.payment_date', '>', date)
+        .orWhere((b) =>
+          b.where('p.payment_date', date).where('p.id', '>', after.id),
+        ),
+    )
+    .distinct('p.id as id', 'p.payment_date as date')
+    .orderBy([
+      { column: 'p.payment_date', order: 'asc' },
+      { column: 'p.id', order: 'asc' },
+    ]);
+
+  return rows.map((row) => ({
+    id: row.id,
+    date: moment(row.date).format('YYYY-MM-DD'),
+  }));
+};
+
+/**
  * A payment (or refund) with its date, in the order the running-total
  * split uses.
  */

@@ -2,7 +2,11 @@ import { AccountNormal } from '@/modules/Accounts/Accounts.types';
 import { LandedCostGLEntriesService } from './LandedCostGLEntries.service';
 
 describe('LandedCostGLEntriesService', () => {
-  let ledgerStorage: { commit: jest.Mock; deleteByReference: jest.Mock };
+  let ledgerStorage: {
+    commit: jest.Mock;
+    deleteByReference: jest.Mock;
+    tagUntaggedByReference: jest.Mock;
+  };
   let billLandedCostModel: jest.Mock;
   let service: LandedCostGLEntriesService;
 
@@ -36,7 +40,11 @@ describe('LandedCostGLEntriesService', () => {
   } as any;
 
   beforeEach(() => {
-    ledgerStorage = { commit: jest.fn(), deleteByReference: jest.fn() };
+    ledgerStorage = {
+      commit: jest.fn(),
+      deleteByReference: jest.fn(),
+      tagUntaggedByReference: jest.fn(),
+    };
     billLandedCostModel = jest.fn();
     service = new LandedCostGLEntriesService(
       ledgerStorage as any,
@@ -268,6 +276,123 @@ describe('LandedCostGLEntriesService', () => {
           [{ date: '2023-02-01', amount: 1000 }],
         ),
       ).toEqual([]);
+    });
+  });
+
+  describe('rewriteLandedCostsCashGLEntriesOfSourceBills', () => {
+    const queryOf = (landedCosts: any[]) => {
+      const builder: any = {
+        where: jest.fn(() => builder),
+        whereIn: jest.fn(() => builder),
+        withGraphFetched: jest.fn(() => builder),
+        then: (resolve: any, reject: any) =>
+          Promise.resolve(landedCosts).then(resolve, reject),
+      };
+      return { query: jest.fn(() => builder) };
+    };
+
+    /** A transaction answering the lock lookup's queries by table. */
+    const fakeTrx = (tables: Record<string, any[]> = {}) => {
+      const make = (table?: string) => {
+        let name = table;
+        const builder: any = {};
+        ['where', 'whereIn', 'whereNull', 'select', 'join'].forEach(
+          (method) => (builder[method] = jest.fn(() => builder)),
+        );
+        builder.from = jest.fn((from: string) => {
+          name = from;
+          return builder;
+        });
+        builder.then = (resolve: any, reject: any) =>
+          Promise.resolve(tables[name] || []).then(resolve, reject);
+        return builder;
+      };
+      const trx: any = jest.fn((table: string) => make(table.split(' ')[0]));
+      trx.queryBuilder = () => make();
+      return trx;
+    };
+
+    it('tags the untagged (old) entries accrual before rewriting the cash set', async () => {
+      const landedCosts = [
+        buildAllocatedLandedCost({ id: 10, fromTransactionType: 'Bill' }),
+        buildAllocatedLandedCost({ id: 11, fromTransactionType: 'Bill' }),
+      ];
+      billLandedCostModel.mockReturnValue(queryOf(landedCosts));
+      const trx = fakeTrx({
+        accounts_transactions: [{ referenceId: 10, date: '2026-06-01' }],
+      });
+      const calls: string[] = [];
+      ledgerStorage.tagUntaggedByReference.mockImplementation(async () => {
+        calls.push('tag');
+      });
+      ledgerStorage.deleteByReference.mockImplementation(async () => {
+        calls.push('delete');
+      });
+
+      await service.rewriteLandedCostsCashGLEntriesOfSourceBills([5], trx);
+
+      expect(ledgerStorage.tagUntaggedByReference).toHaveBeenCalledWith(
+        [10, 11],
+        'LandedCost',
+        'accrual',
+        trx,
+      );
+      expect(ledgerStorage.deleteByReference).toHaveBeenCalledWith(
+        10,
+        'LandedCost',
+        trx,
+        { basis: 'cash' },
+      );
+      // Tagged first: an untagged row never sits next to a cash set.
+      expect(calls).toEqual(['tag', 'delete', 'delete']);
+    });
+
+    it('leaves an old landed cost dated in a locked period as it is', async () => {
+      const landedCosts = [
+        buildAllocatedLandedCost({
+          id: 10,
+          fromTransactionType: 'Bill',
+          fromTransactionId: 5,
+        }),
+        buildAllocatedLandedCost({
+          id: 11,
+          fromTransactionType: 'Bill',
+          fromTransactionId: 5,
+        }),
+      ];
+      billLandedCostModel.mockReturnValue(queryOf(landedCosts));
+      const trx = fakeTrx({
+        // #10 is old (untagged) and dated in the locked period; #11 is
+        // already tagged.
+        accounts_transactions: [{ referenceId: 10, date: '2026-03-15' }],
+        bills_payments_entries: [{ billId: 5, date: '2026-04-10' }],
+        settings: [
+          { key: 'locking-type', value: 'all' },
+          { key: 'all.active', value: 'true' },
+          { key: 'all.lock_to_date', value: '2026-03-31' },
+        ],
+      });
+
+      await service.rewriteLandedCostsCashGLEntriesOfSourceBills([5], trx);
+
+      expect(ledgerStorage.tagUntaggedByReference).toHaveBeenCalledWith(
+        [11],
+        'LandedCost',
+        'accrual',
+        trx,
+      );
+      // No cash set next to #10's untagged rows.
+      expect(ledgerStorage.deleteByReference).toHaveBeenCalledTimes(1);
+      expect(ledgerStorage.deleteByReference.mock.calls[0][0]).toBe(11);
+    });
+
+    it('does nothing when no landed cost comes from the bills', async () => {
+      billLandedCostModel.mockReturnValue(queryOf([]));
+
+      await service.rewriteLandedCostsCashGLEntriesOfSourceBills([5]);
+
+      expect(ledgerStorage.tagUntaggedByReference).not.toHaveBeenCalled();
+      expect(ledgerStorage.deleteByReference).not.toHaveBeenCalled();
     });
   });
 });

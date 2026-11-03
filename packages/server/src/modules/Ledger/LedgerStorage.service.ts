@@ -208,4 +208,32 @@ export class LedgerStorageService {
     // Deletes and reverts the balances.
     await this.delete(reversedLedger, trx);
   };
+
+  /**
+   * Tags the untagged (NULL basis) entries of the given reference with the
+   * given basis. An untagged entry counts on both bases, so it must be tagged
+   * before a set of the other basis is written next to it. The stored
+   * balances don't change: they count every entry whatever its basis.
+   * @param {number | number[]} referenceId - The reference ID.
+   * @param {string} referenceType - The reference type.
+   * @param {AccountingBasis} basis - The basis to tag them with.
+   * @param {Knex.Transaction} trx - The knex transaction.
+   * @returns {Promise<number>} The number of entries tagged.
+   */
+  public tagUntaggedByReference = async (
+    referenceId: number | number[],
+    referenceType: string,
+    basis: AccountingBasis,
+    trx?: Knex.Transaction,
+  ): Promise<number> => {
+    const ids = Array.isArray(referenceId) ? referenceId : [referenceId];
+    if (ids.length === 0) return 0;
+
+    return this.accountTransactionModel()
+      .query(trx)
+      .whereIn('referenceId', ids)
+      .where('referenceType', referenceType)
+      .whereNull('basis')
+      .patch({ basis } as Partial<AccountTransaction>);
+  };
 }
