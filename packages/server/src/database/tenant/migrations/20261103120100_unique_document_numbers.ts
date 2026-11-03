@@ -371,23 +371,20 @@ const repairKind = async (knex: any, kind: DocumentKind, log: string[]) => {
     }
   }
 
-  // 3. Other duplicates: the oldest keeps the number.
+  // 3. Other duplicates: the oldest keeps the number. The grouping query
+  // returns only the duplicated values; each group's rows are then read
+  // whole (a GROUP_CONCAT id list can be cut at `group_concat_max_len`,
+  // 1024 bytes by default on MySQL, and miss rows or split an id).
   const groups: any[] = await knex(table)
     .whereNotNull(column)
     .groupBy(column)
     .havingRaw('COUNT(*) > 1')
-    .select(
-      knex.raw('GROUP_CONCAT(?? ORDER BY ?? SEPARATOR ?) as ??', [
-        'id',
-        'id',
-        ',',
-        'ids',
-      ]),
-    );
+    .select(knex.raw('?? as ??', [column, 'number']));
   for (const group of groups) {
-    const ids = String(group.ids).split(',').map(Number);
+    // Same comparison as the grouping (and the index): the column's
+    // collation, so case and trailing spaces are ignored.
     const rows: any[] = await knex(table)
-      .whereIn('id', ids)
+      .where(column, group.number)
       .select('id', knex.raw('?? as ??', [column, 'number']))
       .orderBy('id');
     const [, ...others] = rows;

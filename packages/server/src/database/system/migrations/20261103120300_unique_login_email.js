@@ -33,20 +33,22 @@ const indexExists = async (knex) => {
 exports.up = async function (knex) {
   if (await indexExists(knex)) return;
 
-  const duplicates = await knex('users')
+  // Only the duplicated emails; each one's logins are read separately (a
+  // GROUP_CONCAT id list can be cut at `group_concat_max_len`).
+  const emails = await knex('users')
     .whereNotNull('email')
     .groupBy('email')
     .havingRaw('COUNT(*) > 1')
-    .select(
-      'email',
-      knex.raw('GROUP_CONCAT(?? ORDER BY ?? SEPARATOR ?) as ??', [
-        'id',
-        'id',
-        ',',
-        'ids',
-      ]),
-    )
+    .select('email')
     .orderBy('email');
+  const duplicates = [];
+  for (const { email } of emails) {
+    const logins = await knex('users')
+      .where('email', email)
+      .orderBy('id')
+      .select('id');
+    duplicates.push({ email, ids: logins.map((login) => login.id) });
+  }
 
   if (duplicates.length > 0) {
     console.warn(
@@ -54,10 +56,7 @@ exports.up = async function (knex) {
         `Nothing was changed. Sort these out (health check H6), then run: ` +
         `ALTER TABLE USERS ADD UNIQUE INDEX USERS_EMAIL_UNIQUE (EMAIL);\n  ` +
         duplicates
-          .map(
-            (row) =>
-              `${row.email}: logins #${String(row.ids).split(',').join(', #')}`,
-          )
+          .map((row) => `${row.email}: logins #${row.ids.join(', #')}`)
           .join('\n  '),
     );
     return;
