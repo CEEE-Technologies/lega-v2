@@ -29,6 +29,11 @@ and keeps `BACKUP_KEEP_DAYS` (default 14) days in the `lega-backups` volume:
 
 A first backup runs right after the first deploy.
 
+**Coolify volume backup.** The app's **Backups** page in Coolify also archives
+the `lega-backups` volume every day at 03:00 UTC (keeping 3 locally). Once an
+S3 storage is added under **Storages** and picked on that schedule, Coolify
+uploads each archive there too (keeping 14).
+
 **Off-site copies.** Set these variables and redeploy to also upload each
 backup to an S3-compatible bucket (Cloudflare R2, Backblaze B2, AWS S3):
 
