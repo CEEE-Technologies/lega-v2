@@ -1,0 +1,6 @@
+# One-shot job that sets up Garage's layout, key and bucket (see init.sh).
+FROM alpine:3.20
+RUN apk add --no-cache curl jq
+COPY init.sh /usr/local/bin/garage-init
+RUN chmod +x /usr/local/bin/garage-init
+CMD ["/usr/local/bin/garage-init"]
