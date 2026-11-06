@@ -15,6 +15,7 @@ import {
 } from '@/components';
 import { CLASSES } from '@/constants/classes';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
+import { useAssignableRoles } from '@/hooks/utils';
 
 interface InviteUserFormContentProps extends WithDialogActionsProps {}
 
@@ -23,6 +24,8 @@ function InviteUserFormContentInner({
 }: InviteUserFormContentProps): React.ReactElement {
   const { isSubmitting } = useFormikContext<InviteUserFormValues>();
   const { isEditMode, dialogName, roles } = useInviteUserFormContext();
+  // Only admins can give the Admin role.
+  const assignableRoles = useAssignableRoles(roles);
 
   const handleClose = () => {
     closeDialog(dialogName);
@@ -50,7 +53,7 @@ function InviteUserFormContentInner({
         >
           <FSelect
             name={'roleId'}
-            items={roles ?? []}
+            items={assignableRoles}
             valueAccessor={'id'}
             textAccessor={'name'}
             popoverProps={{ minimal: true }}

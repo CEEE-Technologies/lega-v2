@@ -6,13 +6,23 @@ import { AppToaster, FormattedMessage as T } from '@/components';
 import { workspacesKeys } from '@/ee/workspaces/hooks/query';
 import { AccountsQueryKeys } from '@/hooks/query/accounts';
 import { CashflowAccountsQueryKeys } from '@/hooks/query/cashflow-accounts';
+import { useAuthOrganizationId, useAuthToken } from '@/hooks/state';
 
 export function DashboardSockets() {
   const socket = useRef<any>();
   const client = useQueryClient();
+  const token = useAuthToken();
+  const organizationId = useAuthOrganizationId();
 
   useEffect(() => {
-    socket.current = io('/', { path: '/socket' });
+    // The server only accepts signed-in connections, and only sends each
+    // organization's updates to its members.
+    if (!token) return undefined;
+
+    socket.current = io('/', {
+      path: '/socket',
+      auth: { token, organizationId },
+    });
 
     socket.current.on('NEW_TRANSACTIONS_DATA', () => {
       client.invalidateQueries({ queryKey: [AccountsQueryKeys.ACCOUNTS] });
@@ -45,6 +55,6 @@ export function DashboardSockets() {
       socket.current.removeAllListeners();
       socket.current.close();
     };
-  }, []);
+  }, [client, token, organizationId]);
   return null;
 }

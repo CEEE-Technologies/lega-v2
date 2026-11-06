@@ -107,6 +107,10 @@ describe('Password reset tokens are stored as hashes', () => {
 
     await resetter.resetPassword(token, 'New-Passw0rd!');
     expect(update).toHaveBeenCalledTimes(1);
+    // The reset raises the session version, which ends older sessions (S10).
+    expect(JSON.stringify(update.mock.calls[0][0].sessionVersion)).toContain(
+      'session_version + 1',
+    );
     expect(resets.rows).toHaveLength(0);
 
     // Used once: the same link no longer works.

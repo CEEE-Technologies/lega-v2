@@ -17,6 +17,10 @@ import { SendInviteUserDto } from '../dtos/InviteUser.dto';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { SystemUser } from '@/modules/System/models/SystemUser';
 import { UserTenant } from '@/modules/System/models/UserTenant.model';
+import {
+  ADMIN_ROLE_SLUG,
+  AdminAccessService,
+} from '@/modules/Roles/AdminAccess.service';
 
 @Injectable()
 export class InviteTenantUserService {
@@ -35,6 +39,8 @@ export class InviteTenantUserService {
 
     @Inject(UserTenant.name)
     private readonly userTenantModel: typeof UserTenant,
+
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -51,6 +57,10 @@ export class InviteTenantUserService {
 
     if (!role) {
       throw new ServiceError(ERRORS.ROLE_NOT_FOUND, 'Role not found.');
+    }
+    // Only the owner and admins can give the Admin role.
+    if (role.slug === ADMIN_ROLE_SLUG) {
+      await this.adminAccess.throwUnlessAdmin();
     }
     // Validates the given email not exists on the storage.
     await this.validateUserEmailNotExists(sendInviteDTO.email);
