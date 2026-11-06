@@ -34,6 +34,7 @@ export interface IItemCategoryEditedPayload {
 export interface IItemCategoryDeletedPayload {
   itemCategoryId: number;
   oldItemCategory: ItemCategory;
+  trx?: Knex.Transaction;
 }
 
 export interface IItemCategoriesFilter extends IDynamicListFilter {

@@ -133,9 +133,12 @@ export class DeleteSaleInvoice {
       const oldSaleInvoice = await this.validate(saleInvoiceId, trx);
 
       // Triggers `onSaleInvoiceDelete` event.
+      // The transaction goes with it: the tax rows removed here must come
+      // back if the delete is refused or is a dry run.
       await this.eventPublisher.emitAsync(events.saleInvoice.onDelete, {
         oldSaleInvoice,
         saleInvoiceId,
+        trx,
       } as ISaleInvoiceDeletePayload);
 
       // Triggers `onSaleInvoiceDeleting` event.
