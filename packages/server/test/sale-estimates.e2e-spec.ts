@@ -4,6 +4,9 @@ import { app, AuthorizationHeader, orgainzationId } from './init-app-test';
 
 let customerId;
 let itemId;
+// Set when another suite has switched on multiple warehouses in this
+// company: an estimate then needs a warehouse (that check now blocks).
+let warehouseId: number | undefined;
 
 const makeEstimateRequest = ({ ...props } = {}) => ({
   customerId: customerId,
@@ -14,6 +17,7 @@ const makeEstimateRequest = ({ ...props } = {}) => ({
   discount: 100,
   discountType: 'amount',
   branchId: 1,
+  ...(warehouseId && { warehouseId }),
   entries: [
     {
       index: 1,
@@ -55,6 +59,16 @@ describe('Sale Estimates (e2e)', () => {
         sellPrice: 100,
       });
     itemId = item.body.id;
+
+    const warehouses = await request(app.getHttpServer())
+      .get('/warehouses')
+      .set('organization-id', orgainzationId)
+      .set('Authorization', AuthorizationHeader);
+    const list: any[] = Array.isArray(warehouses.body)
+      ? warehouses.body
+      : (Object.values(warehouses.body || {}).find(Array.isArray) as any[]) ||
+        [];
+    warehouseId = (list.find((w) => w.primary || w.is_primary) ?? list[0])?.id;
   });
 
   it('/sale-estimates (POST)', async () => {
