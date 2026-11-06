@@ -299,3 +299,93 @@ describe('normalizeLedgerEntries', () => {
     expect(entries[2].credit).toBe(245.68);
   });
 });
+
+/**
+ * E6: the ClickHouse totals are queued only once the save has committed,
+ * so a dry run, preview or failed save leaves the workspace totals alone.
+ */
+describe('LedgerStorageService ClickHouse queueing', () => {
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  const fakeTrx = () => {
+    let resolve: () => void;
+    let reject: (e: Error) => void;
+    const executionPromise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    // Like knex: a rollback nobody waits for is not an unhandled rejection.
+    executionPromise.catch(() => undefined);
+    return {
+      trx: { executionPromise } as any,
+      commit: () => resolve(),
+      rollback: (e: Error) => reject(e),
+    };
+  };
+
+  const ledger = () =>
+    new Ledger([
+      entry({ accountId: AR, debit: 100, entryId: 11 } as any),
+      entry({ accountId: INCOME_A, credit: 100, entryId: 12 } as any),
+    ]);
+
+  /** The delete reads the stored rows first: give it some. */
+  const withDeletedRows = (service: LedgerStorageService) => {
+    (service as any).accountTransactionModel = () => ({
+      query: () => ({
+        whereIn: () => ({
+          select: async () => [{ accountId: AR, debit: 100, credit: 0 }],
+        }),
+      }),
+    });
+  };
+
+  it('queues the totals once a save commits', async () => {
+    const { service } = buildService();
+    const clickHouse = (service as any).ledgerClickHouseSink;
+    const { trx, commit } = fakeTrx();
+
+    await service.commit(ledger(), trx);
+    expect(clickHouse.onLedgerCommitted).not.toHaveBeenCalled();
+
+    commit();
+    await flush();
+    expect(clickHouse.onLedgerCommitted).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues nothing when the save is rolled back (dry run or failure)', async () => {
+    const { service } = buildService();
+    const clickHouse = (service as any).ledgerClickHouseSink;
+    const { trx, rollback } = fakeTrx();
+
+    await service.commit(ledger(), trx);
+    rollback(new Error('dry run'));
+    await flush();
+    expect(clickHouse.onLedgerCommitted).not.toHaveBeenCalled();
+  });
+
+  it('queues a delete once it commits, and nothing when it is rolled back', async () => {
+    const committed = buildService().service;
+    withDeletedRows(committed);
+    const okTrx = fakeTrx();
+    await committed.delete(ledger(), okTrx.trx);
+    expect(
+      (committed as any).ledgerClickHouseSink.onLedgerDeleted,
+    ).not.toHaveBeenCalled();
+    okTrx.commit();
+    await flush();
+    expect(
+      (committed as any).ledgerClickHouseSink.onLedgerDeleted,
+    ).toHaveBeenCalledTimes(1);
+
+    const undone = buildService().service;
+    withDeletedRows(undone);
+    const badTrx = fakeTrx();
+    await undone.delete(ledger(), badTrx.trx);
+    badTrx.rollback(new Error('dry run'));
+    await flush();
+    expect(
+      (undone as any).ledgerClickHouseSink.onLedgerDeleted,
+    ).not.toHaveBeenCalled();
+  });
+});

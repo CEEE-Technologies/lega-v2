@@ -37,29 +37,40 @@ export class InventoryCostSubscriber {
   }
 
   /**
-   * Handles schedule compute inventory items cost once inventory transactions created.
+   * Schedules the items cost compute once the inventory transactions are
+   * created and the save is committed. A dry run, an import preview or a
+   * failed save schedules nothing, and leaves the "cost computing" flag off.
    * @param {IInventoryTransactionsCreatedPayload} payload -
    */
   @OnEvent(events.inventory.onInventoryTransactionsCreated)
   async handleScheduleItemsCostOnInventoryTransactionsCreated({
     inventoryTransactions,
+    trx,
   }: IInventoryTransactionsCreatedPayload) {
-    const inImportPreviewScope = this.importAls.isImportPreview;
-
     // Avoid running the cost items job if the async process is in import preview.
-    if (inImportPreviewScope) return;
+    if (this.importAls.isImportPreview) return;
 
-    await this.saleInvoicesCost.computeItemsCostByInventoryTransactions(
-      inventoryTransactions,
+    runAfterTransaction(trx, () =>
+      this.markRunningAndSchedule(() =>
+        this.saleInvoicesCost.computeItemsCostByInventoryTransactions(
+          inventoryTransactions,
+        ),
+      ),
     );
   }
 
   /**
-   * Marks items cost compute running state.
+   * Sets the "cost computing" flag, then schedules the cost job. The flag
+   * is only set when a job is scheduled, since the job is what clears it.
+   * @param {() => Promise<void>} schedule
    */
-  @OnEvent(events.inventory.onInventoryTransactionsCreated)
-  async markGlobalSettingsComputeItems({}) {
-    await this.inventoryService.markItemsCostComputeRunning(true);
+  private async markRunningAndSchedule(schedule: () => Promise<void>) {
+    try {
+      await this.inventoryService.markItemsCostComputeRunning(true);
+      await schedule();
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   /**
@@ -119,15 +130,13 @@ export class InventoryCostSubscriber {
     if (!oldInventoryTransactions?.length) {
       return;
     }
-    runAfterTransaction(trx, async () => {
-      try {
-        // Each item from the earliest date of its removed movements.
-        await this.saleInvoicesCost.scheduleComputeCostByInventoryTransactions(
+    runAfterTransaction(trx, () =>
+      // Each item from the earliest date of its removed movements.
+      this.markRunningAndSchedule(() =>
+        this.saleInvoicesCost.scheduleComputeCostByInventoryTransactions(
           oldInventoryTransactions,
-        );
-      } catch (error) {
-        console.error(error);
-      }
-    });
+        ),
+      ),
+    );
   }
 }

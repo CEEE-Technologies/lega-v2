@@ -61,8 +61,9 @@ export class DecrementUncategorizedTransactionOnMatchingSubscriber {
     trx,
   }: IBankTransactionUnmatchedEventPayload) {
     const transaction = await this.uncategorizedBankTransactionModel()
-      .query()
-      .findById(uncategorizedTransactionId);
+      .query(trx)
+      .findById(uncategorizedTransactionId)
+      .throwIfNotFound();
 
     await this.accountModel()
       .query(trx)

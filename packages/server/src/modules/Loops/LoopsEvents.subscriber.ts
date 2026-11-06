@@ -18,7 +18,8 @@ export class LoopsEventsSubscriber {
    * Once the user verified sends the event to the Loops.
    * @param {IAuthSignUpVerifiedEventPayload} param0
    */
-  @OnEvent(events.auth.signUpConfirmed)
+  // Side effect (Loops marketing email): an error is logged and does not stop the save.
+  @OnEvent(events.auth.signUpConfirmed, { suppressErrors: true })
   public async triggerEventOnSignupVerified({
     email,
     userId,

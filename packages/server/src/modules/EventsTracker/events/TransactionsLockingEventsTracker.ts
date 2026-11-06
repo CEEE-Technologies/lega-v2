@@ -14,7 +14,8 @@ import { events } from '@/common/events/events';
 export class TransactionsLockingEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.subscription.onSubscriptionResumed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.subscription.onSubscriptionResumed, { suppressErrors: true })
   public handleSubscriptionResumedEvent() {
     this.posthog.trackEvent({
       event: SUBSCRIPTION_RESUMED,
@@ -22,7 +23,10 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.subscription.onSubscriptionCancelled)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.subscription.onSubscriptionCancelled, {
+    suppressErrors: true,
+  })
   public handleSubscriptionCancelledEvent() {
     this.posthog.trackEvent({
       event: SUBSCRIPTION_CANCELLED,
@@ -30,7 +34,10 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.subscription.onSubscriptionPlanChanged)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.subscription.onSubscriptionPlanChanged, {
+    suppressErrors: true,
+  })
   public handleSubscriptionPlanChangedEvent() {
     this.posthog.trackEvent({
       event: SUBSCRIPTION_PLAN_CHANGED,
@@ -38,7 +45,10 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.subscription.onSubscriptionPaymentFailed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.subscription.onSubscriptionPaymentFailed, {
+    suppressErrors: true,
+  })
   public handleSubscriptionPaymentFailedEvent() {
     this.posthog.trackEvent({
       event: SUBSCRIPTION_PAYMENT_FAILED,
@@ -46,7 +56,10 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.subscription.onSubscriptionPaymentSucceed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.subscription.onSubscriptionPaymentSucceed, {
+    suppressErrors: true,
+  })
   public handleSubscriptionPaymentSucceed() {
     this.posthog.trackEvent({
       event: SUBSCRIPTION_PAYMENT_SUCCEED,

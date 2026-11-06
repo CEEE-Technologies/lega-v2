@@ -17,7 +17,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 export class BankRuleEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.bankRules.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onCreated, { suppressErrors: true })
   public handleTrackBankRuleCreatedEvent({}: IBankRuleEventCreatedPayload) {
     this.posthog.trackEvent({
       event: BANK_RULE_CREATED,
@@ -25,7 +26,8 @@ export class BankRuleEventsTracker {
     });
   }
 
-  @OnEvent(events.bankRules.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onEdited, { suppressErrors: true })
   public handleTrackEditedBankRuleEvent({}: IBankRuleEventEditedPayload) {
     this.posthog.trackEvent({
       event: BANK_RULE_EDITED,
@@ -33,7 +35,8 @@ export class BankRuleEventsTracker {
     });
   }
 
-  @OnEvent(events.bankRules.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onDeleted, { suppressErrors: true })
   public handleTrackDeletedBankRuleEvent({}: IBankRuleEventDeletedPayload) {
     this.posthog.trackEvent({
       event: BANK_RULE_DELETED,

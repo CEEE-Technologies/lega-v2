@@ -15,6 +15,10 @@ import { Injectable } from '@nestjs/common';
 import { ServiceError } from '../Items/ServiceError';
 import { ImportModelShape } from './models/Import';
 import { ImportableRegistry } from './ImportableRegistry';
+import {
+  TransactionAbortedError,
+  withSavepoint,
+} from '../Tenancy/TenancyDB/DryRun';
 
 @Injectable()
 export class ImportFileCommon {
@@ -42,7 +46,9 @@ export class ImportFileCommon {
     const importable = await this.importableRegistry.getImportable(
       importFile.resource,
     );
-    const concurrency = importable.concurrency || 10;
+    // Rows share one transaction, so with savepoints they must run one at a
+    // time (the database runs their queries one at a time anyway).
+    const concurrency = trx ? 1 : importable.concurrency || 10;
 
     const success: ImportOperSuccess[] = [];
     const failed: ImportOperError[] = [];
@@ -66,10 +72,19 @@ export class ImportFileCommon {
           transformedDTO,
         );
         try {
-          // Run the importable function and listen to the errors.
-          const data = await importable.importable(transformedDTO, trx);
+          // Run the importable function and listen to the errors. Inside a
+          // transaction each row gets a savepoint: a row that fails half way
+          // (for example in a ledger handler) keeps none of its writes.
+          const data = trx
+            ? await withSavepoint(trx, () =>
+                importable.importable(transformedDTO, trx),
+              )
+            : await importable.importable(transformedDTO, trx);
           success.push({ index, data });
         } catch (err) {
+          // The whole transaction is gone: stop instead of importing the
+          // next rows outside it.
+          if (err instanceof TransactionAbortedError) throw err;
           if (err instanceof ServiceError) {
             const error: ImportInsertError[] = [
               {
@@ -91,6 +106,7 @@ export class ImportFileCommon {
           }
         }
       } catch (errors) {
+        if (errors instanceof TransactionAbortedError) throw errors;
         const error = errors.map((er) => ({ ...er, ...errorContext }));
         failed.push({ index, error });
       }

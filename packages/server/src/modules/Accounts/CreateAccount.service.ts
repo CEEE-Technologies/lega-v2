@@ -137,9 +137,10 @@ export class CreateAccountService {
         trx,
       } as IAccountEventCreatingPayload);
 
-      // Inserts account to the storage.
+      // Inserts account to the storage, inside the transaction: an import
+      // preview rolls it back, and so does a failed save.
       const account = await this.accountModel()
-        .query()
+        .query(trx)
         .insert({
           ...accountInputModel,
         });

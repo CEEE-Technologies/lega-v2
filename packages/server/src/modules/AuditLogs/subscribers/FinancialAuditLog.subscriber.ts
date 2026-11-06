@@ -106,7 +106,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Bills ---
-  @OnEvent(events.bill.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onCreated, { suppressErrors: true })
   async onBillCreated({ bill, trx }: IBillCreatedPayload) {
     await this.write(trx, 'created', AbilitySubject.Bill, bill.id, {
       billNumber: bill.billNumber,
@@ -115,7 +116,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.bill.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onEdited, { suppressErrors: true })
   async onBillEdited({ bill, trx }: IBillEditedPayload) {
     await this.write(trx, 'edited', AbilitySubject.Bill, bill.id, {
       billNumber: bill.billNumber,
@@ -124,14 +126,16 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.bill.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onDeleted, { suppressErrors: true })
   async onBillDeleted({ billId, oldBill, trx }: IBIllEventDeletedPayload) {
     await this.write(trx, 'deleted', AbilitySubject.Bill, billId, {
       billNumber: oldBill.billNumber,
     });
   }
 
-  @OnEvent(events.bill.onOpened)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onOpened, { suppressErrors: true })
   async onBillOpened({ bill, trx }: IBillOpenedPayload) {
     await this.write(trx, 'opened', AbilitySubject.Bill, bill.id, {
       billNumber: bill.billNumber,
@@ -139,7 +143,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Sale invoices ---
-  @OnEvent(events.saleInvoice.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onCreated, { suppressErrors: true })
   async onSaleInvoiceCreated({ saleInvoice, trx }: ISaleInvoiceCreatedPayload) {
     await this.write(
       trx,
@@ -154,7 +159,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleInvoice.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onEdited, { suppressErrors: true })
   async onSaleInvoiceEdited({ saleInvoice, trx }: ISaleInvoiceEditedPayload) {
     await this.write(
       trx,
@@ -169,7 +175,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleInvoice.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onDeleted, { suppressErrors: true })
   async onSaleInvoiceDeleted({
     saleInvoiceId,
     oldSaleInvoice,
@@ -184,7 +191,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleInvoice.onDelivered)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onDelivered, { suppressErrors: true })
   async onSaleInvoiceDelivered({
     saleInvoice,
     trx,
@@ -200,7 +208,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleInvoice.onWrittenoff)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onWrittenoff, { suppressErrors: true })
   async onSaleInvoiceWrittenoff({
     saleInvoice,
     trx,
@@ -216,7 +225,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleInvoice.onWrittenoffCanceled)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onWrittenoffCanceled, { suppressErrors: true })
   async onSaleInvoiceWrittenoffCanceled({
     saleInvoice,
     trx,
@@ -231,7 +241,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Sale receipts ---
-  @OnEvent(events.saleReceipt.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleReceipt.onCreated, { suppressErrors: true })
   async onSaleReceiptCreated({ saleReceipt, trx }: ISaleReceiptCreatedPayload) {
     await this.write(
       trx,
@@ -246,7 +257,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleReceipt.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleReceipt.onEdited, { suppressErrors: true })
   async onSaleReceiptEdited({ saleReceipt, trx }: ISaleReceiptEditedPayload) {
     await this.write(
       trx,
@@ -261,7 +273,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleReceipt.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleReceipt.onDeleted, { suppressErrors: true })
   async onSaleReceiptDeleted({
     saleReceiptId,
     oldSaleReceipt,
@@ -277,7 +290,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Payments received ---
-  @OnEvent(events.paymentReceive.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onCreated, { suppressErrors: true })
   async onPaymentReceivedCreated({
     paymentReceive,
     trx,
@@ -295,7 +309,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.paymentReceive.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onEdited, { suppressErrors: true })
   async onPaymentReceivedEdited({
     paymentReceive,
     trx,
@@ -312,7 +327,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.paymentReceive.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onDeleted, { suppressErrors: true })
   async onPaymentReceivedDeleted({
     paymentReceiveId,
     oldPaymentReceive,
@@ -328,7 +344,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Bill payments (payments made) ---
-  @OnEvent(events.billPayment.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onCreated, { suppressErrors: true })
   async onBillPaymentCreated({
     billPayment,
     trx,
@@ -346,7 +363,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.billPayment.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onEdited, { suppressErrors: true })
   async onBillPaymentEdited({
     billPayment,
     trx,
@@ -363,7 +381,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.billPayment.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onDeleted, { suppressErrors: true })
   async onBillPaymentDeleted({
     billPaymentId,
     oldBillPayment,
@@ -379,7 +398,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Expenses ---
-  @OnEvent(events.expenses.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.expenses.onCreated, { suppressErrors: true })
   async onExpenseCreated({ expense, expenseId, trx }: IExpenseCreatedPayload) {
     await this.write(trx, 'created', AbilitySubject.Expense, expenseId, {
       amount: expense.totalAmount,
@@ -387,7 +407,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.expenses.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.expenses.onEdited, { suppressErrors: true })
   async onExpenseEdited({ expense, expenseId, trx }: IExpenseEventEditPayload) {
     await this.write(trx, 'edited', AbilitySubject.Expense, expenseId, {
       amount: expense.totalAmount,
@@ -395,7 +416,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.expenses.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.expenses.onDeleted, { suppressErrors: true })
   async onExpenseDeleted({
     expenseId,
     oldExpense,
@@ -406,7 +428,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.expenses.onPublished)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.expenses.onPublished, { suppressErrors: true })
   async onExpensePublished({
     expense,
     expenseId,
@@ -419,7 +442,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Credit notes ---
-  @OnEvent(events.creditNote.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.creditNote.onCreated, { suppressErrors: true })
   async onCreditNoteCreated({ creditNote, trx }: ICreditNoteCreatedPayload) {
     await this.write(trx, 'created', AbilitySubject.CreditNote, creditNote.id, {
       creditNoteNumber: creditNote.creditNoteNumber,
@@ -428,7 +452,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.creditNote.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.creditNote.onEdited, { suppressErrors: true })
   async onCreditNoteEdited({ creditNote, trx }: ICreditNoteEditedPayload) {
     await this.write(trx, 'edited', AbilitySubject.CreditNote, creditNote.id, {
       creditNoteNumber: creditNote.creditNoteNumber,
@@ -436,7 +461,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.creditNote.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.creditNote.onDeleted, { suppressErrors: true })
   async onCreditNoteDeleted({
     creditNoteId,
     oldCreditNote,
@@ -447,14 +473,16 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.creditNote.onOpened)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.creditNote.onOpened, { suppressErrors: true })
   async onCreditNoteOpened({ creditNote, trx }: ICreditNoteOpenedPayload) {
     await this.write(trx, 'opened', AbilitySubject.CreditNote, creditNote.id, {
       creditNoteNumber: creditNote.creditNoteNumber,
     });
   }
 
-  @OnEvent(events.creditNote.onRefundCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.creditNote.onRefundCreated, { suppressErrors: true })
   async onCreditNoteRefundCreated({
     trx,
     refundCreditNote,
@@ -473,7 +501,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Vendor credits ---
-  @OnEvent(events.vendorCredit.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.vendorCredit.onCreated, { suppressErrors: true })
   async onVendorCreditCreated({
     vendorCredit,
     trx,
@@ -491,7 +520,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.vendorCredit.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.vendorCredit.onEdited, { suppressErrors: true })
   async onVendorCreditEdited({
     vendorCredit,
     trx,
@@ -508,7 +538,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.vendorCredit.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.vendorCredit.onDeleted, { suppressErrors: true })
   async onVendorCreditDeleted({
     vendorCreditId,
     oldVendorCredit,
@@ -523,7 +554,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.vendorCredit.onOpened)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.vendorCredit.onOpened, { suppressErrors: true })
   async onVendorCreditOpened({
     vendorCredit,
     vendorCreditId,
@@ -540,7 +572,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.vendorCredit.onRefundCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.vendorCredit.onRefundCreated, { suppressErrors: true })
   async onVendorCreditRefundCreated({
     trx,
     refundVendorCredit,
@@ -556,7 +589,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Manual journals ---
-  @OnEvent(events.manualJournals.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onCreated, { suppressErrors: true })
   async onManualJournalCreated({
     manualJournal,
     trx,
@@ -574,7 +608,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.manualJournals.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onEdited, { suppressErrors: true })
   async onManualJournalEdited({
     manualJournal,
     trx,
@@ -591,7 +626,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.manualJournals.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onDeleted, { suppressErrors: true })
   async onManualJournalDeleted({
     manualJournalId,
     trx,
@@ -605,7 +641,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.manualJournals.onPublished)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onPublished, { suppressErrors: true })
   async onManualJournalPublished({
     manualJournal,
     trx,
@@ -620,7 +657,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Cashflow ---
-  @OnEvent(events.cashflow.onTransactionCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.cashflow.onTransactionCreated, { suppressErrors: true })
   async onCashflowCreated({
     cashflowTransaction,
     trx,
@@ -637,7 +675,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.cashflow.onTransactionDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.cashflow.onTransactionDeleted, { suppressErrors: true })
   async onCashflowDeleted({
     cashflowTransactionId,
     trx,
@@ -651,7 +690,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.cashflow.onTransactionCategorized)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.cashflow.onTransactionCategorized, { suppressErrors: true })
   async onCashflowCategorized({
     cashflowTransaction,
     trx,
@@ -666,7 +706,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- GL accounts ---
-  @OnEvent(events.accounts.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onCreated, { suppressErrors: true })
   async onAccountCreated({
     account,
     accountId,
@@ -678,7 +719,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.accounts.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onDeleted, { suppressErrors: true })
   async onAccountDeleted({
     accountId,
     oldAccount,
@@ -690,13 +732,15 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.accounts.onActivated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onActivated, { suppressErrors: true })
   async onAccountActivated({ accountId, trx }: IAccountEventActivatedPayload) {
     await this.write(trx, 'activated', AbilitySubject.Account, accountId, {});
   }
 
   // --- Inventory adjustments ---
-  @OnEvent(events.inventoryAdjustment.onQuickCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.inventoryAdjustment.onQuickCreated, { suppressErrors: true })
   async onInventoryAdjustmentCreated({
     inventoryAdjustment,
     inventoryAdjustmentId,
@@ -711,7 +755,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.inventoryAdjustment.onPublished)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.inventoryAdjustment.onPublished, { suppressErrors: true })
   async onInventoryAdjustmentPublished({
     inventoryAdjustment,
     inventoryAdjustmentId,
@@ -726,7 +771,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.inventoryAdjustment.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.inventoryAdjustment.onDeleted, { suppressErrors: true })
   async onInventoryAdjustmentDeleted({
     inventoryAdjustmentId,
     trx,
@@ -741,7 +787,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Warehouse transfers ---
-  @OnEvent(events.warehouseTransfer.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.warehouseTransfer.onCreated, { suppressErrors: true })
   async onWarehouseTransferCreated({
     warehouseTransfer,
     trx,
@@ -758,7 +805,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.warehouseTransfer.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.warehouseTransfer.onEdited, { suppressErrors: true })
   async onWarehouseTransferEdited({
     warehouseTransfer,
     trx,
@@ -769,7 +817,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.warehouseTransfer.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.warehouseTransfer.onDeleted, { suppressErrors: true })
   async onWarehouseTransferDeleted({
     oldWarehouseTransfer,
     trx,
@@ -783,7 +832,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.warehouseTransfer.onInitiated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.warehouseTransfer.onInitiated, { suppressErrors: true })
   async onWarehouseTransferInitiated({
     warehouseTransfer,
     trx,
@@ -800,7 +850,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.warehouseTransfer.onTransferred)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.warehouseTransfer.onTransferred, { suppressErrors: true })
   async onWarehouseTransferTransferred({
     warehouseTransfer,
     trx,
@@ -818,7 +869,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Transactions locking (settings change; no trx on payload) ---
-  @OnEvent(events.transactionsLocking.partialUnlocked)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.transactionsLocking.partialUnlocked, { suppressErrors: true })
   async onTransactionsLockingChanged(
     payload: ITransactionsLockingPartialUnlocked | ITransactionsLockingCanceled,
   ) {
@@ -843,7 +895,8 @@ export class FinancialAuditLogSubscriber {
   }
 
   // --- Sale estimates ---
-  @OnEvent(events.saleEstimate.onCreated)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onCreated, { suppressErrors: true })
   async onSaleEstimateCreated({
     saleEstimate,
     saleEstimateId,
@@ -862,7 +915,8 @@ export class FinancialAuditLogSubscriber {
     );
   }
 
-  @OnEvent(events.saleEstimate.onEdited)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onEdited, { suppressErrors: true })
   async onSaleEstimateEdited({
     saleEstimate,
     estimateId,
@@ -874,7 +928,8 @@ export class FinancialAuditLogSubscriber {
     });
   }
 
-  @OnEvent(events.saleEstimate.onDeleted)
+  // Side effect (audit log): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onDeleted, { suppressErrors: true })
   async onSaleEstimateDeleted({
     saleEstimateId,
     oldSaleEstimate,

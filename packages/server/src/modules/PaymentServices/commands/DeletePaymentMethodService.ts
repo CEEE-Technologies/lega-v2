@@ -53,6 +53,7 @@ export class DeletePaymentMethodService {
       // Triggers `onPaymentMethodDeleted` event.
       await this.eventEmitter.emitAsync(events.paymentMethod.onDeleted, {
         paymentIntegrationId,
+        trx,
       });
     });
   }

@@ -15,7 +15,8 @@ export class SaleInvoiceSmsNotificationSubscriber {
    * Handles sending SMS notification after the sale invoice creation.
    * @param {ISaleInvoiceCreatedPayload} payload -
    */
-  @OnEvent(events.saleInvoice.onCreated)
+  // Side effect (SMS notice): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onCreated, { suppressErrors: true })
   private async handleNotifyBySmsAfterCreation({
     saleInvoiceId,
     trx,

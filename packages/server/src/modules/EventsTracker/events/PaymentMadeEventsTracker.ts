@@ -17,7 +17,8 @@ import {
 export class PaymentMadeEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.billPayment.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onCreated, { suppressErrors: true })
   public handleTrackPaymentMadeCreatedEvent({}: IBillPaymentEventCreatedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_MADE_CREATED,
@@ -25,7 +26,8 @@ export class PaymentMadeEventsTracker {
     });
   }
 
-  @OnEvent(events.billPayment.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onEdited, { suppressErrors: true })
   public handleTrackEditedPaymentMadeEvent({}: IBillPaymentEditingPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_MADE_EDITED,
@@ -33,7 +35,8 @@ export class PaymentMadeEventsTracker {
     });
   }
 
-  @OnEvent(events.billPayment.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.billPayment.onDeleted, { suppressErrors: true })
   public handleTrackDeletedPaymentMadeEvent({}: IBillPaymentEventDeletedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_MADE_DELETED,
