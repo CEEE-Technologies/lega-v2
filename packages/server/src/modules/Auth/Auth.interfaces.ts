@@ -6,6 +6,8 @@ import { AuthSignupDto } from './dtos/AuthSignup.dto';
 export interface JwtPayload {
   /** The authenticated user's id. */
   sub: string;
+  /** The login's session version when the token was made. */
+  sv?: number;
   iss?: string;
   aud?: string;
   iat: number;

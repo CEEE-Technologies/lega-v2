@@ -13,5 +13,8 @@ export const transformApiErrors = (errors: ResponseError[]) => {
   if (errors.find((error) => error.type === 'EMAIL.ALREADY.EXISTS')) {
     fields.email = intl.get('email_is_already_used');
   }
+  if (errors.find((error) => error.type === 'ADMIN_ONLY')) {
+    fields.roleId = intl.get('roles.error.admin_only');
+  }
   return fields;
 };
