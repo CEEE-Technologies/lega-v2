@@ -9,7 +9,10 @@ import { Injectable } from '@nestjs/common';
 export class StripeIntegrationEventsTracker {
   constructor(private readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.stripeIntegration.onOAuthCodeGranted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.stripeIntegration.onOAuthCodeGranted, {
+    suppressErrors: true,
+  })
   public handleTrackOAuthCodeGrantedTrackEvent({}: ISaleInvoiceCreatedPayload) {
     this.posthog.trackEvent({
       event: STRIPE_INTEGRAION_CONNECTED,

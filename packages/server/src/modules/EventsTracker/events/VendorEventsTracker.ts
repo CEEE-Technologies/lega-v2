@@ -17,7 +17,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 export class VendorEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.vendors.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.vendors.onCreated, { suppressErrors: true })
   public handleTrackVendorCreatedEvent({}: IVendorEventCreatedPayload) {
     this.posthog.trackEvent({
       event: VENDOR_CREATED,
@@ -25,7 +26,8 @@ export class VendorEventsTracker {
     });
   }
 
-  @OnEvent(events.vendors.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.vendors.onEdited, { suppressErrors: true })
   public handleTrackEditedVendorEvent({}: IVendorEventEditedPayload) {
     this.posthog.trackEvent({
       event: VENDOR_EDITED,
@@ -33,7 +35,8 @@ export class VendorEventsTracker {
     });
   }
 
-  @OnEvent(events.vendors.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.vendors.onDeleted, { suppressErrors: true })
   public handleTrackDeletedVendorEvent({}: IVendorEventDeletedPayload) {
     this.posthog.trackEvent({
       event: VENDOR_DELETED,

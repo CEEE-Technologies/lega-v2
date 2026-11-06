@@ -15,8 +15,9 @@ export class InvoiceChangeStatusOnMailSentSubscriber {
    * @param {ISaleInvoiceMailSent}
    * @returns {Promise<void>}
    */
-  @OnEvent(events.saleInvoice.onMailReminderSent)
-  @OnEvent(events.saleInvoice.onMailSent)
+  // Side effect (runs after the mail is sent): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onMailReminderSent, { suppressErrors: true })
+  @OnEvent(events.saleInvoice.onMailSent, { suppressErrors: true })
   async markInvoiceDelivered({
     saleInvoiceId,
     messageOptions: _messageOptions,

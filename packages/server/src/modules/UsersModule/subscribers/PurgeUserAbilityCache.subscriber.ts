@@ -17,10 +17,11 @@ export class PurgeUserAbilityCacheSubscriber {
   /**
    * Purges authorized user ability once the user mutate.
    */
-  @OnEvent(events.tenantUser.onEdited)
-  @OnEvent(events.tenantUser.onActivated)
-  @OnEvent(events.tenantUser.onInactivated)
-  @OnEvent(events.tenantUser.onDeleted)
+  // Side effect (cache purge, after the user change is saved): an error is logged and does not stop the save.
+  @OnEvent(events.tenantUser.onEdited, { suppressErrors: true })
+  @OnEvent(events.tenantUser.onActivated, { suppressErrors: true })
+  @OnEvent(events.tenantUser.onInactivated, { suppressErrors: true })
+  @OnEvent(events.tenantUser.onDeleted, { suppressErrors: true })
   purgeAuthorizedUserAbility({
     tenantUser,
   }:

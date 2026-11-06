@@ -13,7 +13,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 export class BillEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.bill.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onCreated, { suppressErrors: true })
   public handleTrackBillCreatedEvent({}: IBillPaymentEventCreatedPayload) {
     this.posthog.trackEvent({
       event: BILL_CREATED,
@@ -21,7 +22,8 @@ export class BillEventsTracker {
     });
   }
 
-  @OnEvent(events.bill.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onEdited, { suppressErrors: true })
   public handleTrackEditedBillEvent({}: IBillPaymentEventEditedPayload) {
     this.posthog.trackEvent({
       event: BILL_EDITED,
@@ -29,7 +31,8 @@ export class BillEventsTracker {
     });
   }
 
-  @OnEvent(events.bill.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bill.onDeleted, { suppressErrors: true })
   public handleTrackDeletedBillEvent({}: IBillPaymentEventDeletedPayload) {
     this.posthog.trackEvent({
       event: BILL_DELETED,

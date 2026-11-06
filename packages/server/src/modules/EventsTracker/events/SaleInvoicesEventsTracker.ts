@@ -19,7 +19,8 @@ import {
 export class SaleInvoiceEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.saleInvoice.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onCreated, { suppressErrors: true })
   public handleTrackInvoiceCreatedEvent({}: ISaleInvoiceCreatedPayload) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_CREATED,
@@ -27,7 +28,8 @@ export class SaleInvoiceEventsTracker {
     });
   }
 
-  @OnEvent(events.saleInvoice.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onEdited, { suppressErrors: true })
   public handleTrackEditedInvoiceEvent({}: ISaleInvoiceEditedPayload) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_EDITED,
@@ -35,7 +37,8 @@ export class SaleInvoiceEventsTracker {
     });
   }
 
-  @OnEvent(events.saleInvoice.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onDeleted, { suppressErrors: true })
   public handleTrackDeletedInvoiceEvent({}: ISaleInvoiceEditedPayload) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_DELETED,
@@ -43,7 +46,8 @@ export class SaleInvoiceEventsTracker {
     });
   }
 
-  @OnEvent(events.saleInvoice.onViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onViewed, { suppressErrors: true })
   public handleTrackViewedInvoiceEvent({}) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_VIEWED,
@@ -51,7 +55,8 @@ export class SaleInvoiceEventsTracker {
     });
   }
 
-  @OnEvent(events.saleInvoice.onPdfViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onPdfViewed, { suppressErrors: true })
   public handleTrackPdfViewedInvoiceEvent({}) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_PDF_VIEWED,
@@ -59,7 +64,8 @@ export class SaleInvoiceEventsTracker {
     });
   }
 
-  @OnEvent(events.saleInvoice.onMailSent)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleInvoice.onMailSent, { suppressErrors: true })
   public handleTrackMailSentInvoiceEvent({}) {
     this.posthog.trackEvent({
       event: SALE_INVOICE_MAIL_SENT,

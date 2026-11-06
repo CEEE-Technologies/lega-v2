@@ -7,7 +7,8 @@ import { events } from '@/common/events/events';
 export class WorkspaceDeletedSubscriber {
   constructor(private readonly socketGateway: SocketGateway) {}
 
-  @OnEvent(events.workspace.deleted)
+  // Side effect (live-update notice): an error is logged and does not stop the save.
+  @OnEvent(events.workspace.deleted, { suppressErrors: true })
   handleWorkspaceDeleted() {
     this.socketGateway.emitWorkspacesChanged();
   }

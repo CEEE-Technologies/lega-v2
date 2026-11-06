@@ -52,5 +52,10 @@
   },
   "dependencies": {
     "tsup": "^8.3.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@nestjs/event-emitter@2.1.1": "patches/@nestjs__event-emitter@2.1.1.patch"
+    }
   }
 }

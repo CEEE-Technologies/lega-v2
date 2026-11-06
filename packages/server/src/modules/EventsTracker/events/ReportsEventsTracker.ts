@@ -24,7 +24,8 @@ import { EventTrackerService } from '../EventTracker.service';
 export class ReportsEventsTracker {
   constructor(private readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.reports.onBalanceSheetViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onBalanceSheetViewed, { suppressErrors: true })
   handleTrackBalanceSheetViewedEvent() {
     this.posthog.trackEvent({
       event: BALANCE_SHEET_VIEWED,
@@ -32,7 +33,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onTrialBalanceSheetView)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onTrialBalanceSheetView, { suppressErrors: true })
   handleTrackTrialBalanceSheetViewedEvent() {
     this.posthog.trackEvent({
       event: TRIAL_BALANCE_SHEET_VIEWED,
@@ -40,7 +42,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onProfitLossSheetViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onProfitLossSheetViewed, { suppressErrors: true })
   handleTrackProfitLossSheetViewedEvent() {
     this.posthog.trackEvent({
       event: PROFIT_LOSS_SHEET_VIEWED,
@@ -48,7 +51,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onCashflowStatementViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onCashflowStatementViewed, { suppressErrors: true })
   handleTrackCashflowStatementViewedEvent() {
     this.posthog.trackEvent({
       event: CASHFLOW_STATEMENT_VIEWED,
@@ -56,7 +60,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onGeneralLedgerViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onGeneralLedgerViewed, { suppressErrors: true })
   handleTrackGeneralLedgerViewedEvent() {
     this.posthog.trackEvent({
       event: GENERAL_LEDGER_VIEWED,
@@ -64,7 +69,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onJournalViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onJournalViewed, { suppressErrors: true })
   handleTrackJournalViewedEvent() {
     this.posthog.trackEvent({
       event: JOURNAL_VIEWED,
@@ -72,7 +78,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onReceivableAgingViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onReceivableAgingViewed, { suppressErrors: true })
   handleTrackReceivableAgingViewedEvent() {
     this.posthog.trackEvent({
       event: RECEIVABLE_AGING_VIEWED,
@@ -80,7 +87,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onPayableAgingViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onPayableAgingViewed, { suppressErrors: true })
   handleTrackPayableAgingViewedEvent() {
     this.posthog.trackEvent({
       event: PAYABLE_AGING_VIEWED,
@@ -88,7 +96,10 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onCustomerBalanceSummaryViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onCustomerBalanceSummaryViewed, {
+    suppressErrors: true,
+  })
   handleTrackCustomerBalanceSummaryViewedEvent() {
     this.posthog.trackEvent({
       event: CUSTOMER_BALANCE_SUMMARY_VIEWED,
@@ -96,7 +107,10 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onVendorBalanceSummaryViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onVendorBalanceSummaryViewed, {
+    suppressErrors: true,
+  })
   handleTrackVendorBalanceSummaryViewedEvent() {
     this.posthog.trackEvent({
       event: VENDOR_BALANCE_SUMMARY_VIEWED,
@@ -104,7 +118,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onInventoryValuationViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onInventoryValuationViewed, { suppressErrors: true })
   handleTrackInventoryValuationViewedEvent() {
     this.posthog.trackEvent({
       event: INVENTORY_VALUATION_VIEWED,
@@ -112,7 +127,10 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onCustomerTransactionsViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onCustomerTransactionsViewed, {
+    suppressErrors: true,
+  })
   handleTrackCustomerTransactionsViewedEvent() {
     this.posthog.trackEvent({
       event: CUSTOMER_TRANSACTIONS_VIEWED,
@@ -120,7 +138,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onVendorTransactionsViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onVendorTransactionsViewed, { suppressErrors: true })
   handleTrackVendorTransactionsViewedEvent() {
     this.posthog.trackEvent({
       event: VENDOR_TRANSACTIONS_VIEWED,
@@ -128,7 +147,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onSalesByItemViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onSalesByItemViewed, { suppressErrors: true })
   handleTrackSalesByItemViewedEvent() {
     this.posthog.trackEvent({
       event: SALES_BY_ITEM_VIEWED,
@@ -136,7 +156,8 @@ export class ReportsEventsTracker {
     });
   }
 
-  @OnEvent(events.reports.onPurchasesByItemViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.reports.onPurchasesByItemViewed, { suppressErrors: true })
   handleTrackPurchasesByItemViewedEvent() {
     this.posthog.trackEvent({
       event: PURCHASES_BY_ITEM_VIEWED,

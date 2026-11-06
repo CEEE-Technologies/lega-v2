@@ -16,6 +16,8 @@ ENV PYTHON=/usr/bin/python3
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml lerna.json ./
 COPY --chown=node:node packages/webapp/package.json ./packages/webapp/
 COPY --chown=node:node shared ./shared
+# Patched dependencies (see `pnpm.patchedDependencies` in package.json)
+COPY --chown=node:node patches ./patches
 
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install

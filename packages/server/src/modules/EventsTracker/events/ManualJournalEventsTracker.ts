@@ -17,7 +17,8 @@ import {
 export class ManualJournalEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.manualJournals.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onCreated, { suppressErrors: true })
   public handleTrackManualJournalCreatedEvent(
     _payload: IManualJournalEventCreatedPayload,
   ) {
@@ -27,7 +28,8 @@ export class ManualJournalEventsTracker {
     });
   }
 
-  @OnEvent(events.manualJournals.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onEdited, { suppressErrors: true })
   public handleTrackEditedManualJournalEvent(
     _payload: IManualJournalEventEditedPayload,
   ) {
@@ -37,7 +39,8 @@ export class ManualJournalEventsTracker {
     });
   }
 
-  @OnEvent(events.manualJournals.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.manualJournals.onDeleted, { suppressErrors: true })
   public handleTrackDeletedManualJournalEvent(
     _payload: IManualJournalEventDeletedPayload,
   ) {

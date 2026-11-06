@@ -7,7 +7,8 @@ import { IWorkspaceCreatedEventPayload } from '../Workspaces.types';
 export class WorkspaceCreatedSubscriber {
   constructor() {}
 
-  @OnEvent(events.workspace.created)
+  // Side effect (runs after the workspace is saved): an error is logged and does not stop the save.
+  @OnEvent(events.workspace.created, { suppressErrors: true })
   async handleWorkspaceCreated({
     tenantId: _tenantId,
     organizationId: _organizationId,

@@ -25,7 +25,8 @@ export default class InviteSendMainNotificationSubscribe {
    * Sends mail notification.
    * @param {IUserInvitedEventPayload} payload
    */
-  @OnEvent(events.inviteUser.sendInviteTenantSynced)
+  // Side effect (invite email): an error is logged and does not stop the save.
+  @OnEvent(events.inviteUser.sendInviteTenantSynced, { suppressErrors: true })
   async sendMailNotification({
     invite,
     user: _user,

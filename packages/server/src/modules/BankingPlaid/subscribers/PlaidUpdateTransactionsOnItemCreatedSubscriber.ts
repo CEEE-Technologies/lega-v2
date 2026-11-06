@@ -20,7 +20,8 @@ export class PlaidUpdateTransactionsOnItemCreatedSubscriber {
    * Updates the Plaid item transactions
    * @param {IPlaidItemCreatedEventPayload} payload - Event payload.
    */
-  @OnEvent(events.plaid.onItemCreated)
+  // Side effect (Plaid sync, after the bank connection is saved): an error is logged and does not stop the save.
+  @OnEvent(events.plaid.onItemCreated, { suppressErrors: true })
   public async handleUpdateTransactionsOnItemCreated({
     plaidItemId,
   }: IPlaidItemCreatedEventPayload) {

@@ -15,7 +15,8 @@ export class SaleReceiptSmsNotificationSubscriber {
    * Handles sending SMS notification after the sale receipt creation.
    * @param {ISaleReceiptCreatedPayload} payload -
    */
-  @OnEvent(events.saleReceipt.onCreated)
+  // Side effect (SMS notice): an error is logged and does not stop the save.
+  @OnEvent(events.saleReceipt.onCreated, { suppressErrors: true })
   private async handleNotifyBySmsAfterCreation({
     saleReceiptId,
     trx,

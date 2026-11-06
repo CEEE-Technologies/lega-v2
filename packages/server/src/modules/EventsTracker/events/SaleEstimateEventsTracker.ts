@@ -20,7 +20,8 @@ import { events } from '@/common/events/events';
 export class SaleEstimateEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.saleEstimate.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onCreated, { suppressErrors: true })
   public handleTrackEstimateCreatedEvent({}: ISaleEstimateCreatedPayload) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_CREATED,
@@ -28,7 +29,8 @@ export class SaleEstimateEventsTracker {
     });
   }
 
-  @OnEvent(events.saleEstimate.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onEdited, { suppressErrors: true })
   public handleTrackEditedEstimateEvent({}: ISaleEstimateEditedPayload) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_EDITED,
@@ -36,7 +38,8 @@ export class SaleEstimateEventsTracker {
     });
   }
 
-  @OnEvent(events.saleEstimate.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onDeleted, { suppressErrors: true })
   public handleTrackDeletedEstimateEvent({}: ISaleEstimateDeletedPayload) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_DELETED,
@@ -44,7 +47,8 @@ export class SaleEstimateEventsTracker {
     });
   }
 
-  @OnEvent(events.saleEstimate.onPdfViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onPdfViewed, { suppressErrors: true })
   public handleTrackPdfViewedEstimateEvent({}: ISaleEstimateDeletedPayload) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_PDF_VIEWED,
@@ -52,7 +56,8 @@ export class SaleEstimateEventsTracker {
     });
   }
 
-  @OnEvent(events.saleEstimate.onViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onViewed, { suppressErrors: true })
   public handleTrackViewedEstimateEvent({}) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_VIEWED,
@@ -60,7 +65,8 @@ export class SaleEstimateEventsTracker {
     });
   }
 
-  @OnEvent(events.saleEstimate.onMailSent)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onMailSent, { suppressErrors: true })
   public handleTrackMailSentEstimateEvent({}) {
     this.posthog.trackEvent({
       event: SALE_ESTIMATE_MAIL_SENT,

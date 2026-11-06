@@ -18,7 +18,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 export class AccountEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.accounts.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onCreated, { suppressErrors: true })
   public handleTrackAccountCreatedEvent({}: IAccountEventCreatedPayload) {
     this.posthog.trackEvent({
       event: ACCOUNT_CREATED,
@@ -26,7 +27,8 @@ export class AccountEventsTracker {
     });
   }
 
-  @OnEvent(events.accounts.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onEdited, { suppressErrors: true })
   public handleTrackEditedAccountEvent({}: IAccountEventEditedPayload) {
     this.posthog.trackEvent({
       event: ACCOUNT_EDITED,
@@ -34,7 +36,8 @@ export class AccountEventsTracker {
     });
   }
 
-  @OnEvent(events.accounts.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onDeleted, { suppressErrors: true })
   public handleTrackDeletedAccountEvent({}: IAccountEventDeletedPayload) {
     this.posthog.trackEvent({
       event: ACCOUNT_DELETED,
@@ -42,7 +45,8 @@ export class AccountEventsTracker {
     });
   }
 
-  @OnEvent(events.accounts.onViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.accounts.onViewed, { suppressErrors: true })
   public handleTrackAccountViewedEvent({}) {
     this.posthog.trackEvent({
       event: ACCOUNT_VIEWED,

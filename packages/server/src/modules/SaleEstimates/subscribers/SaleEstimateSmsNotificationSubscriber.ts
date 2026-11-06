@@ -15,7 +15,8 @@ export class SaleEstimateSmsNotificationSubscriber {
    * Handles sending SMS notification after the sale estimate creation.
    * @param {ISaleEstimateCreatedPayload} payload -
    */
-  @OnEvent(events.saleEstimate.onCreated)
+  // Side effect (SMS notice): an error is logged and does not stop the save.
+  @OnEvent(events.saleEstimate.onCreated, { suppressErrors: true })
   private async handleNotifyBySmsAfterCreation({
     saleEstimateId,
     trx,
