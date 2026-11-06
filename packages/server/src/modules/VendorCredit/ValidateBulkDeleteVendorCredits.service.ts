@@ -2,6 +2,11 @@ import { Injectable, Inject } from '@nestjs/common';
 import { Knex } from 'knex';
 import { TENANCY_DB_CONNECTION } from '../Tenancy/TenancyDB/TenancyDB.constants';
 import { DeleteVendorCreditService } from './commands/DeleteVendorCredit.service';
+import {
+  runDryRun,
+  TransactionAbortedError,
+  withSavepoint,
+} from '@/modules/Tenancy/TenancyDB/DryRun';
 
 @Injectable()
 export class ValidateBulkDeleteVendorCreditsService {
@@ -19,27 +24,27 @@ export class ValidateBulkDeleteVendorCreditsService {
     deletableIds: number[];
     nonDeletableIds: number[];
   }> {
-    const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read committed',
-    });
-
-    try {
+    // Every delete runs in a transaction that is always rolled back, so
+    // nothing is kept and no after-save work runs.
+    return runDryRun(this.tenantKnex(), async (trx) => {
       const deletableIds: number[] = [];
       const nonDeletableIds: number[] = [];
 
       for (const vendorCreditId of vendorCreditIds) {
         try {
-          await this.deleteVendorCreditService.deleteVendorCredit(
-            vendorCreditId,
-            trx,
+          // A failed delete only undoes its own writes.
+          await withSavepoint(trx, () =>
+            this.deleteVendorCreditService.deleteVendorCredit(
+              vendorCreditId,
+              trx,
+            ),
           );
           deletableIds.push(vendorCreditId);
-        } catch (_error) {
+        } catch (error) {
+          if (error instanceof TransactionAbortedError) throw error;
           nonDeletableIds.push(vendorCreditId);
         }
       }
-
-      await trx.rollback();
 
       return {
         deletableCount: deletableIds.length,
@@ -47,9 +52,6 @@ export class ValidateBulkDeleteVendorCreditsService {
         deletableIds,
         nonDeletableIds,
       };
-    } catch (error) {
-      await trx.rollback();
-      throw error;
-    }
+    });
   }
 }

@@ -1,4 +1,3 @@
-import { Knex } from 'knex';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   IImportFileCommitedEventPayload,
@@ -6,9 +5,8 @@ import {
 } from './interfaces';
 import { ImportFileProcess } from './ImportFileProcess';
 import { ImportAls } from './ImportALS';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { events } from '@/common/events/events';
-import { TENANCY_DB_CONNECTION } from '../Tenancy/TenancyDB/TenancyDB.constants';
 
 @Injectable()
 export class ImportFileProcessCommit {
@@ -16,9 +14,6 @@ export class ImportFileProcessCommit {
     private readonly importFile: ImportFileProcess,
     private readonly importAls: ImportAls,
     private readonly eventEmitter: EventEmitter2,
-
-    @Inject(TENANCY_DB_CONNECTION)
-    private readonly tenantKnex: () => Knex,
   ) {}
 
   /**
@@ -38,13 +33,10 @@ export class ImportFileProcessCommit {
    * @returns {Promise<ImportFilePreviewPOJO>}
    */
   public async commitAlsRun(importId: string): Promise<ImportFilePreviewPOJO> {
-    const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read committed',
-    });
-    const meta = await this.importFile.import(importId, trx);
-
-    // Commit the successed transaction.
-    await trx.commit();
+    // The import opens its own transaction: it is committed when the import
+    // succeeds and rolled back when it fails, so the connection is always
+    // given back.
+    const meta = await this.importFile.import(importId);
 
     // Triggers `onImportFileCommitted` event.
     await this.eventEmitter.emitAsync(events.import.onImportCommitted, {
