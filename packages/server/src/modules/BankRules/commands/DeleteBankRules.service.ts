@@ -19,10 +19,16 @@ export class DeleteBankRulesService {
   ) {
     const bankRulesIds = uniq(castArray(bankRuleId));
 
-    const _results = await PromisePool.withConcurrency(1)
+    const results = await PromisePool.withConcurrency(1)
       .for(bankRulesIds)
       .process(async (bankRuleId: number) => {
         await this.deleteBankRuleService.deleteBankRule(bankRuleId, trx);
       });
+    // The pool collects errors instead of throwing them. A rule that failed
+    // to delete must stop the save (such as the account delete it is part
+    // of), so nothing is removed.
+    if (results.errors?.length > 0) {
+      throw results.errors[0].raw;
+    }
   }
 }
