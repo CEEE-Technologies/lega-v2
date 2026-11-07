@@ -392,7 +392,8 @@ export class RefundVendorCreditGLEntries {
     // its accrual entries were posted with at the old rate.
     const baseCurrency = (await this.tenancyContext?.getTenantMetadata())
       ?.baseCurrency;
-    const currencyCode = refund.currencyCode ?? refund.vendorCredit?.currencyCode;
+    const currencyCode =
+      refund.currencyCode ?? refund.vendorCredit?.currencyCode;
     const isForeign =
       (!!baseCurrency && !!currencyCode && currencyCode !== baseCurrency) ||
       Number(refund.exchangeRate ?? 1) !== 1 ||
