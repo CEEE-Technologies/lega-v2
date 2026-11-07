@@ -84,6 +84,10 @@ export class DeleteBill {
     // Validate the given bill has no associated landed cost transactions.
     await this.validators.validateBillHasNoLandedCost(billId, trx);
 
+    // Validate no landed cost was allocated from the bill (it is the source
+    // of the cost, such as a freight bill).
+    await this.validators.validateBillNotLandedCostSource(billId, trx);
+
     // Validate the purchase bill has no associated payments transactions.
     await this.validators.validateBillHasNoEntries(billId, trx);
 

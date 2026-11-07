@@ -1,5 +1,9 @@
 import { Knex } from 'knex';
-import { IsolationLevel } from './TransactionsHooks';
+import {
+  closeStepHooks,
+  IsolationLevel,
+  openStepHooks,
+} from './TransactionsHooks';
 
 /**
  * The reason a dry run gives when it undoes its transaction.
@@ -47,7 +51,8 @@ let savepointCounter = 0;
  *
  * The step gets the outer transaction itself (not a nested knex
  * transaction), so after-commit work it registers still waits for the
- * outer commit. Steps must run one at a time on the transaction.
+ * outer commit; if the step fails, that work is dropped with its writes.
+ * Steps must run one at a time on the transaction.
  * @param {Knex.Transaction} trx - The outer transaction.
  * @param {() => Promise<T>} step
  * @returns {Promise<T>}
@@ -60,9 +65,13 @@ export const withSavepoint = async <T>(
   const name = `lega_step_${savepointCounter}`;
 
   await trx.raw(`SAVEPOINT ${name}`);
+  // After-commit work the step queues runs only if the step is kept.
+  openStepHooks(trx);
+  let kept = false;
   try {
     const result = await step();
     await trx.raw(`RELEASE SAVEPOINT ${name}`);
+    kept = true;
     return result;
   } catch (error) {
     try {
@@ -74,6 +83,8 @@ export const withSavepoint = async <T>(
       throw new TransactionAbortedError(error);
     }
     throw error;
+  } finally {
+    closeStepHooks(trx, kept);
   }
 };
 

@@ -31,6 +31,8 @@ const REVIEWED_SIDE_EFFECTS_WITH_TRX: Record<string, string> = {
     'SMS sent after commit; trx is only used to wait for the commit',
   'modules/SaleReceipts/subscribers/SaleReceiptSmsNotificationSubscriber.ts':
     'SMS sent after commit; trx is only used to wait for the commit',
+  'modules/BankingTranasctionsRegonize/events/TriggerRecognizedTransactions.ts':
+    'bank-rules job queued after commit; trx is only used to wait for the commit',
 };
 
 interface HandlerInfo {
