@@ -14,7 +14,8 @@ import {
 } from '../src/modules/AccountingBasis/DataHealthCheck';
 
 /**
- * Package 6 data health check (H1–H8). A new company is built, checked
+ * Package 6 data health check (H1–H8; H9–H16 are in
+ * data-health-check-round-3.e2e-spec.ts). A new company is built, checked
  * clean ("none" in every section), then one bad record of each kind is
  * written straight into its database (the fixed code no longer makes them)
  * and each is checked to be listed. The check itself runs on connections
@@ -173,7 +174,7 @@ describe('Data health check (H1–H8)', () => {
     const titles = lines
       .map((line, index) => ({ line, index }))
       .filter(({ line }) => /^ {2}H\d/.test(line));
-    expect(titles.map(({ line }) => line.slice(2, 4))).toEqual([
+    expect(titles.map(({ line }) => line.slice(2, 5).trim())).toEqual([
       'H1',
       'H2',
       'H3',
@@ -184,11 +185,25 @@ describe('Data health check (H1–H8)', () => {
       'H8',
       'H8',
       'H8',
+      // Round 3 (data-health-check-round-3.e2e-spec.ts).
+      'H9',
+      'H10',
+      'H11',
+      'H11',
+      'H11',
+      'H12',
+      'H12',
+      'H13',
+      'H14',
+      'H15',
+      'H16',
     ]);
     titles.forEach(({ line, index }) => {
       expect(line).toMatch(/: 0$/);
-      // H2 prints its note first.
-      const next = lines[index + (line.startsWith('  H2') ? 2 : 1)];
+      // H2 and the H12 "counted twice" list print their note first.
+      const hasNote =
+        line.startsWith('  H2') || line.includes('may be counted twice');
+      const next = lines[index + (hasNote ? 2 : 1)];
       expect(next).toBe('      none');
     });
     expect(lines.join('\n')).toContain(
