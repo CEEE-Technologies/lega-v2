@@ -1050,7 +1050,8 @@ describe('Warehouses and smaller fixes (e2e)', () => {
       const found = await scan();
       expect(
         found.filter(
-          (f) => f.referenceType === 'CreditNote' && f.referenceId === roundedId,
+          (f) =>
+            f.referenceType === 'CreditNote' && f.referenceId === roundedId,
         ),
       ).toEqual([]);
     });
