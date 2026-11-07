@@ -43,6 +43,8 @@ import {
 export const MIN_LINES_NUMBER = 1;
 
 export type BillFormEntry = {
+  /** Id of a stored line; empty for a new line. */
+  id?: number | '';
   index: number;
   itemId: string | number;
   rate: string | number;
@@ -81,6 +83,9 @@ export type BillFormValues = {
 
 // Default bill entry.
 export const defaultBillEntry: BillFormEntry = {
+  // Kept on edit, so the server updates the line instead of replacing it
+  // (a landed cost allocated from the line stays linked to it).
+  id: '',
   index: 0,
   itemId: '',
   rate: '',
@@ -128,7 +133,7 @@ export const ERRORS = {
   BILL_AMOUNT_SMALLER_THAN_PAID_AMOUNT: 'BILL_AMOUNT_SMALLER_THAN_PAID_AMOUNT',
 };
 
-type BillErrorResponse = { type: string };
+type BillErrorResponse = { type: string; message?: string | null };
 
 /**
  * Transformes the bill to initial values of edit form.
@@ -170,8 +175,8 @@ export const transformEntriesToSubmit = (
   entries: BillFormEntry[],
 ): Record<string, unknown>[] => {
   const transformBillEntry = (entry: BillFormEntry) => {
-    const { amount, ...rest } = transformToForm(entry, defaultBillEntry);
-    return rest;
+    const { amount, id, ...rest } = transformToForm(entry, defaultBillEntry);
+    return id ? { id, ...rest } : rest;
   };
   return FF.pipe(
     entries,
@@ -229,6 +234,18 @@ export const handleDeleteErrors = (errors: BillErrorResponse[]) => {
       intent: Intent.DANGER,
     });
   }
+  const landedCostSource = errors.find(
+    (error) => error.type === 'BILL_USED_AS_LANDED_COST',
+  );
+  if (landedCostSource) {
+    // The server names the bill the landed cost was allocated to.
+    AppToaster.show({
+      message:
+        landedCostSource.message ||
+        'This bill is used as landed cost on another bill; remove it there first.',
+      intent: Intent.DANGER,
+    });
+  }
   if (
     errors.find((error) => error.type === 'BILL_HAS_APPLIED_TO_VENDOR_CREDIT')
   ) {
@@ -283,14 +300,17 @@ export const handleErrors = (
       billNumber: intl.get('bill_number_exists'),
     });
   }
-  if (
-    errors.some(
-      (e) => e.type === ERRORS.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED,
-    )
-  ) {
+  const landedCostError = errors.find(
+    (e) =>
+      e.type === ERRORS.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED ||
+      e.type === 'LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES',
+  );
+  if (landedCostError) {
     AppToaster.show({
       intent: Intent.DANGER,
-      message: 'ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED',
+      message:
+        landedCostError.message ||
+        "This line is used as landed cost on another bill, so it can't be removed or reduced. Remove the landed cost there first.",
     });
   }
   if (

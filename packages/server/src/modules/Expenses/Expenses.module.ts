@@ -20,9 +20,18 @@ import { ExpensesExportable } from './ExpensesExportable';
 import { ExpensesImportable } from './ExpensesImportable';
 import { BulkDeleteExpensesService } from './BulkDeleteExpenses.service';
 import { ValidateBulkDeleteExpensesService } from './ValidateBulkDeleteExpenses.service';
+import { RegisterTenancyModel } from '../Tenancy/TenancyModels/Tenancy.module';
+import { BillLandedCost } from '../EE/BillLandedCosts/models/BillLandedCost';
 
 @Module({
-  imports: [TenancyModule, LedgerModule, BranchesModule, DynamicListModule],
+  imports: [
+    TenancyModule,
+    LedgerModule,
+    BranchesModule,
+    DynamicListModule,
+    // Read by the landed-cost checks on delete and edit.
+    RegisterTenancyModel(BillLandedCost),
+  ],
   controllers: [ExpensesController],
   exports: [CreateExpense, ExpensesExportable, ExpensesImportable],
   providers: [

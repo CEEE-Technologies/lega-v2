@@ -7,6 +7,8 @@ import type {
 import type React from 'react';
 
 export type ExpenseEntry = {
+  /** Id of a stored line; empty for a new line. */
+  id?: number | '';
   index?: number | null;
   amount: string | number;
   expenseAccountId: string | number;
@@ -36,6 +38,7 @@ export type ExpenseSubmitPayload = {
 
 export type ExpenseErrorResponse = {
   type: string;
+  message?: string | null;
   indexes?: number[];
   meta?: unknown[];
 };
