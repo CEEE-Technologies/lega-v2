@@ -22,6 +22,7 @@ import { MatchTransactionsTypes } from './commands/MatchTransactionsTypes';
 import { GetMatchedTransactionsByManualJournals } from './queries/GetMatchedTransactionsByManualJournals.service';
 import { ValidateTransactionMatched } from './commands/ValidateTransactionsMatched.service';
 import { BankingMatchingController } from './BankingMatching.controller';
+import { TenancyModule } from '../Tenancy/Tenancy.module';
 
 const models = [RegisterTenancyModel(MatchedBankTransaction)];
 
@@ -29,6 +30,7 @@ const models = [RegisterTenancyModel(MatchedBankTransaction)];
   controllers: [BankingMatchingController],
   imports: [
     ...models,
+    TenancyModule,
     BillPaymentsModule,
     BankingTransactionsModule,
     PaymentsReceivedModule,

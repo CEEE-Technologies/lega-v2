@@ -38,12 +38,15 @@ export class DeleteUncategorizedTransactionsOnAccountDeleting {
       .where('applyIfAccountId', oldAccount.id);
     const foundAssociatedRulesIds = foundAssociatedRules.map((rule) => rule.id);
 
-    // Revert the recognized transactions of the given bank rules.
-    await this.revertRecognizedTransactins.revertRecognizedTransactions(
-      foundAssociatedRulesIds,
-      null,
-      trx,
-    );
+    // Revert the suggestions of the account's own rules, on its own bank
+    // lines. An account with no rules has nothing to revert.
+    if (foundAssociatedRulesIds.length > 0) {
+      await this.revertRecognizedTransactins.revertRecognizedTransactions(
+        foundAssociatedRulesIds,
+        { accountId: oldAccount.id },
+        trx,
+      );
+    }
     // Delete the associated uncategorized transactions.
     await this.uncategorizedCashflowTransactionModel()
       .query(trx)

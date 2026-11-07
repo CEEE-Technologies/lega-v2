@@ -14,6 +14,10 @@ import { withBanking } from '../withBanking';
 import { withBankingActions } from '../withBankingActions';
 import styles from './CategorizeTransactionAside.module.scss';
 import { useCategorizeTransactionTabsBoot } from './CategorizeTransactionTabsBoot';
+import {
+  MatchExchangeRateFields,
+  useSelectedForeignMatches,
+} from './MatchExchangeRateFields';
 import { MatchingReconcileTransactionForm } from './MatchingReconcileTransactionAside/MatchingReconcileTransactionForm';
 import {
   MatchingTransactionBoot,
@@ -35,6 +39,7 @@ import { useIsDarkMode } from '@/hooks/useDarkMode';
 
 const initialValues: MatchingTransactionFormValues = {
   matched: {},
+  exchangeRates: {},
 };
 
 interface MatchingBankTransactionRootProps
@@ -84,8 +89,23 @@ function MatchingBankTransactionRoot({
       })
       .catch(
         (err: {
-          response?: { data?: { errors?: Array<{ type: string }> } };
+          response?: {
+            data?: { errors?: Array<{ type: string; message?: string }> };
+          };
         }) => {
+          const rateError = err.response?.data?.errors?.find(
+            (e) => e.type === 'EXCHANGE_RATE_REQUIRED',
+          );
+          if (rateError) {
+            AppToaster.show({
+              message:
+                rateError.message ||
+                'Enter the exchange rate of each invoice or bill in another currency.',
+              intent: Intent.DANGER,
+            });
+            setSubmitting(false);
+            return;
+          }
           if (
             err.response?.data?.errors?.find(
               (e) => e.type === 'TOTAL_MATCHING_TRANSACTIONS_INVALID',
@@ -202,6 +222,7 @@ function MatchingBankTransactionContent() {
     <Box className={styles.root}>
       <PerfectMatchingTransactions />
       <PossibleMatchingTransactions />
+      <MatchExchangeRateFields />
     </Box>
   );
 }
@@ -333,11 +354,25 @@ const MatchTransactionFooter = FF.pipe(
     closeMatchingTransactionAside,
     openReconcileMatchingTransaction,
   }: MatchTransctionFooterProps) => {
-    const { submitForm, isSubmitting } =
+    const { submitForm, isSubmitting, values } =
       useFormikContext<MatchingTransactionFormValues>();
     const totalPending = useGetPendingAmountMatched();
     const showReconcileLink = useIsShowReconcileTransactionLink();
-    const submitDisabled = !moneyIsZero(totalPending);
+    // Every selected invoice or bill in another currency needs a rate.
+    const foreignMatches = useSelectedForeignMatches();
+    const missingRate = foreignMatches.some(
+      (match) =>
+        !(
+          parseFloat(
+            String(
+              values.exchangeRates?.[
+                `${match.referenceType}-${match.referenceId}`
+              ] ?? '',
+            ),
+          ) > 0
+        ),
+    );
+    const submitDisabled = !moneyIsZero(totalPending) || missingRate;
     const isDarkMode = useIsDarkMode();
 
     const handleCancelBtnClick = () => {

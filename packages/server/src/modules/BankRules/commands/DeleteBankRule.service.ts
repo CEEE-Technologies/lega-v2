@@ -33,8 +33,9 @@ export class DeleteBankRuleService {
     ruleId: number,
     trx?: Knex.Transaction,
   ): Promise<void> {
+    // Read inside the caller's transaction when there is one.
     const oldBankRule = await this.bankRuleModel()
-      .query()
+      .query(trx)
       .findById(ruleId)
       .throwIfNotFound();
 
