@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { Knex } from 'knex';
 import { SettingsStore } from '../Settings/SettingsStore';
 import { SETTINGS_PROVIDER } from '../Settings/Settings.types';
 import { Features } from '@/common/types/Features';
@@ -12,13 +13,14 @@ export class WarehousesSettings {
 
   /**
    * Marks multi-warehouses as activated.
+   * @param {Knex.Transaction} trx - Saves the setting inside this transaction.
    */
-  public markMutliwarehoussAsActivated = async () => {
+  public markMutliwarehoussAsActivated = async (trx?: Knex.Transaction) => {
     const settings = await this.settingsStore();
 
     settings.set({ group: 'features', key: Features.WAREHOUSES, value: 1 });
 
-    await settings.save();
+    await settings.save(trx);
   };
 
   /**

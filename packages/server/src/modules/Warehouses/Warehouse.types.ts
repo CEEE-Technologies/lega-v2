@@ -150,6 +150,7 @@ export interface IItemWarehouseQuantityChange {
 export type IWarehousesActivatePayload = object;
 export interface IWarehousesActivatedPayload {
   primaryWarehouse: Warehouse;
+  trx?: Knex.Transaction;
 }
 
 export interface IWarehouseMarkAsPrimaryPayload {
