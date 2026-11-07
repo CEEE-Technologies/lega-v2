@@ -10,6 +10,7 @@ import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectab
 import { S3_CLIENT } from '@/modules/S3/S3.module';
 import { WorkspacesFinancialsService } from './WorkspacesFinancials.service';
 import { OrgFinancialTotalsMap } from '@/modules/Analytics/Analytics.constants';
+import { WorkspaceUserStatusService } from './WorkspaceUserStatus.service';
 
 @Injectable()
 export class GetWorkspacesService {
@@ -28,6 +29,8 @@ export class GetWorkspacesService {
     private readonly configService: ConfigService,
 
     private readonly workspacesFinancials: WorkspacesFinancialsService,
+
+    private readonly workspaceUserStatus: WorkspaceUserStatusService,
   ) {}
 
   /**
@@ -87,7 +90,15 @@ export class GetWorkspacesService {
     // Compute the financial totals (assets/liabilities) of the ready organizations.
     const financialTotals = await this.getFinancialTotals(memberships);
 
+    // The organizations where the user is deactivated (shown greyed out).
+    const inactiveOrganizationIds =
+      await this.workspaceUserStatus.getInactiveOrganizationIds(
+        userId,
+        memberships,
+      );
+
     return this.transformer.transform(memberships, new WorkspaceTransformer(), {
+      inactiveOrganizationIds,
       defaultTenantId,
       includeInactive,
       currentOrganizationId,

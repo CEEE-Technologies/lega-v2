@@ -1,4 +1,5 @@
 {
+  "workspaces.access_deactivated": "تم إلغاء تفعيل وصولك",
   "hello_world": "مرحبا بالعالم",
   "email_or_phone_number": "البريد الإلكتروني أو رقم الهاتف",
   "password": "كلمه السر",

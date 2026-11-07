@@ -1,4 +1,5 @@
 {
+  "workspaces.access_deactivated": "Din åtkomst har inaktiverats",
   "email_or_phone_number": "E-post eller telefonnummer",
   "password": "Lösenord",
   "login": "Logga in",

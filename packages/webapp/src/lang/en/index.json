@@ -55,6 +55,7 @@
   "workspaces.set_as_default": "Set as default",
   "workspaces.default_workspace": "Default",
   "workspaces.view_all_workspaces": "View All Workspaces",
+  "workspaces.access_deactivated": "Your access was deactivated",
   "workspaces.create_workspace": "Create Workspace",
   "workspaces.delete_workspace": "Delete Workspace",
   "workspaces.delete_workspace_confirmation": "Are you sure you want to delete <b>{name}</b>? This action cannot be undone and all data will be permanently lost.",

@@ -20,6 +20,11 @@ export class WorkspaceDto {
   @ApiPropertyOptional() buildJobId?: string;
   @ApiProperty() role: 'owner' | 'member';
   @ApiPropertyOptional() isDefault?: boolean;
+  @ApiPropertyOptional({
+    description:
+      'Whether the user is deactivated in this organization (it cannot be opened).',
+  })
+  isUserInactive?: boolean;
   @ApiPropertyOptional({ type: WorkspaceMetadataDto })
   metadata?: WorkspaceMetadataDto;
   @ApiPropertyOptional() totalIncome?: number;

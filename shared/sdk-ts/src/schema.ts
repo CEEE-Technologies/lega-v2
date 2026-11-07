@@ -16976,6 +16976,8 @@ export interface components {
             buildJobId?: string;
             role: string;
             isDefault?: boolean;
+            /** @description Whether the user is deactivated in this organization (it cannot be opened). */
+            isUserInactive?: boolean;
             metadata?: components["schemas"]["WorkspaceMetadataDto"];
             totalIncome?: number;
             totalExpenses?: number;

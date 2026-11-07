@@ -1,4 +1,5 @@
 {
+  "workspaces.access_deactivated": "Tu acceso fue desactivado",
   "hello_world": "Hola Mundo",
   "email_or_phone_number": "Correo electrónico o número de teléfono",
   "password": "Contraseña",
