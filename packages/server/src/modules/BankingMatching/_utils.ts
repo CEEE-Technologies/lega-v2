@@ -63,3 +63,31 @@ export const validateUncategorizedTransactionsExcluded = (
     });
   }
 };
+
+/**
+ * The exchange rate of the payment a match creates for an invoice or a bill.
+ * A document in the base currency is paid at 1. A foreign one needs the rate
+ * the user gave (D4): never a silent 1, which would post the payment at the
+ * wrong base amount and a false exchange difference.
+ * @param {string} documentCurrency - The invoice or bill currency.
+ * @param {string} baseCurrency - The organization base currency.
+ * @param {number} exchangeRate - The rate given with the match.
+ * @returns {number}
+ */
+export const getMatchPaymentExchangeRate = (
+  documentCurrency: string,
+  baseCurrency: string,
+  exchangeRate?: number,
+): number => {
+  if (!documentCurrency || documentCurrency === baseCurrency) {
+    return 1;
+  }
+  if (!exchangeRate || !(exchangeRate > 0)) {
+    throw new ServiceError(
+      ERRORS.EXCHANGE_RATE_REQUIRED,
+      `This document is in ${documentCurrency}. Enter the exchange rate to ${baseCurrency} to match it.`,
+      { currencyCode: documentCurrency, baseCurrency },
+    );
+  }
+  return exchangeRate;
+};

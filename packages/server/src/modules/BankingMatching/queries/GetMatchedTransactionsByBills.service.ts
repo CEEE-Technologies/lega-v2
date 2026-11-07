@@ -9,6 +9,7 @@ import {
   MatchedTransactionPOJO,
 } from '../types';
 import { GetMatchedTransactionsByType } from './GetMatchedTransactionsByType';
+import { getMatchPaymentExchangeRate } from '../_utils';
 import { CreateBillPaymentService } from '@/modules/BillPayments/commands/CreateBillPayment.service';
 import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectable.service';
 import { Bill } from '@/modules/Bills/models/Bill';
@@ -96,6 +97,17 @@ export class GetMatchedTransactionsByBills extends GetMatchedTransactionsByType 
     matchTransactionDTO: IMatchTransactionDTO,
     trx?: Knex.Transaction,
   ): Promise<void> {
+    const bill = await this.billModel()
+      .query(trx)
+      .findById(matchTransactionDTO.referenceId)
+      .throwIfNotFound();
+
+    // A foreign-currency bill is paid at the rate given with the match.
+    const exchangeRate = getMatchPaymentExchangeRate(
+      bill.currencyCode,
+      await this.getBaseCurrency(),
+      matchTransactionDTO.exchangeRate,
+    );
     await super.createMatchedTransaction(
       uncategorizedTransactionIds,
       matchTransactionDTO,
@@ -108,16 +120,11 @@ export class GetMatchedTransactionsByBills extends GetMatchedTransactionsByType 
         .findById(uncategorizedTransactionId)
         .throwIfNotFound();
 
-    const bill = await this.billModel()
-      .query(trx)
-      .findById(matchTransactionDTO.referenceId)
-      .throwIfNotFound();
-
     const createPaymentMadeDTO: CreateBillPaymentDto = {
       vendorId: bill.vendorId,
       paymentAccountId: uncategorizedTransaction.accountId,
       paymentDate: uncategorizedTransaction.date,
-      exchangeRate: 1,
+      exchangeRate,
       entries: [
         {
           paymentAmount: bill.dueAmount,

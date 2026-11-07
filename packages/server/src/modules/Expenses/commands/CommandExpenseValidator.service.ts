@@ -1,16 +1,26 @@
 import { moneyGt, sumMoneyBy } from '@bigcapital/utils';
-import { difference } from 'lodash';
+import { difference, uniq } from 'lodash';
 import { Knex } from 'knex';
 import { ERRORS, SUPPORTED_EXPENSE_PAYMENT_ACCOUNT_TYPES } from '../constants';
 import { ACCOUNT_ROOT_TYPE } from '@/constants/accounts';
 import { Account } from '@/modules/Accounts/models/Account.model';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Expense } from '../models/Expense.model';
 import { ServiceError } from '@/modules/Items/ServiceError';
 import { CreateExpenseDto, EditExpenseDto } from '../dtos/Expense.dto';
+import { ExpenseCategory } from '../models/ExpenseCategory.model';
+import { BillLandedCost } from '@/modules/EE/BillLandedCosts/models/BillLandedCost';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 
 @Injectable()
 export class CommandExpenseValidator {
+  constructor(
+    @Inject(BillLandedCost.name)
+    private readonly billLandedCostModel: TenantModelProxy<
+      typeof BillLandedCost
+    >,
+  ) {}
+
   /**
    * Validates expense categories not equals zero.
    * @param  {IExpenseCreateDTO | IExpenseEditDTO} expenseDTO
@@ -79,22 +89,138 @@ export class CommandExpenseValidator {
   };
 
   /**
-   * Validates the expense has not associated landed cost
-   * references to the given expense.
+   * Retrieves the landed costs allocated from the given expense, with the
+   * bills they were allocated to.
+   * @param {number} expenseId - Expense id.
+   * @param {number[]} entriesIds - Only the costs from these lines, if given.
+   * @param {Knex.Transaction} trx
+   */
+  private getAssociatedLandedCosts(
+    expenseId: number,
+    entriesIds?: number[],
+    trx?: Knex.Transaction,
+  ) {
+    return this.billLandedCostModel()
+      .query(trx)
+      .where('fromTransactionType', 'Expense')
+      .where('fromTransactionId', expenseId)
+      .modify((q) => {
+        if (entriesIds) q.whereIn('fromTransactionEntryId', entriesIds);
+      })
+      .withGraphFetched('bill');
+  }
+
+  /**
+   * "Used as landed cost on bill B-00012; remove it there first."
+   * @param {BillLandedCost[]} landedCosts
+   */
+  private landedCostMessage(landedCosts: BillLandedCost[]) {
+    const bills = uniq(
+      landedCosts.map((cost) => cost.bill?.billNumber || `#${cost.billId}`),
+    );
+    const label = bills.length > 1 ? 'bills' : 'bill';
+    return `Used as landed cost on ${label} ${bills.join(', ')}; remove it there first.`;
+  }
+
+  /**
+   * Validates the expense has no landed cost allocated from it. Deleting it
+   * would leave the cost in the target bill's stock with nothing paying it.
    * @param {number} expenseId
    * @param {Knex.Transaction} trx
    */
   public async validateNoAssociatedLandedCost(
-    _expenseId: number,
-    _trx?: Knex.Transaction,
+    expenseId: number,
+    trx?: Knex.Transaction,
   ) {
-    // const { BillLandedCost } = this.tenancy.models(tenantId);
-    // const associatedLandedCosts = await BillLandedCost.query()
-    //   .where('fromTransactionType', 'Expense')
-    //   .where('fromTransactionId', expenseId);
-    // if (associatedLandedCosts.length > 0) {
-    //   throw new ServiceError(ERRORS.EXPENSE_HAS_ASSOCIATED_LANDED_COST);
-    // }
+    const associatedLandedCosts = await this.getAssociatedLandedCosts(
+      expenseId,
+      undefined,
+      trx,
+    );
+    if (associatedLandedCosts.length > 0) {
+      throw new ServiceError(
+        ERRORS.EXPENSE_HAS_ASSOCIATED_LANDED_COST,
+        this.landedCostMessage(associatedLandedCosts),
+        { billIds: uniq(associatedLandedCosts.map((cost) => cost.billId)) },
+      );
+    }
+  }
+
+  /**
+   * Validates an edit keeps every line a landed cost was allocated from, and
+   * keeps each such line at least as large as what was allocated from it.
+   * Lines are matched by id; a line sent without its id is a new line.
+   * @param {number} expenseId
+   * @param {ExpenseCategory[]} oldCategories - Stored lines (locked).
+   * @param {EditExpenseDto['categories']} newCategories - Lines of the edit.
+   * @param {Knex.Transaction} trx
+   */
+  public async validateLandedCostCategoriesOnEdit(
+    expenseId: number,
+    oldCategories: ExpenseCategory[],
+    newCategories: EditExpenseDto['categories'],
+    trx?: Knex.Transaction,
+  ) {
+    const allocated = oldCategories.filter((category) =>
+      moneyGt(category.allocatedCostAmount || 0, 0),
+    );
+    if (allocated.length === 0) return;
+
+    const newById = new Map(
+      newCategories.filter((c) => c.id).map((c) => [c.id, c]),
+    );
+    const removed = allocated.filter((category) => !newById.has(category.id));
+    const reduced = allocated.filter((category) => {
+      const newCategory = newById.get(category.id);
+      return (
+        newCategory &&
+        moneyGt(category.allocatedCostAmount, newCategory.amount || 0)
+      );
+    });
+    if (removed.length > 0) {
+      const costs = await this.getAssociatedLandedCosts(
+        expenseId,
+        removed.map((c) => c.id),
+        trx,
+      );
+      throw new ServiceError(
+        ERRORS.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED,
+        this.landedCostMessage(costs),
+        { categoriesIds: removed.map((c) => c.id) },
+      );
+    }
+    if (reduced.length > 0) {
+      const costs = await this.getAssociatedLandedCosts(
+        expenseId,
+        reduced.map((c) => c.id),
+        trx,
+      );
+      throw new ServiceError(
+        ERRORS.LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES,
+        `A line can't be less than the landed cost allocated from it (${reduced
+          .map((c) => c.allocatedCostAmount)
+          .join(', ')}). ${this.landedCostMessage(costs)}`,
+        { categoriesIds: reduced.map((c) => c.id) },
+      );
+    }
+  }
+
+  /**
+   * Validates the edit's line ids belong to the expense.
+   * @param {ExpenseCategory[]} oldCategories
+   * @param {EditExpenseDto['categories']} newCategories
+   */
+  public validateCategoriesIdsExist(
+    oldCategories: ExpenseCategory[],
+    newCategories: EditExpenseDto['categories'],
+  ) {
+    const oldIds = oldCategories.map((c) => c.id);
+    const unknown = newCategories.filter((c) => c.id && !oldIds.includes(c.id));
+    if (unknown.length > 0) {
+      throw new ServiceError(ERRORS.EXPENSE_CATEGORIES_IDS_NOT_FOUND, '', {
+        ids: unknown.map((c) => c.id),
+      });
+    }
   }
 
   /**

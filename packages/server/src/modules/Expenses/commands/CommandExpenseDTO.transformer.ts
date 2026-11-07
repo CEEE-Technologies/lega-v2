@@ -92,6 +92,10 @@ export class ExpenseDTOTransformer {
 
     return {
       ...initialDTO,
+      // Line ids only identify existing lines on edit.
+      categories: initialDTO.categories?.map(
+        ({ id: _id, ...category }) => category,
+      ) as Expense['categories'],
       currencyCode: expenseDTO.currencyCode || tenant?.metadata?.baseCurrency,
       exchangeRate: expenseDTO.exchangeRate || 1,
       // ...(user
