@@ -1,7 +1,6 @@
 import { InventoryTransaction } from '@/modules/InventoryCost/models/InventoryTransaction';
 import { Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
-import { omit } from 'lodash';
 import { IItemWarehouseQuantityChange } from '../Warehouse.types';
 import { WarehousesItemsQuantity } from './WarehousesItemsQuantity';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
@@ -62,6 +61,17 @@ export class WarehousesItemsQuantitySync {
 
   /**
    * Mutates the warehouse item quantity.
+   *
+   * There is one row per item and warehouse (unique index, migration
+   * `20261107130000`). Two first movements at the same moment used to both
+   * read "no row" and both insert, and every later change then updated
+   * both rows (double the stock). Now:
+   * 1. the change is added to the existing row;
+   * 2. if there is none, the row is inserted, or, when another movement
+   *    inserted it in the meantime, the change is added to that row (the
+   *    unique index makes the insert wait for it).
+   * Step 1 keeps a company whose database doesn't have the index yet
+   * working as before.
    * @param {number} warehouseItemQuantity
    * @param {Knex.Transaction} trx
    */
@@ -69,29 +79,39 @@ export class WarehousesItemsQuantitySync {
     warehouseItemQuantity: IItemWarehouseQuantityChange,
     trx: Knex.Transaction,
   ): Promise<void> => {
-    const itemWarehouseQuantity = await this.itemWarehouseQuantityModel()
-      .query(trx)
-      .where('itemId', warehouseItemQuantity.itemId)
-      .where('warehouseId', warehouseItemQuantity.warehouseId)
-      .first();
+    const { itemId, warehouseId, amount } = warehouseItemQuantity;
+    if (!amount) return;
 
-    if (itemWarehouseQuantity) {
-      await this.itemWarehouseQuantityModel().query(trx).changeAmount(
-        {
-          itemId: warehouseItemQuantity.itemId,
-          warehouseId: warehouseItemQuantity.warehouseId,
-        },
-        'quantityOnHand',
-        warehouseItemQuantity.amount,
-      );
-    } else {
-      await this.itemWarehouseQuantityModel()
-        .query(trx)
-        .insert({
-          ...omit(warehouseItemQuantity, ['amount']),
-          quantityOnHand: warehouseItemQuantity.amount,
-        });
-    }
+    const knex = trx ?? this.itemWarehouseQuantityModel().knex();
+
+    const updated = await this.itemWarehouseQuantityModel()
+      .query(trx)
+      .where({ itemId, warehouseId })
+      .patch({
+        quantityOnHand: knex.raw('COALESCE(??, 0) + ?', [
+          'quantity_on_hand',
+          amount,
+        ]),
+      } as any);
+    if (updated > 0) return;
+
+    // Identifiers as `??` bindings, so the tenant knex maps their names.
+    await knex.raw(
+      `INSERT INTO ?? (??, ??, ??) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE ?? = COALESCE(??, 0) + VALUES(??)`,
+      [
+        'items_warehouses_quantity',
+        'item_id',
+        'warehouse_id',
+        'quantity_on_hand',
+        itemId,
+        warehouseId,
+        amount,
+        'quantity_on_hand',
+        'quantity_on_hand',
+        'quantity_on_hand',
+      ],
+    );
   };
 
   /**

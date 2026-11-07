@@ -29,7 +29,7 @@ export class WarehousesDTOValidators {
     );
     // Validate the sale invoice warehouse existance on the storage.
     if (DTO.warehouseId) {
-      this.validateWarehouseExistanceService.validateWarehouseExistance(
+      await this.validateWarehouseExistanceService.validateWarehouseExistance(
         DTO.warehouseId,
       );
     }
