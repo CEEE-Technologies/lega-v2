@@ -413,6 +413,31 @@ describe('Foreign currency refunds post the exchange gain/loss (e2e)', () => {
       expect(net[accounts.gainLoss]).toBe(1);
     });
 
+    it('editing the credit note rate to 1 (refund at 1) drops the gain/loss', async () => {
+      // EUR 100 at 1.2, refunded at 1: a USD 10 gain on the refund of 50.
+      const { id: creditNoteId, number } = await createCreditNote(100, 1.2);
+      const refund = await refundCreditNote(creditNoteId, {
+        amount: 50,
+        exchangeRate: 1,
+      });
+      expect(
+        netByAccount(await accrualRows('RefundCreditNote', refund.id))[
+          accounts.gainLoss
+        ],
+      ).toBe(-10);
+
+      ok(
+        await api()
+          .put(`/credit-notes/${creditNoteId}`)
+          .send(creditNoteBody(eurCustomerId, 100, 1, number)),
+      );
+      const net = netByAccount(
+        await accrualRows('RefundCreditNote', refund.id),
+      );
+      expect(net[eurAR]).toBe(50);
+      expect(net[accounts.gainLoss] ?? 0).toBe(0);
+    });
+
     it('at the credit note rate there is no gain/loss line', async () => {
       const { id: creditNoteId } = await createCreditNote(100, 1.2);
       const refund = await refundCreditNote(creditNoteId, { amount: 40 });

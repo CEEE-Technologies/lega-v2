@@ -375,7 +375,14 @@ export class RefundCreditNoteGLEntries {
       .withGraphFetched('creditNote');
     if (!refund) return;
 
+    // By the currency, not the rates: a foreign document edited to the
+    // rate 1 (with a refund at 1) still has to drop the exchange gain/loss
+    // its accrual entries were posted with at the old rate.
+    const baseCurrency = (await this.tenancyContext?.getTenantMetadata())
+      ?.baseCurrency;
+    const currencyCode = refund.currencyCode ?? refund.creditNote?.currencyCode;
     const isForeign =
+      (!!baseCurrency && !!currencyCode && currencyCode !== baseCurrency) ||
       Number(refund.exchangeRate ?? 1) !== 1 ||
       Number(refund.creditNote?.exchangeRate ?? 1) !== 1;
     return isForeign
