@@ -22,8 +22,9 @@ export class WorkspaceUserStatusService {
 
   /**
    * Retrieves the organizations (of the given memberships) where the user
-   * is deactivated. Organizations not built yet are skipped: they have no
-   * users to look at.
+   * is deactivated. Skipped without a lookup: organizations not built yet
+   * (no users to look at) and the ones the user owns (nobody can
+   * deactivate the owner).
    * @param {number} userId - System user id.
    * @param {UserTenant[]} memberships - With `tenant` fetched.
    * @returns {Promise<Set<string>>} Their organization ids.
@@ -37,6 +38,7 @@ export class WorkspaceUserStatusService {
     for (const membership of memberships) {
       const tenant = membership.tenant;
       if (!tenant?.organizationId || !tenant.initializedAt) continue;
+      if (membership.role === 'owner') continue;
 
       if (await this.isUserInactive(userId, tenant.organizationId)) {
         inactive.add(tenant.organizationId);
