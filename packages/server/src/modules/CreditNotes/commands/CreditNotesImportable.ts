@@ -5,6 +5,7 @@ import { Importable } from '@/modules/Import/Importable';
 import { CreateCreditNoteDto } from '../dtos/CreditNote.dto';
 import { ImportableService } from '@/modules/Import/decorators/Import.decorator';
 import { CreditNote } from '../models/CreditNote';
+import { CreditNotesSampleData } from '../constants';
 
 @Injectable()
 @ImportableService({ name: CreditNote.name })
@@ -37,9 +38,9 @@ export class CreditNotesImportable extends Importable {
   }
 
   /**
-   * Retrieves the sample data that used to download accounts sample sheet.
+   * Retrieves the sample data of the credit notes sample sheet.
    */
   public sampleData(): any[] {
-    return [];
+    return CreditNotesSampleData;
   }
 }
