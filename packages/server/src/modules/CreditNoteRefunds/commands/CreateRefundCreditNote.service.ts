@@ -135,7 +135,8 @@ export class CreateRefundCreditNoteService {
       creditNoteId: creditNote.id,
       currencyCode: creditNote.currencyCode,
       ...creditNoteDTO,
-      exchangeRate: creditNoteDTO.exchangeRate || 1,
+      // No rate given: the credit note's (1 in the base currency), not 1.
+      exchangeRate: creditNoteDTO.exchangeRate || creditNote.exchangeRate || 1,
     };
   };
 }

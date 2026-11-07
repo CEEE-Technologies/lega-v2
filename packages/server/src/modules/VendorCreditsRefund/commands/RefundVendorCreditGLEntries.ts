@@ -15,7 +15,10 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { AccountNormal } from '@/interfaces/Account';
 import { AccountRepository } from '@/modules/Accounts/repositories/Account.repository';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { RefundVendorCreditCashGL } from './RefundVendorCreditCashGL';
+import {
+  getRefundVendorCreditLocalAmount,
+  RefundVendorCreditCashGL,
+} from './RefundVendorCreditCashGL';
 
 @Injectable()
 export class RefundVendorCreditGLEntries {
@@ -80,7 +83,7 @@ export class RefundVendorCreditGLEntries {
 
     return {
       ...commonEntry,
-      credit: refundVendorCredit.amount,
+      credit: getRefundVendorCreditLocalAmount(refundVendorCredit),
       foreignCredit: refundVendorCredit.amount,
       accountId: APAccountId,
       contactId: refundVendorCredit.vendorCredit.vendorId,
@@ -102,7 +105,7 @@ export class RefundVendorCreditGLEntries {
 
     return {
       ...commonEntry,
-      debit: refundVendorCredit.amount,
+      debit: getRefundVendorCreditLocalAmount(refundVendorCredit),
       foreignDebit: refundVendorCredit.amount,
       accountId: refundVendorCredit.depositAccountId,
       index: 2,
@@ -277,6 +280,38 @@ export class RefundVendorCreditGLEntries {
   };
 
   /**
+   * Builds the journal (accrual and cash basis) the refund is posted with.
+   * @param {number} refundVendorCreditId
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<Ledger | null>} Null when the refund is gone.
+   */
+  public buildRefundVendorCreditGLedger = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger | null> => {
+    // Retrieve the refund with associated vendor credit and items.
+    const refundVendorCredit = await this.refundVendorCreditModel()
+      .query(trx)
+      .findById(refundVendorCreditId)
+      .withGraphFetched('vendorCredit.entries.item');
+
+    if (!refundVendorCredit) return null;
+
+    // Retrieve the payable account (A/P) account based on the given currency.
+    const APAccount = await this.accountRepository.findOrCreateAccountsPayable(
+      refundVendorCredit.currencyCode,
+      {},
+      trx,
+    );
+    // Retrieve refund vendor credit ledger entries.
+    return this.getRefundVendorCreditGLedger(
+      refundVendorCredit,
+      APAccount.id,
+      trx,
+    );
+  };
+
+  /**
    * Creates refund vendor credit GL entries.
    * @param {number} refundVendorCreditId
    * @param {Knex.Transaction} trx
@@ -285,28 +320,26 @@ export class RefundVendorCreditGLEntries {
     refundVendorCreditId: number,
     trx?: Knex.Transaction,
   ) => {
-    // Retrieve the refund with associated vendor credit and items.
-    const refundVendorCredit = await this.refundVendorCreditModel()
-      .query(trx)
-      .findById(refundVendorCreditId)
-      .withGraphFetched('vendorCredit.entries.item');
-
-    // Retrieve the payable account (A/P) account based on the given currency.
-    const APAccount = await this.accountRepository.findOrCreateAccountsPayable(
-      refundVendorCredit.currencyCode,
-      {},
+    const ledger = await this.buildRefundVendorCreditGLedger(
+      refundVendorCreditId,
       trx,
     );
-
-    // Retrieve refund vendor credit ledger entries.
-    const ledger = await this.getRefundVendorCreditGLedger(
-      refundVendorCredit,
-      APAccount.id,
-      trx,
-    );
-
     // Saves refund ledger entries.
-    await this.ledgerStorage.commit(ledger, trx);
+    if (ledger) await this.ledgerStorage.commit(ledger, trx);
+  };
+
+  /**
+   * Rewrites the whole journal of the refund (accrual and cash basis), as
+   * deleting and saving it again would.
+   * @param {number} refundVendorCreditId
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteRefundVendorCreditGLEntries = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    await this.revertRefundVendorCreditGLEntries(refundVendorCreditId, trx);
+    await this.createRefundVendorCreditGLEntries(refundVendorCreditId, trx);
   };
 
   /**
