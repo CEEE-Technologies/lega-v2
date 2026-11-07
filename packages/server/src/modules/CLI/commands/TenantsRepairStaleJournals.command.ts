@@ -66,17 +66,26 @@ export class TenantsRepairStaleJournalsCommand extends BaseCommand {
       const organizationIds = await this.getOrganizationIds(
         options.organization,
       );
+      let failed = 0;
       await this.withApp(async (runInTenant) => {
         for (const organizationId of organizationIds) {
           await runInTenant(organizationId, async (service) => {
             if (options.apply) {
-              this.report(organizationId, await service.repair());
+              const result = await service.repair();
+              this.report(organizationId, result);
+              failed += result.failed.length;
             } else {
               this.list(organizationId, await service.scan());
             }
           });
         }
       });
+      // Exits unsuccessfully, so maintenance scripts see the failures.
+      if (failed > 0) {
+        this.exit(
+          `The repair failed for ${failed} journals (listed above); the rest were applied.`,
+        );
+      }
       this.success(
         options.apply
           ? 'Repair applied.'
@@ -132,16 +141,12 @@ export class TenantsRepairStaleJournalsCommand extends BaseCommand {
       ) => Promise<void>,
     ) => Promise<void>,
   ) {
-    const { NestFactory } = await import('@nestjs/core');
     const { ClsService } = await import('nestjs-cls');
-    const { AppModule } = await import('../../App/App.module');
     const { StaleJournalsRepairService } = await import(
       '../../AccountingBasis/StaleJournalsRepair.service'
     );
-    const app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn'],
-    });
-    await app.init();
+    const { createMaintenanceApp } = await import('../MaintenanceApp');
+    const app = await createMaintenanceApp();
     try {
       const cls = app.get(ClsService);
       await work((organizationId, fn) =>
