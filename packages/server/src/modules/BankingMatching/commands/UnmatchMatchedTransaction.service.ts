@@ -18,6 +18,12 @@ import { DeleteBillPayment } from '@/modules/BillPayments/commands/DeleteBillPay
  */
 export const PAYMENT_TYPES_CREATED_BY_MATCH = ['PaymentReceive', 'BillPayment'];
 
+/** The table of each payment type a match creates. */
+const CREATED_PAYMENT_TABLES: Record<string, string> = {
+  PaymentReceive: 'payment_receives',
+  BillPayment: 'bills_payments',
+};
+
 @Injectable()
 export class UnmatchMatchedBankTransaction {
   constructor(
@@ -130,12 +136,22 @@ export class UnmatchMatchedBankTransaction {
 
   /**
    * Deletes a payment the match created, with its ledger entries, and
-   * puts the paid amount back on the invoice or bill.
+   * puts the paid amount back on the invoice or bill. A payment that is
+   * already gone (deleted while the line was still matched) is skipped, so
+   * the line can still be unmatched.
    */
   private async deleteCreatedPayment(
     payment: MatchedBankTransaction,
     trx: Knex.Transaction,
   ) {
+    const table = CREATED_PAYMENT_TABLES[payment.referenceType];
+    if (!table) return;
+
+    const exists = await trx(table)
+      .where('id', payment.referenceId)
+      .first('id');
+    if (!exists) return;
+
     if (payment.referenceType === 'PaymentReceive') {
       await this.deletePaymentReceivedService.deletePaymentReceive(
         payment.referenceId,

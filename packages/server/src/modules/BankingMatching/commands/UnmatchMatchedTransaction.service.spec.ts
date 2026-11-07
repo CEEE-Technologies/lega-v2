@@ -8,7 +8,20 @@ import { events } from '@/common/events/events';
  * B4: unmatching deletes the payment the match created.
  */
 describe('UnmatchMatchedBankTransaction', () => {
-  const trx = { id: 'trx' } as any;
+  // Payments that still exist (by table and id); the rest are gone.
+  let existingPayments: Record<string, number[]> = {};
+  const trx = Object.assign(
+    jest.fn((table: string) => ({
+      where: (_column: string, id: number) => ({
+        first: async () =>
+          (existingPayments[table] ?? []).includes(id) ? { id } : undefined,
+      }),
+    })),
+    { id: 'trx' },
+  ) as any;
+  beforeEach(() => {
+    existingPayments = { payment_receives: [21], bills_payments: [13] };
+  });
 
   type Match = {
     uncategorizedTransactionId: number;
@@ -209,5 +222,33 @@ describe('UnmatchMatchedBankTransaction', () => {
       .filter(([name]) => name === events.bankMatch.onUnmatched)
       .map(([, payload]) => payload.uncategorizedTransactionId);
     expect(unmatched).toEqual([5, 6]);
+  });
+
+  it('still unmatches when the created payment was already deleted', async () => {
+    existingPayments = {};
+    const { service, eventPublisher, deleteBillPayment, deletedLines } = setup(
+      {
+        line: { id: 5, accountId: 1 },
+        matches: [
+          {
+            uncategorizedTransactionId: 5,
+            referenceType: 'Bill',
+            referenceId: 8,
+          },
+          {
+            uncategorizedTransactionId: 5,
+            referenceType: 'BillPayment',
+            referenceId: 13,
+          },
+        ],
+      },
+    );
+    await service.unmatchMatchedTransaction(5);
+    expect(deletedLines).toEqual([[5]]);
+    expect(deleteBillPayment.deleteBillPayment).not.toHaveBeenCalled();
+    expect(eventPublisher.emitAsync).toHaveBeenCalledWith(
+      events.bankMatch.onUnmatched,
+      expect.objectContaining({ uncategorizedTransactionId: 5 }),
+    );
   });
 });
