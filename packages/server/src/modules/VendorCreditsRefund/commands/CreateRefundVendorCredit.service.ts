@@ -159,7 +159,9 @@ export class CreateRefundVendorCredit {
       vendorCreditId: vendorCredit.id,
       ...vendorCreditDTO,
       currencyCode: vendorCredit.currencyCode,
-      exchangeRate: vendorCreditDTO.exchangeRate || 1,
+      // No rate given: the vendor credit's (1 in the base currency), not 1.
+      exchangeRate:
+        vendorCreditDTO.exchangeRate || vendorCredit.exchangeRate || 1,
     };
     return this.branchDTOTransform.transformDTO(initialDTO);
   };

@@ -15,7 +15,10 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { AccountNormal } from '@/interfaces/Account';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { AccountRepository } from '@/modules/Accounts/repositories/Account.repository';
-import { RefundCreditNoteCashGL } from './RefundCreditNoteCashGL';
+import {
+  getRefundLocalAmount,
+  RefundCreditNoteCashGL,
+} from './RefundCreditNoteCashGL';
 
 @Injectable()
 export class RefundCreditNoteGLEntries {
@@ -78,7 +81,7 @@ export class RefundCreditNoteGLEntries {
 
     return {
       ...commonEntry,
-      debit: refundCreditNote.amount,
+      debit: getRefundLocalAmount(refundCreditNote),
       foreignDebit: refundCreditNote.amount,
       accountId: ARAccountId,
       contactId: refundCreditNote.creditNote.customerId,
@@ -99,7 +102,7 @@ export class RefundCreditNoteGLEntries {
 
     return {
       ...commonEntry,
-      credit: refundCreditNote.amount,
+      credit: getRefundLocalAmount(refundCreditNote),
       foreignCredit: refundCreditNote.amount,
       accountId: refundCreditNote.fromAccountId,
       index: 2,
@@ -271,6 +274,40 @@ export class RefundCreditNoteGLEntries {
   };
 
   /**
+   * Builds the journal (accrual and cash basis) the refund is posted with.
+   * @param {number} refundCreditNoteId
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<Ledger | null>} Null when the refund is gone.
+   */
+  public buildRefundCreditGLedger = async (
+    refundCreditNoteId: number,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger | null> => {
+    // Retrieve the refund with associated credit note and items.
+    const refundCreditNote = await this.refundCreditNoteModel()
+      .query(trx)
+      .findById(refundCreditNoteId)
+      .withGraphFetched('creditNote.entries.item');
+
+    if (!refundCreditNote) return null;
+
+    // The A/R account of the refund currency: the one the credit note
+    // credited (the base A/R for a base currency refund).
+    const receivableAccount =
+      await this.accountRepository.findOrCreateAccountReceivable(
+        refundCreditNote.currencyCode,
+        {},
+        trx,
+      );
+    // Retrieve refund credit ledger entries.
+    return this.getRefundCreditNoteGLedger(
+      refundCreditNote,
+      receivableAccount.id,
+      trx,
+    );
+  };
+
+  /**
    * Creates refund credit GL entries.
    * @param {IRefundCreditNote} refundCreditNote
    * @param {Knex.Transaction} trx
@@ -279,26 +316,23 @@ export class RefundCreditNoteGLEntries {
     refundCreditNoteId: number,
     trx?: Knex.Transaction,
   ) => {
-    // Retrieve the refund with associated credit note and items.
-    const refundCreditNote = await this.refundCreditNoteModel()
-      .query(trx)
-      .findById(refundCreditNoteId)
-      .withGraphFetched('creditNote.entries.item');
-
-    // Receivable account A/R.
-    const receivableAccount = await this.accountModel()
-      .query()
-      .findOne('slug', 'accounts-receivable');
-
-    // Retrieve refund credit ledger entries.
-    const ledger = await this.getRefundCreditNoteGLedger(
-      refundCreditNote,
-      receivableAccount.id,
-      trx,
-    );
-
+    const ledger = await this.buildRefundCreditGLedger(refundCreditNoteId, trx);
     // Saves refund ledger entries.
-    await this.ledgerStorage.commit(ledger, trx);
+    if (ledger) await this.ledgerStorage.commit(ledger, trx);
+  };
+
+  /**
+   * Rewrites the whole journal of the refund (accrual and cash basis), as
+   * deleting and saving it again would.
+   * @param {number} refundCreditNoteId
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteRefundCreditGLEntries = async (
+    refundCreditNoteId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    await this.revertRefundCreditGLEntries(refundCreditNoteId, trx);
+    await this.createRefundCreditGLEntries(refundCreditNoteId, trx);
   };
 
   /**

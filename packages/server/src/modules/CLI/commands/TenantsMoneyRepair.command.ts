@@ -205,9 +205,7 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
    * the organization's cash basis set inside the tenant context.
    */
   private async rebuildCashBasis(organizationId: string) {
-    const { NestFactory } = await import('@nestjs/core');
     const { ClsService } = await import('nestjs-cls');
-    const { AppModule } = await import('@/modules/App/App.module');
     const { CashBasisRebuildService } = await import(
       '@/modules/AccountingBasis/CashBasisRebuild.service'
     );
@@ -217,10 +215,8 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
     const { SaleInvoiceWriteoffGLStorage } = await import(
       '@/modules/SaleInvoices/commands/writeoff/SaleInvoiceWriteoffGLStorage'
     );
-    const app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn'],
-    });
-    await app.init();
+    const { createMaintenanceApp } = await import('../MaintenanceApp');
+    const app = await createMaintenanceApp();
     try {
       const cls = app.get(ClsService);
       return await cls.run(async () => {

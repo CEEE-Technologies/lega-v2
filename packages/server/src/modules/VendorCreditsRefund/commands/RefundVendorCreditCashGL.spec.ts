@@ -177,9 +177,11 @@ describe('RefundVendorCreditCashGL', () => {
     expect(inventoryEntry.accountId).toBe(600);
   });
 
-  it('converts the multi-currency refund amount using the credit exchange rate', () => {
+  it('converts the multi-currency refund amount at the refund exchange rate', () => {
+    // The vendor credit was at 1.2; the cash came in at 1.25, as the
+    // accrual bank line says.
     const refund = buildRefund({
-      exchangeRate: 1,
+      exchangeRate: 1.25,
       amount: 1000,
       vendorCredit: buildVendorCredit({
         exchangeRate: 1.2,
@@ -191,8 +193,8 @@ describe('RefundVendorCreditCashGL', () => {
     const depositEntry = entries.find((entry) => entry.accountId === 900);
     const expenseEntry = entries.find((entry) => entry.accountId === 500);
 
-    expect(depositEntry.debit).toBe(1200);
-    expect(expenseEntry.credit).toBe(1200);
+    expect(depositEntry.debit).toBe(1250);
+    expect(expenseEntry.credit).toBe(1250);
     expect(sumBy(entries, 'debit')).toBeCloseTo(sumBy(entries, 'credit'), 2);
   });
 

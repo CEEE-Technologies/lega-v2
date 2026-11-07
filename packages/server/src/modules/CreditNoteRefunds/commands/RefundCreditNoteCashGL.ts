@@ -9,14 +9,23 @@ import {
   allocateCumulativeShare,
   balanceEntries,
   moneyGt,
+  multiplyMoney,
   roundMoney,
   subtractMoney,
 } from '@bigcapital/utils';
-import {
-  creditSide,
-  debitSide,
-  roundLedgerAmount,
-} from '@/utils/ledger-rounding';
+import { creditSide, debitSide } from '@/utils/ledger-rounding';
+
+/**
+ * The refund amount in the base currency: the amount (credit note
+ * currency) x the refund's exchange rate, rounded to the cent. Both the
+ * accrual and the cash basis bank lines use it.
+ * @param {Pick<RefundCreditNote, 'amount' | 'exchangeRate'>} refund
+ * @returns {number}
+ */
+export const getRefundLocalAmount = (
+  refund: Pick<RefundCreditNote, 'amount' | 'exchangeRate'>,
+): number =>
+  multiplyMoney(defaultTo(refund.amount, 0), defaultTo(refund.exchangeRate, 1));
 
 /**
  * Records the cash basis journal entries of the credit note refund.
@@ -30,6 +39,10 @@ import {
  * When the credit note has no income to reverse (zero total or missing), the
  * cash still leaves the bank, so the refund is taken from the customer's
  * unearned revenue instead of dropping the withdrawal line.
+ *
+ * The split runs in the credit note currency; every line is then converted
+ * at the refund's exchange rate (the rate the cash left at), and a rounding
+ * cent goes on an income line, so the set balances with the bank line.
  */
 export class RefundCreditNoteCashGL {
   private readonly refundCreditNote: RefundCreditNote;
@@ -134,6 +147,20 @@ export class RefundCreditNoteCashGL {
   }
 
   /**
+   * The refund's exchange rate (refund currency to base currency).
+   */
+  private get exchangeRate(): number {
+    return defaultTo(this.refundCreditNote.exchangeRate, 1);
+  }
+
+  /**
+   * The refund amount in the base currency.
+   */
+  private get refundLocalAmount(): number {
+    return getRefundLocalAmount(this.refundCreditNote);
+  }
+
+  /**
    * Retrieves the part of the refund that reverses the credit note income:
    * no more than what the earlier refunds left of the credit note total.
    * Anything above it comes from the customer's unearned revenue.
@@ -168,7 +195,7 @@ export class RefundCreditNoteCashGL {
         -defaultTo(creditNote.discountAmount, 0),
         defaultTo(creditNote.adjustment, 0),
       ],
-    );
+    ).map((part) => multiplyMoney(part, this.exchangeRate));
     return {
       items: parts.slice(0, items.length),
       discount: -parts[items.length],
@@ -183,7 +210,7 @@ export class RefundCreditNoteCashGL {
   private get refundEntry(): ILedgerEntry {
     return {
       ...this.cashEntriesCommonEntry,
-      credit: roundLedgerAmount(this.refundCreditNote.amount),
+      credit: this.refundLocalAmount,
       accountId: this.refundCreditNote.fromAccountId,
       index: 1,
       accountNormal: AccountNormal.DEBIT,
@@ -261,7 +288,7 @@ export class RefundCreditNoteCashGL {
    * @returns {ILedgerEntry[]}
    */
   public GLEntries(): ILedgerEntry[] {
-    if (roundLedgerAmount(this.refundCreditNote.amount) <= 0) {
+    if (this.refundLocalAmount <= 0) {
       return [];
     }
     if (!this.isIncomeReversible()) {
@@ -275,8 +302,8 @@ export class RefundCreditNoteCashGL {
     // A refund above what is left of the credit note total comes from the
     // customer's unearned revenue.
     const overAmount = subtractMoney(
-      this.refundCreditNote.amount,
-      this.recognizedAmount,
+      this.refundLocalAmount,
+      multiplyMoney(this.recognizedAmount, this.exchangeRate),
     );
     const overEntries = moneyGt(overAmount, 0)
       ? [{ ...this.unearnedRevenueEntry, debit: overAmount }]
@@ -302,7 +329,7 @@ export class RefundCreditNoteCashGL {
   private get unearnedRevenueEntry(): ILedgerEntry {
     return {
       ...this.cashEntriesCommonEntry,
-      debit: roundLedgerAmount(this.refundCreditNote.amount),
+      debit: this.refundLocalAmount,
       accountId: this.unearnedRevenueAccountId,
       contactId: this.refundCreditNote.creditNote?.customerId,
       index: 2,

@@ -13,11 +13,19 @@ import {
   roundMoney,
   subtractMoney,
 } from '@bigcapital/utils';
-import {
-  creditSide,
-  debitSide,
-  roundLedgerAmount,
-} from '@/utils/ledger-rounding';
+import { creditSide, debitSide } from '@/utils/ledger-rounding';
+
+/**
+ * The refund amount in the base currency: the amount (vendor credit
+ * currency) x the refund's exchange rate, rounded to the cent. Both the
+ * accrual and the cash basis bank lines use it.
+ * @param {Pick<RefundVendorCredit, 'amount' | 'exchangeRate'>} refund
+ * @returns {number}
+ */
+export const getRefundVendorCreditLocalAmount = (
+  refund: Pick<RefundVendorCredit, 'amount' | 'exchangeRate'>,
+): number =>
+  multiplyMoney(defaultTo(refund.amount, 0), defaultTo(refund.exchangeRate, 1));
 
 /**
  * Records the cash basis journal entries of the vendor credit refund.
@@ -141,30 +149,21 @@ export class RefundVendorCreditCashGL {
   }
 
   /**
-   * Retrieves the refunded amount in local currency.
-   * The refund amount is stored in the vendor credit currency, so it is
-   * converted using the vendor credit exchange rate to keep the cash basis
-   * entries consistent with the local currency composition of the credit.
+   * Retrieves the refunded amount in local currency: converted at the
+   * refund's rate (the rate the cash came in at), like the accrual bank
+   * line. It used the vendor credit's rate, so the cash bank line was off
+   * the accrual one when the two rates differ.
    * @returns {number}
    */
   private get refundLocalAmount(): number {
-    const exchangeRate = defaultTo(
-      this.vendorCredit?.exchangeRate,
-      defaultTo(this.refundVendorCredit.exchangeRate, 1),
-    );
-    return roundLedgerAmount(
-      defaultTo(this.refundVendorCredit.amount, 0) * exchangeRate,
-    );
+    return getRefundVendorCreditLocalAmount(this.refundVendorCredit);
   }
 
   /**
-   * The exchange rate of the vendor credit (falls back to the refund's).
+   * The refund's exchange rate (refund currency to base currency).
    */
-  private get vendorCreditRate(): number {
-    return defaultTo(
-      this.vendorCredit?.exchangeRate,
-      defaultTo(this.refundVendorCredit.exchangeRate, 1),
-    );
+  private get exchangeRate(): number {
+    return defaultTo(this.refundVendorCredit.exchangeRate, 1);
   }
 
   /**
@@ -189,7 +188,7 @@ export class RefundVendorCreditCashGL {
 
   /**
    * Splits the refund over the vendor credit lines with the running-total
-   * method, in the vendor credit currency, converted with its rate. Once the
+   * method, in the vendor credit currency, converted at the refund rate. Once the
    * vendor credit is fully refunded every line ends exactly at its amount.
    */
   private get shares() {
@@ -203,7 +202,7 @@ export class RefundVendorCreditCashGL {
         -defaultTo(this.vendorCredit.discountAmount, 0),
         defaultTo(this.vendorCredit.adjustment, 0),
       ],
-    ).map((part) => multiplyMoney(part, this.vendorCreditRate));
+    ).map((part) => multiplyMoney(part, this.exchangeRate));
 
     return {
       items: parts.slice(0, items.length),
@@ -314,7 +313,7 @@ export class RefundVendorCreditCashGL {
     // A refund above what is left of the vendor credit is a prepaid expense.
     const overAmount = subtractMoney(
       this.refundLocalAmount,
-      multiplyMoney(this.recognizedAmount, this.vendorCreditRate),
+      multiplyMoney(this.recognizedAmount, this.exchangeRate),
     );
     const overEntries = moneyGt(overAmount, 0)
       ? [{ ...this.prepaidExpensesEntry, credit: overAmount }]

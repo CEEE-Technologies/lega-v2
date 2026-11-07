@@ -19,6 +19,7 @@ import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBas
 import { TenantsMoneyHealthCheckCommand } from './commands/TenantsMoneyHealthCheck.command';
 import { TenantsMoneyRepairCommand } from './commands/TenantsMoneyRepair.command';
 import { TenantsRepairStaleJournalsCommand } from './commands/TenantsRepairStaleJournals.command';
+import { TenantsRepairRefundJournalsCommand } from './commands/TenantsRepairRefundJournals.command';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { TenantsRepairStaleJournalsCommand } from './commands/TenantsRepairStale
     TenantsMoneyHealthCheckCommand,
     TenantsMoneyRepairCommand,
     TenantsRepairStaleJournalsCommand,
+    TenantsRepairRefundJournalsCommand,
   ],
 })
 export class CLIModule {}
