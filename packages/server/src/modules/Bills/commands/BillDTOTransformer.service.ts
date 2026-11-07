@@ -95,7 +95,8 @@ export class BillDTOTransformer {
     const initialEntries = billDTO.entries.map((entry) => ({
       referenceType: 'Bill',
       isInclusiveTax: billDTO.isInclusiveTax,
-      ...omit(entry, ['amount']),
+      // Line ids only identify existing lines on edit.
+      ...omit(entry, oldBill ? ['amount'] : ['amount', 'id']),
     }));
     const asyncEntries = await composeAsync(
       // Associate tax rate from tax id to entries.

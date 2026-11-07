@@ -1,3 +1,4 @@
+import { runAfterTransaction } from './TransactionsHooks';
 import {
   DryRunRollback,
   runDryRun,
@@ -82,5 +83,64 @@ describe('withSavepoint', () => {
         throw new Error('Deadlock found');
       }),
     ).rejects.toBeInstanceOf(TransactionAbortedError);
+  });
+
+  describe('after-commit work queued by a step', () => {
+    // A transaction whose commit (or rollback) the test decides.
+    const committableTrx = () => {
+      const { trx } = fakeTrx();
+      let finish: (ok: boolean) => void = () => undefined;
+      trx.executionPromise = new Promise<void>((resolve, reject) => {
+        finish = (ok) => (ok ? resolve() : reject(new Error('rolled back')));
+      });
+      return { trx, finish: (ok: boolean) => finish(ok) };
+    };
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('is dropped when the step fails, kept when it succeeds', async () => {
+      const { trx, finish } = committableTrx();
+      const ran: string[] = [];
+
+      await withSavepoint(trx, async () => {
+        runAfterTransaction(trx, () => ran.push('kept row'));
+      });
+      await expect(
+        withSavepoint(trx, async () => {
+          runAfterTransaction(trx, () => ran.push('failed row'));
+          throw new Error('handler failed');
+        }),
+      ).rejects.toThrow('handler failed');
+
+      expect(ran).toEqual([]); // nothing before the commit
+      finish(true);
+      await flush();
+      expect(ran).toEqual(['kept row']);
+    });
+
+    it('still skips kept work when the outer transaction rolls back', async () => {
+      const { trx, finish } = committableTrx();
+      const ran: string[] = [];
+      await withSavepoint(trx, async () => {
+        runAfterTransaction(trx, () => ran.push('row'));
+      });
+      finish(false);
+      await flush();
+      expect(ran).toEqual([]);
+    });
+
+    it('drops an inner step\'s work with it, keeping the outer step\'s', async () => {
+      const { trx, finish } = committableTrx();
+      const ran: string[] = [];
+      await withSavepoint(trx, async () => {
+        runAfterTransaction(trx, () => ran.push('outer'));
+        await withSavepoint(trx, async () => {
+          runAfterTransaction(trx, () => ran.push('inner'));
+          throw new Error('inner failed');
+        }).catch(() => undefined);
+      });
+      finish(true);
+      await flush();
+      expect(ran).toEqual(['outer']);
+    });
   });
 });

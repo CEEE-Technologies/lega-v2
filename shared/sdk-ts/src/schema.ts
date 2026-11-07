@@ -8723,6 +8723,8 @@ export interface components {
              * @example ac_xxx
              */
             code: string;
+            /** @description The state of the Stripe connect link, returned by Stripe unchanged */
+            state?: string;
         };
         CreateStripeAccountResponseDto: {
             /**

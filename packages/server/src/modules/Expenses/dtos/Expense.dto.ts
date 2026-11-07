@@ -23,6 +23,17 @@ class AttachmentDto {
 }
 
 export class ExpenseCategoryDto {
+  @IsOptional()
+  @ToNumber()
+  @IsInt()
+  @ApiProperty({
+    required: false,
+    example: 1,
+    description:
+      'The id of an existing line, on edit. A line sent with its id is updated in place, so the landed cost allocated from it stays linked.',
+  })
+  id?: number;
+
   @IsInt()
   @IsNotEmpty()
   @ApiProperty({ example: 1, description: 'The index of the expense category' })

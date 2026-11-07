@@ -25,6 +25,17 @@ enum DiscountType {
 
 export class BillEntryDto extends ItemEntryDto {
   @ApiProperty({
+    description:
+      'The id of an existing line, on edit. A line sent with its id is updated in place, so the landed cost allocated from it stays linked.',
+    example: 1,
+    required: false,
+  })
+  @IsOptional()
+  @ToNumber()
+  @IsInt()
+  id?: number;
+
+  @ApiProperty({
     description: 'Flag indicating whether the entry contributes to landed cost',
     example: true,
     required: false,

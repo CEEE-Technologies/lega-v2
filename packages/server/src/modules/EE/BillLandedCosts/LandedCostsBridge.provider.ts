@@ -1,5 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { Knex } from 'knex';
+import { uniq } from 'lodash';
 import {
   BillLandedCostsBridge,
   IBillLandedCostEntryDTO,
@@ -53,6 +54,34 @@ export class LandedCostsBridgeProvider
 
     if (billLandedCosts.length > 0) {
       throw new ServiceError(ERRORS.BILL_HAS_ASSOCIATED_LANDED_COSTS);
+    }
+  }
+
+  /**
+   * Validates no landed cost was allocated from the given bill. Deleting it
+   * would leave the cost in the target bill's stock with nothing paying it.
+   * @param {number} billId - Bill id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public async validateBillNotLandedCostSource(
+    billId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    const landedCosts = await this.billLandedCostModel()
+      .query(trx)
+      .where('fromTransactionType', 'Bill')
+      .where('fromTransactionId', billId)
+      .withGraphFetched('bill');
+
+    if (landedCosts.length > 0) {
+      const bills = uniq(
+        landedCosts.map((cost) => cost.bill?.billNumber || `#${cost.billId}`),
+      );
+      throw new ServiceError(
+        ERRORS.BILL_USED_AS_LANDED_COST,
+        `Used as landed cost on ${bills.length > 1 ? 'bills' : 'bill'} ${bills.join(', ')}; remove it there first.`,
+        { billIds: uniq(landedCosts.map((cost) => cost.billId)) },
+      );
     }
   }
 

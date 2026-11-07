@@ -25,6 +25,7 @@ describe('BillLandedCostsBridge', () => {
   describe('with a registered provider', () => {
     const buildProvider = (): jest.Mocked<IBillLandedCostsProvider> => ({
       validateBillHasNoLandedCosts: jest.fn().mockResolvedValue(undefined),
+      validateBillNotLandedCostSource: jest.fn().mockResolvedValue(undefined),
       validateBillEntries: jest.fn().mockResolvedValue(undefined),
       validateBillEditEntries: jest.fn(),
     });
@@ -34,11 +35,16 @@ describe('BillLandedCostsBridge', () => {
       bridge.register(provider);
 
       await bridge.validateBillHasNoLandedCosts(7);
+      await bridge.validateBillNotLandedCostSource(8);
       await bridge.validateBillEntries([{ itemId: 1, landedCost: true }]);
       bridge.validateBillEditEntries([{ id: 1 }], [{ id: 1 }]);
 
       expect(provider.validateBillHasNoLandedCosts).toHaveBeenCalledWith(
         7,
+        undefined,
+      );
+      expect(provider.validateBillNotLandedCostSource).toHaveBeenCalledWith(
+        8,
         undefined,
       );
       expect(provider.validateBillEntries).toHaveBeenCalledWith([

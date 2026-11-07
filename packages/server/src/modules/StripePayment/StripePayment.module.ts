@@ -6,6 +6,7 @@ import { ExchangeStripeOAuthTokenService } from './ExchangeStripeOauthToken';
 import { SeedStripeAccountsOnOAuthGrantedSubscriber } from './subscribers/SeedStripeAccounts';
 import { StripeWebhooksSubscriber } from './subscribers/StripeWebhooksSubscriber';
 import { StripeIntegrationController } from './StripePayment.controller';
+import { StripeConnectStateService } from './StripeConnectState.service';
 import { StripePaymentWebhooksController } from './StripePaymentWebhooks.controller';
 import { StripePaymentService } from './StripePaymentService';
 import { GetStripeAuthorizationLinkService } from './GetStripeAuthorizationLink';
@@ -24,6 +25,7 @@ import { TenancyModule } from '../Tenancy/Tenancy.module';
   ],
   providers: [
     StripePaymentService,
+    StripeConnectStateService,
     GetStripeAuthorizationLinkService,
     CreateStripeAccountLinkService,
     CreateStripeAccountService,

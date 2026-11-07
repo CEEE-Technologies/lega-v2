@@ -9,6 +9,7 @@ import { Bill } from '../models/Bill';
 import { events } from '@/common/events/events';
 import { Vendor } from '@/modules/Vendors/models/Vendor';
 import { Knex } from 'knex';
+import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { BillLandedCostsBridge } from '../integrations/BillLandedCostsBridge';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { EditBillDto } from '../dtos/Bill.dto';
@@ -133,9 +134,14 @@ export class EditBillService {
       oldBill,
     );
     // Validate landed cost entries against the bill edit operation.
+    // Lines are matched by id; the new amount is the line amount the
+    // landed cost was allocated from (after discount).
     this.landedCostsBridge.validateBillEditEntries(
       oldBill.entries,
-      billObj.entries,
+      billObj.entries.map((entry) => ({
+        id: entry.id,
+        amount: ItemEntry.fromJson(entry, { skipValidation: true }).amount,
+      })),
     );
     // Validate bill total amount should be bigger than paid amount
     // against the locked row.

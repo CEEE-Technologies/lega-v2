@@ -19,6 +19,7 @@ import {
   AbilitySubject,
 } from '@/constants/abilityOption';
 import { CLASSES } from '@/constants/classes';
+import { MATCHED_TRANSACTION_MESSAGE } from '@/constants/errors';
 import { formattedAmount, safeCallback } from '@/utils';
 
 export type InvoiceTableRow = NonNullable<
@@ -127,7 +128,14 @@ export const handleDeleteErrors = (errors: DeleteError[]) => {
   if (errors.find((e) => e.type === 'CANNOT_DELETE_TRANSACTION_MATCHED')) {
     AppToaster.show({
       intent: Intent.DANGER,
-      message: 'Cannot delete a transaction matched with a bank transaction.',
+      message: MATCHED_TRANSACTION_MESSAGE,
+    });
+  }
+  if (errors.find((e) => e.type === 'SALE_INVOICE_IS_WRITTEN_OFF')) {
+    AppToaster.show({
+      intent: Intent.DANGER,
+      message:
+        'This invoice is written off. Cancel the write-off first, then delete the invoice.',
     });
   }
 };

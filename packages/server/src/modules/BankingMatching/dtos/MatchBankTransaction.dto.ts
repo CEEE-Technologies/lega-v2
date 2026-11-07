@@ -3,6 +3,8 @@ import {
   IsArray,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
+  IsPositive,
   IsString,
   ValidateNested,
 } from 'class-validator';
@@ -25,6 +27,17 @@ export class MatchTransactionEntryDto {
     example: 1,
   })
   referenceId: number;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  @ApiProperty({
+    description:
+      "Exchange rate of the payment the match creates, from the document's currency to the base currency. Required when an invoice or bill is not in the base currency.",
+    example: 1.1,
+    required: false,
+  })
+  exchangeRate?: number;
 }
 
 export class MatchBankTransactionDto {
