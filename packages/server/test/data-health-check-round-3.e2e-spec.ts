@@ -544,6 +544,31 @@ describe('Data health check, round 3 (H9–H16)', () => {
     }
   });
 
+  it('H13 compares a cash-only journal with its cash basis entries', async () => {
+    const journal = await insert('manual_journals', {
+      journalNumber: `HC3-MJ-CASH-${tag}`,
+      date: '2026-06-04',
+      amount: 200,
+      currencyCode: 'USD',
+      exchangeRate: 1,
+      basis: 'cash',
+      publishedAt: '2026-06-04',
+    });
+    await post(
+      'Journal',
+      journal,
+      [
+        [accounts.bank, 200, 0],
+        [accounts.income, 0, 200],
+      ],
+      { basis: 'cash' },
+    );
+    const lines = sectionLines(await run(), 'H13');
+    expect(lines.some((line) => line.includes(`HC3-MJ-CASH-${tag}`))).toBe(
+      false,
+    );
+  });
+
   it('H14 lists invoices whose tax rows are missing, and rows of a deleted invoice (E8)', async () => {
     const customerId = await contact('customer');
     const taxRateId = await insert('tax_rates', {

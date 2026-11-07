@@ -702,6 +702,11 @@ interface ILedgerDocumentKind {
   cashSet?: boolean;
   /** Whole set: the journal's debits. */
   allDebits?: boolean;
+  /**
+   * The document's own basis (a journal can be cash only, accrual only, or
+   * both when null): its entries are compared on that basis.
+   */
+  basisColumn?: string;
 }
 
 const LEDGER_DOCUMENTS: ILedgerDocumentKind[] = [
@@ -814,6 +819,7 @@ const LEDGER_DOCUMENTS: ILedgerDocumentKind[] = [
     totalSql: 'AMOUNT',
     sign: 1,
     allDebits: true,
+    basisColumn: 'basis',
   },
   {
     referenceType: 'CashflowTransaction',
@@ -869,6 +875,9 @@ const getLedgerMismatches = async (
     if (kind.accountColumn) {
       query.select(`${kind.accountColumn} as documentAccountId`);
     }
+    if (kind.basisColumn) {
+      query.select(`${kind.basisColumn} as documentBasis`);
+    }
     if (kind.publishedColumn) query.whereNotNull(kind.publishedColumn);
     const documents: any[] = await query;
     if (documents.length === 0) continue;
@@ -894,7 +903,11 @@ const getLedgerMismatches = async (
       const total = roundMoney(num(pick(document, 'health_total')));
       const expected = multiplyMoney(total, num(document.exchangeRate || 1));
       const rows = byDocument.get(Number(document.id)) || [];
-      const accrual = rows.filter((row) => row.basis !== 'cash');
+      // A cash-only journal has only cash basis entries: compare those.
+      const cashOnly = !!kind.basisColumn && document.documentBasis === 'cash';
+      const accrual = rows.filter((row) =>
+        cashOnly ? row.basis === 'cash' : row.basis !== 'cash',
+      );
       const base = {
         documentType: kind.referenceType,
         documentId: document.id,
