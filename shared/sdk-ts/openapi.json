@@ -45636,6 +45636,10 @@
           "isDefault": {
             "type": "boolean"
           },
+          "isUserInactive": {
+            "type": "boolean",
+            "description": "Whether the user is deactivated in this organization (it cannot be opened)."
+          },
           "metadata": {
             "$ref": "#/components/schemas/WorkspaceMetadataDto"
           },

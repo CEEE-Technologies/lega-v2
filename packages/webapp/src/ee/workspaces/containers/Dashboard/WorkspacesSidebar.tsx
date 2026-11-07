@@ -34,10 +34,13 @@ function WorkspaceIcon({
   const initials = firstLettersArgs(...(name || '').split(' '));
   const isDisabled = !canSwitchWorkspace(workspace);
   const logoUri = workspace.metadata?.logoUri;
+  const tooltip = workspace.isUserInactive
+    ? `${name} — ${intl.get('workspaces.access_deactivated')}`
+    : name;
 
   return (
     <Tooltip
-      content={name}
+      content={tooltip}
       position={Position.LEFT}
       boundary="viewport"
       modifiers={{ offset: { offset: '0, 8' } }}

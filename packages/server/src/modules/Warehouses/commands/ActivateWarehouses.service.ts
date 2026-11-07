@@ -38,6 +38,11 @@ export class ActivateWarehousesService {
    * - Creates a new warehouses and mark it as primary.
    * - Seed warehouses items quantity.
    * - Mutate inventory transactions with the primary warehouse.
+   *
+   * Everything is one save: the primary warehouse, the feature setting and
+   * the linking of the existing documents and stock all use the same
+   * transaction, one step after the other. If any step fails nothing is
+   * kept and the feature stays off, so it can be turned on again.
    */
   public async activateWarehouses(): Promise<void> {
     const isActivated = await this.settings.isMultiWarehousesActive();
@@ -47,9 +52,9 @@ export class ActivateWarehousesService {
       await this.eventEmitter.emitAsync(events.warehouse.onActivate, { trx });
 
       const primaryWarehouse =
-        await this.createInitialWarehouse.createInitialWarehouse();
+        await this.createInitialWarehouse.createInitialWarehouse(trx);
 
-      this.settings.markMutliwarehoussAsActivated();
+      await this.settings.markMutliwarehoussAsActivated(trx);
 
       await this.eventEmitter.emitAsync(events.warehouse.onActivated, {
         primaryWarehouse,

@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { CreateWarehouse } from './CreateWarehouse.service';
 import { Injectable } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
@@ -15,13 +16,16 @@ export class CreateInitialWarehouse {
 
   /**
    * Creates a initial warehouse.
-   * @param {number} tenantId
+   * @param {Knex.Transaction} trx - The activation transaction.
    */
-  public createInitialWarehouse = async () => {
-    return this.createWarehouse.createWarehouse({
-      name: this.i18n.t('warehouses.primary_warehouse'),
-      code: '10001',
-      primary: true,
-    });
+  public createInitialWarehouse = async (trx?: Knex.Transaction) => {
+    return this.createWarehouse.createWarehouse(
+      {
+        name: this.i18n.t('warehouses.primary_warehouse'),
+        code: '10001',
+        primary: true,
+      },
+      trx,
+    );
   };
 }

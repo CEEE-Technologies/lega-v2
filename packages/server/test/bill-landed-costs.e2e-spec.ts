@@ -124,8 +124,10 @@ const deleteAllocatedLandedCost = (allocatedLandedCostId: number) =>
     .delete(`/landed-cost/${allocatedLandedCostId}`)
     .set(authHeaders());
 
+// Landed cost is on a service line (the freight): an inventory line would
+// already be stock of its own item (decision D7).
 const createBillAllocatedFixture = async (cost = 100) => {
-  const costBill = await postBill(inventoryItemId, { landedCost: true }).expect(
+  const costBill = await postBill(serviceItemId, { landedCost: true }).expect(
     201,
   );
   const targetBill = await postBill(inventoryItemId).expect(201);
@@ -196,7 +198,7 @@ describe('Bill Landed Costs (e2e)', () => {
   });
 
   it('/landed-cost/bills/:billId/allocate (POST) allocates a bill landed cost and posts the GL entries', async () => {
-    const costBill = await postBill(inventoryItemId, {
+    const costBill = await postBill(serviceItemId, {
       landedCost: true,
     }).expect(201);
     const targetBill = await postBill(inventoryItemId).expect(201);
@@ -282,7 +284,7 @@ describe('Bill Landed Costs (e2e)', () => {
   });
 
   it('rejects allocating more than the unallocated cost amount', async () => {
-    const costBill = await postBill(inventoryItemId, {
+    const costBill = await postBill(serviceItemId, {
       landedCost: true,
     }).expect(201);
     const targetBill = await postBill(inventoryItemId).expect(201);
@@ -297,8 +299,29 @@ describe('Bill Landed Costs (e2e)', () => {
     ).expect(400);
   });
 
-  it('rejects creating a bill with a landed cost entry on a non-inventory item', async () => {
-    await postBill(serviceItemId, { landedCost: true }).expect(400);
+  it('rejects creating a bill with a landed cost entry on an inventory item', async () => {
+    const response = await postBill(inventoryItemId, {
+      landedCost: true,
+    }).expect(400);
+    expect(response.body.errors[0].type).toBe(
+      'LANDED_COST_ENTRIES_SHOULD_NOT_BE_INVENTORY_ITEMS',
+    );
+  });
+
+  it('/landed-cost/transactions (GET) lists the unallocated bill landed costs', async () => {
+    const costBill = await postBill(serviceItemId, {
+      landedCost: true,
+    }).expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get('/landed-cost/transactions')
+      .query({ transactionType: 'Bill' })
+      .set(authHeaders())
+      .expect(200);
+
+    const listed = response.body.find((t) => t.id === costBill.body.id);
+    expect(listed).toBeDefined();
+    expect(listed.amount).toBe(2000);
   });
 
   it('should reject the landed cost endpoints when the feature is disabled', async () => {

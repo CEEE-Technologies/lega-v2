@@ -8,6 +8,8 @@ export function canSwitchWorkspace(
     workspace.organizationId !== currentOrganizationId &&
     workspace.isReady &&
     workspace.isActive &&
+    // Opening it is refused (and a refusal signs the user out).
+    !workspace.isUserInactive &&
     !workspace.isBuildRunning &&
     !workspace.isDeleting
   );

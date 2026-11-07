@@ -70,10 +70,12 @@ function VendorOpeningBalanceFormFieldsInner() {
 
       <If condition={!isEqual(baseCurrency, vendor.currencyCode)}>
         {/*------------ Opening balance exchange rate -----------*/}
+        {/* The rate is base currency per 1 unit of the vendor's currency:
+            "1 USD = 3.67 AED" for a USD vendor in an AED company. */}
         <ExchangeRateMutedField
           name={'openingBalanceExchangeRate'}
-          fromCurrency={baseCurrency}
-          toCurrency={vendor.currencyCode}
+          fromCurrency={vendor.currencyCode}
+          toCurrency={baseCurrency}
           formGroupProps={{ label: '', inline: false }}
           date={values.openingBalanceAt}
           exchangeRate={values.openingBalanceExchangeRate}

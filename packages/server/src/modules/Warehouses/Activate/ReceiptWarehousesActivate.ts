@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
@@ -17,18 +18,20 @@ export class ReceiptActivateWarehouses {
   /**
    * Updates all sale receipts transactions with the primary warehouse.
    * @param {Warehouse} primaryWarehouse
+   * @param   {Knex.Transaction} trx - The activation transaction.
    * @returns {Promise<void>}
    */
   public updateReceiptsWithWarehouse = async (
     primaryWarehouse: Warehouse,
+    trx?: Knex.Transaction,
   ): Promise<void> => {
     // Updates the vendor credits transactions with primary warehouse.
-    await this.saleReceiptModel().query().update({
+    await this.saleReceiptModel().query(trx).update({
       warehouseId: primaryWarehouse.id,
     });
     // Update the sale invoices entries with primary warehouse.
     await this.itemEntryModel()
-      .query()
+      .query(trx)
       .where('referenceType', 'SaleReceipt')
       .update({
         warehouseId: primaryWarehouse.id,

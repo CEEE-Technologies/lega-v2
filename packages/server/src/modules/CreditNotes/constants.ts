@@ -15,6 +15,28 @@ export const ERRORS = {
   CUSTOMER_HAS_LINKED_CREDIT_NOTES: 'CUSTOMER_HAS_LINKED_CREDIT_NOTES',
 };
 
+/**
+ * The credit note import sample: one credit note with every column. The
+ * column names are the English names of the import fields, so the import
+ * maps them by itself. Item names are matched by name or code.
+ */
+export const CreditNotesSampleData = [
+  {
+    Customer: 'Harley Veum',
+    'Exchange Rate': 1,
+    'Credit Note Date': '2024-01-01',
+    'Reference No.': 'REF0',
+    'Credit Note Number': 'CN-101',
+    Note: 'Returned goods.',
+    'Terms & Conditions': 'Quia illum aut dolores.',
+    Open: 'T',
+    Item: 'Thompson - Reichert',
+    Rate: 100,
+    Quantity: 1,
+    Description: 'Description',
+  },
+];
+
 export const DEFAULT_CREDIT_NOTE_MAIL_SUBJECT =
   'Credit note {Credit Note Number} from {Company Name}';
 export const DEFAULT_CREDIT_NOTE_MAIL_CONTENT = `Hi {Customer Name},

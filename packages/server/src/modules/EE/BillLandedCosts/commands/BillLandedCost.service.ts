@@ -50,7 +50,9 @@ export class BillLandedCost {
       id: billEntry.id,
       name: billEntry.item.name,
       code: billEntry.item.code,
-      amount: billEntry.amount,
+      // What the line posted to its cost account (after discount, without
+      // tax): the most that can be allocated from it.
+      amount: billEntry.totalExcludingTax,
 
       unallocatedCostAmount: billEntry.unallocatedCostAmount,
       allocatedCostAmount: billEntry.allocatedCostAmount,

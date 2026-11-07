@@ -17,6 +17,7 @@ import { TenantModel } from '@/modules/System/models/TenantModel';
 import { getAbilityForRole } from '@/modules/Roles/TenantAbilities';
 import { ReportsAction } from '@/modules/FinancialStatements/types/Report.types';
 import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { WorkspaceUserStatusService } from './WorkspaceUserStatus.service';
 
 @Injectable()
 export class GetWorkspacesService {
@@ -40,6 +41,7 @@ export class GetWorkspacesService {
     private readonly tenantUserModel: TenantModelProxy<typeof TenantUser>,
 
     private readonly cls: ClsService,
+    private readonly workspaceUserStatus: WorkspaceUserStatusService,
   ) {}
 
   /**
@@ -100,7 +102,15 @@ export class GetWorkspacesService {
     // organizations where the user may see them.
     const financialTotals = await this.getFinancialTotals(userId, memberships);
 
+    // The organizations where the user is deactivated (shown greyed out).
+    const inactiveOrganizationIds =
+      await this.workspaceUserStatus.getInactiveOrganizationIds(
+        userId,
+        memberships,
+      );
+
     return this.transformer.transform(memberships, new WorkspaceTransformer(), {
+      inactiveOrganizationIds,
       defaultTenantId,
       includeInactive,
       currentOrganizationId,
