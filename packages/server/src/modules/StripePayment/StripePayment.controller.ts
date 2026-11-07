@@ -56,7 +56,7 @@ export class StripeIntegrationController {
     description: 'Successfully exchanged OAuth code',
   })
   public async exchangeOAuth(@Body() body: ExchangeStripeOAuthBodyDto) {
-    await this.stripePaymentApp.exchangeStripeOAuthToken(body.code);
+    await this.stripePaymentApp.exchangeStripeOAuthToken(body.code, body.state);
 
     return {};
   }

@@ -37,8 +37,9 @@ export class SyncSystemSendInviteSubscriber {
     user,
     invitingUser,
   }: IUserInvitedEventPayload) {
-    const authorizedUser = await this.tenancyContext.getSystemUser();
-    const tenantId = authorizedUser.tenantId;
+    // The invite is for the organization it was sent from, not the
+    // inviter's first (sign-up) organization.
+    const tenantId = (await this.tenancyContext.getTenant()).id;
 
     // Links the existing login with that email, so one person keeps one
     // login across organizations. Otherwise creates a new login.
@@ -87,8 +88,8 @@ export class SyncSystemSendInviteSubscriber {
     inviteToken,
     user,
   }: IUserInviteResendEventPayload) {
-    const authorizedUser = await this.tenancyContext.getSystemUser();
-    const tenantId = authorizedUser.tenantId;
+    // The organization the invite is resent from.
+    const tenantId = (await this.tenancyContext.getTenant()).id;
 
     // Clear all invite tokens of the given user id.
     await this.clearInviteTokensByUserId(tenantId, user.systemUserId);

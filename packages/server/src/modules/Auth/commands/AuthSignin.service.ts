@@ -72,11 +72,18 @@ export class AuthSigninService {
         .query()
         .findOne({ id: Number(payload.sub) })
         .throwIfNotFound();
-
-      this.clsService.set('userId', user.id);
     } catch (_error) {
       throw new UserNotFoundException(String(payload.sub));
     }
+    if (!user) {
+      throw new UserNotFoundException(String(payload.sub));
+    }
+    // A password reset raises the session version, which ends every session
+    // made before it. Tokens from before versions existed count as 0.
+    if ((payload.sv ?? 0) !== (user.sessionVersion ?? 0)) {
+      throw new UnauthorizedException('Your session has ended. Sign in again.');
+    }
+    this.clsService.set('userId', user.id);
     return payload;
   }
 
@@ -176,6 +183,7 @@ export class AuthSigninService {
   signToken(user: SystemUser, rememberMe = false): string {
     const payload = {
       sub: String(user.id),
+      sv: user.sessionVersion ?? 0,
     };
     const expiresIn = rememberMe ? '30d' : '1d';
     return this.jwtService.sign(payload, {

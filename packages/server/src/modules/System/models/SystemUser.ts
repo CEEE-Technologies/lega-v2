@@ -14,6 +14,12 @@ export class SystemUser extends BaseModel {
   public readonly verified: boolean;
   public readonly inviteAcceptedAt!: string;
 
+  /**
+   * Raised by a password reset. Sign-in tokens made with an older version
+   * are refused.
+   */
+  public readonly sessionVersion!: number;
+
   static get tableName() {
     return 'users';
   }
