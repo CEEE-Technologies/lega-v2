@@ -33,7 +33,8 @@
     "cli:tenants:seed:latest": "ts-node -r tsconfig-paths/register src/cli.ts tenants:seed:latest",
     "cli:tenants:rebuild-cash-basis": "ts-node -r tsconfig-paths/register src/cli.ts tenants:rebuild-cash-basis",
     "cli:tenants:money-health-check": "ts-node -r tsconfig-paths/register src/cli.ts tenants:money-health-check",
-    "cli:tenants:money-repair": "ts-node -r tsconfig-paths/register src/cli.ts tenants:money-repair"
+    "cli:tenants:money-repair": "ts-node -r tsconfig-paths/register src/cli.ts tenants:money-repair",
+    "cli:tenants:repair-refund-journals": "ts-node -r tsconfig-paths/register src/cli.ts tenants:repair-refund-journals"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.576.0",
