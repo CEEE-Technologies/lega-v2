@@ -33,7 +33,12 @@ import { BillLandedCost } from '../EE/BillLandedCosts/models/BillLandedCost';
     RegisterTenancyModel(BillLandedCost),
   ],
   controllers: [ExpensesController],
-  exports: [CreateExpense, ExpensesExportable, ExpensesImportable],
+  exports: [
+    CreateExpense,
+    DeleteExpense,
+    ExpensesExportable,
+    ExpensesImportable,
+  ],
   providers: [
     CreateExpense,
     ExpenseDTOTransformer,

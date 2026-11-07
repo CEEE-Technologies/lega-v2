@@ -23,6 +23,18 @@ export const handleDeleteErrors = (errors: DeleteError[]): void => {
         ),
     });
   }
+  if (
+    errors.find(
+      (e) =>
+        e.type === 'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+    )
+  ) {
+    AppToaster.show({
+      intent: Intent.DANGER,
+      message:
+        'This transaction was made from a bank line. Uncategorize the bank line instead.',
+    });
+  }
   if (errors.find((e) => e.type === 'CANNOT_DELETE_TRANSACTION_MATCHED')) {
     AppToaster.show({
       intent: Intent.DANGER,

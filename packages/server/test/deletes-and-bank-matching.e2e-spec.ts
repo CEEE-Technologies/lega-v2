@@ -541,6 +541,103 @@ describe('Deletes, undo and bank matching (e2e)', () => {
   });
 
   // -------------------------------------------------------------------
+  describe('B3: deleting an expense made from a bank line', () => {
+    // No route categorizes a bank line as an expense today, so the link is
+    // planted the way categorizing would store it.
+    const plantExpenseLine = async () => {
+      const expenseId = ok(
+        await api()
+          .post('/expenses')
+          .send({
+            exchangeRate: 1,
+            paymentAccountId: accounts.bank,
+            referenceNo: `P2X-${uid()}`,
+            publish: true,
+            paymentDate: DATE,
+            categories: [
+              { index: 1, expenseAccountId: accounts.expense, amount: 75 },
+            ],
+          }),
+      ).body.id as number;
+      const [lineId] = await db('uncategorized_cashflow_transactions').insert({
+        date: DATE,
+        accountId: accounts.bank,
+        amount: -75,
+        currencyCode: 'USD',
+        description: `P2 expense line ${uid()}`,
+        categorized: true,
+        categorizeRefType: 'Expense',
+        categorizeRefId: expenseId,
+      });
+      return { expenseId, lineId: lineId as number };
+    };
+    const lineOf = (lineId: number) =>
+      db('uncategorized_cashflow_transactions').where({ id: lineId }).first();
+    const expenseExists = async (expenseId: number) =>
+      (await db('expenses_transactions').where({ id: expenseId })).length === 1;
+
+    it('is refused, and the bank line keeps its expense', async () => {
+      const { expenseId, lineId } = await plantExpenseLine();
+
+      const refused = await api().delete(`/expenses/${expenseId}`);
+      expect(refused.status).toBe(400);
+      expect(errorType(refused)).toBe(
+        'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+      );
+      expect(errorMessage(refused)).toMatch(/Uncategorize the bank line/);
+      expect(await expenseExists(expenseId)).toBe(true);
+      expect((await ledger('Expense', expenseId)).length).toBeGreaterThan(0);
+      expect(Number((await lineOf(lineId)).categorized)).toBe(1);
+    });
+
+    it('bulk delete and its dry run leave it in place', async () => {
+      const { expenseId, lineId } = await plantExpenseLine();
+
+      const check = ok(
+        await api()
+          .post('/expenses/validate-bulk-delete')
+          .send({ ids: [expenseId] }),
+      );
+      const body = check.body.data ?? check.body;
+      expect(body.nonDeletableIds ?? body.non_deletable_ids).toEqual([
+        expenseId,
+      ]);
+
+      const strict = await api()
+        .post('/expenses/bulk-delete')
+        .send({ ids: [expenseId] });
+      expect(strict.status).toBe(400);
+      expect(errorType(strict)).toBe(
+        'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+      );
+
+      ok(
+        await api()
+          .post('/expenses/bulk-delete')
+          .send({ ids: [expenseId], skipUndeletable: true }),
+      );
+      expect(await expenseExists(expenseId)).toBe(true);
+      expect((await ledger('Expense', expenseId)).length).toBeGreaterThan(0);
+      const line = await lineOf(lineId);
+      expect(line.categorizeRefType).toBe('Expense');
+      expect(line.categorizeRefId).toBe(expenseId);
+    });
+
+    it('uncategorizing removes the expense and frees the line', async () => {
+      const { expenseId, lineId } = await plantExpenseLine();
+
+      ok(await api().delete(`/banking/categorize/${lineId}`));
+
+      expect(await expenseExists(expenseId)).toBe(false);
+      expect(await ledger('Expense', expenseId)).toEqual([]);
+      const line = await lineOf(lineId);
+      expect(Number(line.categorized)).toBe(0);
+      expect(line.categorizeRefType).toBeNull();
+      expect(line.categorizeRefId).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------
   describe('B4: unmatching', () => {
     const match = (
       lineId: number,

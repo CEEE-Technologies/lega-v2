@@ -59,4 +59,33 @@ describe('PreventDeleteTransactionOnDeleteSubscriber', () => {
       categorizeRefType: 'CashflowTransaction',
     });
   });
+
+  // B3, expense part: an expense a bank line was categorized to.
+  it('refuses deleting an expense a bank line is categorized to', async () => {
+    const { subscriber, where, query } = setup([{ id: 4 }]);
+    await expect(
+      subscriber.preventDeleteExpenseHasUncategorizedTransaction({
+        oldExpense: { id: 12 },
+        trx: { id: 'trx' },
+      } as any),
+    ).rejects.toMatchObject({
+      errorType: 'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+    });
+    expect(query).toHaveBeenCalledWith({ id: 'trx' });
+    expect(where).toHaveBeenCalledWith({
+      categorized: true,
+      categorizeRefId: 12,
+      categorizeRefType: 'Expense',
+    });
+  });
+
+  it('allows deleting an expense no bank line points at', async () => {
+    const { subscriber } = setup([]);
+    await expect(
+      subscriber.preventDeleteExpenseHasUncategorizedTransaction({
+        oldExpense: { id: 12 },
+        trx: { id: 'trx' },
+      } as any),
+    ).resolves.toBeUndefined();
+  });
 });
