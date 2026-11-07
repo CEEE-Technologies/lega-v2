@@ -21,7 +21,8 @@ import { IBankAccountDisconnectedEventPayload } from '@/modules/BankingAccounts/
 export class BankTransactionEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.bankMatch.onMatched)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankMatch.onMatched, { suppressErrors: true })
   public handleTrackBankTransactionMatchedEvent({}: IBankTransactionMatchedEventPayload) {
     this.posthog.trackEvent({
       event: BANK_TRANSACTION_MATCHED,
@@ -29,7 +30,8 @@ export class BankTransactionEventsTracker {
     });
   }
 
-  @OnEvent(events.bankTransactions.onExcluded)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankTransactions.onExcluded, { suppressErrors: true })
   public handleTrackBankTransactionExcludedEvent({}: IBankTransactionExcludedEventPayload) {
     this.posthog.trackEvent({
       event: BANK_TRANSACTION_EXCLUDED,
@@ -37,7 +39,8 @@ export class BankTransactionEventsTracker {
     });
   }
 
-  @OnEvent(events.cashflow.onTransactionCategorized)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.cashflow.onTransactionCategorized, { suppressErrors: true })
   public handleTrackBankTransactionCategorizedEvent({}: ICashflowTransactionCategorizedPayload) {
     this.posthog.trackEvent({
       event: BANK_TRANSACTION_CATEGORIZED,
@@ -45,7 +48,8 @@ export class BankTransactionEventsTracker {
     });
   }
 
-  @OnEvent(events.cashflow.onTransactionUncategorized)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.cashflow.onTransactionUncategorized, { suppressErrors: true })
   public handleTrackBankTransactionUncategorizedEvent({}: ICashflowTransactionUncategorizedPayload) {
     this.posthog.trackEvent({
       event: BANK_TRANSACTION_UNCATEGORIZED,
@@ -53,7 +57,8 @@ export class BankTransactionEventsTracker {
     });
   }
 
-  @OnEvent(events.bankAccount.onDisconnected)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.bankAccount.onDisconnected, { suppressErrors: true })
   public handleTrackBankAccountDisconnectedEvent({}: IBankAccountDisconnectedEventPayload) {
     this.posthog.trackEvent({
       event: BANK_ACCOUNT_DISCONNECTED,

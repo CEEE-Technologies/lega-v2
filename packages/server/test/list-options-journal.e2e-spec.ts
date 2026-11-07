@@ -157,6 +157,13 @@ describe('F8: inventory adjustments sorting (e2e)', () => {
   beforeAll(async () => {
     await cancelTransactionsLock();
     const itemId = await createInventoryItem();
+    // Another suite may have switched on multiple warehouses in this
+    // company; then an adjustment needs a warehouse (that check now blocks).
+    const warehouses = rowsOf(
+      (await http().get('/warehouses').set(authHeaders())).body,
+    );
+    const warehouse =
+      warehouses.find((w) => w.primary || w.is_primary) ?? warehouses[0];
     const create = async (date: string) => {
       const res = await http()
         .post('/inventory-adjustments/quick')
@@ -171,6 +178,7 @@ describe('F8: inventory adjustments sorting (e2e)', () => {
           quantity: 1,
           cost: 10,
           publish: true,
+          ...(warehouse && { warehouseId: warehouse.id }),
         })
         .expect(201);
       return res.body.id as number;

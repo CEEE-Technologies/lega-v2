@@ -3,6 +3,11 @@ import { Knex } from 'knex';
 import { TENANCY_DB_CONNECTION } from '../Tenancy/TenancyDB/TenancyDB.constants';
 import { DeleteAccount } from './DeleteAccount.service';
 import { ModelHasRelationsError } from '@/common/exceptions/ModelHasRelations.exception';
+import {
+  runDryRun,
+  TransactionAbortedError,
+  withSavepoint,
+} from '@/modules/Tenancy/TenancyDB/DryRun';
 
 @Injectable()
 export class ValidateBulkDeleteAccountsService {
@@ -25,19 +30,21 @@ export class ValidateBulkDeleteAccountsService {
     deletableIds: number[];
     nonDeletableIds: number[];
   }> {
-    const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read committed',
-    });
-
-    try {
+    // Every delete runs in a transaction that is always rolled back, so
+    // nothing is kept and no after-save work runs.
+    return runDryRun(this.tenantKnex(), async (trx) => {
       const deletableIds: number[] = [];
       const nonDeletableIds: number[] = [];
 
       for (const accountId of accountIds) {
         try {
-          await this.deleteAccountService.deleteAccount(accountId, trx);
+          // A failed delete only undoes its own writes.
+          await withSavepoint(trx, () =>
+            this.deleteAccountService.deleteAccount(accountId, trx),
+          );
           deletableIds.push(accountId);
         } catch (error) {
+          if (error instanceof TransactionAbortedError) throw error;
           if (error instanceof ModelHasRelationsError) {
             nonDeletableIds.push(accountId);
           } else {
@@ -46,17 +53,12 @@ export class ValidateBulkDeleteAccountsService {
         }
       }
 
-      await trx.rollback();
-
       return {
         deletableCount: deletableIds.length,
         nonDeletableCount: nonDeletableIds.length,
         deletableIds,
         nonDeletableIds,
       };
-    } catch (error) {
-      await trx.rollback();
-      throw error;
-    }
+    });
   }
 }

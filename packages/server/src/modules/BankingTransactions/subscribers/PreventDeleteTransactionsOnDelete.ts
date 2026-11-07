@@ -5,12 +5,15 @@ import { ServiceError } from '@/modules/Items/ServiceError';
 import { Inject, Injectable } from '@nestjs/common';
 import { UncategorizedBankTransaction } from '../models/UncategorizedBankTransaction';
 import { ICommandCashflowDeletingPayload } from '../types/BankingTransactions.types';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 
 @Injectable()
 export class PreventDeleteTransactionOnDeleteSubscriber {
   constructor(
     @Inject(UncategorizedBankTransaction.name)
-    private readonly uncategorizedBankTransactionModel: typeof UncategorizedBankTransaction,
+    private readonly uncategorizedBankTransactionModel: TenantModelProxy<
+      typeof UncategorizedBankTransaction
+    >,
   ) {}
 
   /**
@@ -23,7 +26,7 @@ export class PreventDeleteTransactionOnDeleteSubscriber {
     trx,
   }: ICommandCashflowDeletingPayload) {
     if (oldCashflowTransaction.uncategorizedTransactionId) {
-      const foundTransactions = await this.uncategorizedBankTransactionModel
+      const foundTransactions = await this.uncategorizedBankTransactionModel()
         .query(trx)
         .where({
           categorized: true,

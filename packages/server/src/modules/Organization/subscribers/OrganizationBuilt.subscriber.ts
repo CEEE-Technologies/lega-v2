@@ -7,7 +7,8 @@ import { events } from '@/common/events/events';
 export class OrganizationBuiltSubscriber {
   constructor(private readonly socketGateway: SocketGateway) {}
 
-  @OnEvent(events.organization.built)
+  // Side effect (live-update notice): an error is logged and does not stop the save.
+  @OnEvent(events.organization.built, { suppressErrors: true })
   handleOrganizationBuilt() {
     this.socketGateway.emitWorkspacesChanged();
   }

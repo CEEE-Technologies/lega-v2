@@ -59,6 +59,7 @@ export class DeleteItemCategoryService {
       await this.eventEmitter.emitAsync(events.itemCategory.onDeleted, {
         itemCategoryId,
         oldItemCategory,
+        trx,
       } as IItemCategoryDeletedPayload);
     }, trx);
   }

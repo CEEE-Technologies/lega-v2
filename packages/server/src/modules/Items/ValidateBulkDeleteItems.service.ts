@@ -3,6 +3,11 @@ import { Knex } from 'knex';
 import { TENANCY_DB_CONNECTION } from '../Tenancy/TenancyDB/TenancyDB.constants';
 import { DeleteItemService } from './DeleteItem.service';
 import { ModelHasRelationsError } from '@/common/exceptions/ModelHasRelations.exception';
+import {
+  runDryRun,
+  TransactionAbortedError,
+  withSavepoint,
+} from '@/modules/Tenancy/TenancyDB/DryRun';
 
 @Injectable()
 export class ValidateBulkDeleteItemsService {
@@ -25,12 +30,9 @@ export class ValidateBulkDeleteItemsService {
     deletableIds: number[];
     nonDeletableIds: number[];
   }> {
-    // Create a transaction that will be rolled back
-    const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read committed',
-    });
-
-    try {
+    // Every delete runs in a transaction that is always rolled back, so
+    // nothing is kept and no after-save work runs.
+    return runDryRun(this.tenantKnex(), async (trx) => {
       const deletableIds: number[] = [];
       const nonDeletableIds: number[] = [];
 
@@ -39,11 +41,15 @@ export class ValidateBulkDeleteItemsService {
         try {
           // Attempt to delete the item using the deleteItem service with the transaction
           // This will use the exact same validation logic as the actual delete
-          await this.deleteItemService.deleteItem(itemId, trx);
+          // A failed delete only undoes its own writes.
+          await withSavepoint(trx, () =>
+            this.deleteItemService.deleteItem(itemId, trx),
+          );
 
           // If deletion succeeds, item is deletable
           deletableIds.push(itemId);
         } catch (error) {
+          if (error instanceof TransactionAbortedError) throw error;
           // If error occurs, check the type of error
           if (error instanceof ModelHasRelationsError) {
             // Item has associated transactions/relations, cannot be deleted
@@ -55,19 +61,12 @@ export class ValidateBulkDeleteItemsService {
         }
       }
 
-      // Always rollback the transaction to ensure no changes are persisted
-      await trx.rollback();
-
       return {
         deletableCount: deletableIds.length,
         nonDeletableCount: nonDeletableIds.length,
         deletableIds,
         nonDeletableIds,
       };
-    } catch (error) {
-      // Rollback in case of any error
-      await trx.rollback();
-      throw error;
-    }
+    });
   }
 }

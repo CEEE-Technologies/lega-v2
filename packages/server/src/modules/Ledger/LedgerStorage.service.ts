@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { runAfterTransaction } from '@/modules/Tenancy/TenancyDB/TransactionsHooks';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ILedger } from './types/Ledger.types';
 import { LedgerContactsBalanceStorage } from './LedgerContactStorage.service';
@@ -134,8 +135,11 @@ export class LedgerStorageService {
     ];
     await Promise.all(tasks);
 
-    // Queues the ledger deltas to the ClickHouse analytics store.
-    this.ledgerClickHouseSink.onLedgerCommitted(ledger);
+    // Queues the ledger deltas to the ClickHouse analytics store, once the
+    // save is committed: a dry run or failed save must not move the totals.
+    this.afterCommit(trx, () =>
+      this.ledgerClickHouseSink.onLedgerCommitted(ledger),
+    );
   };
 
   /**
@@ -173,9 +177,26 @@ export class LedgerStorageService {
     ];
     await Promise.all(tasks);
 
-    // Queues the negated ledger deltas to the ClickHouse analytics store.
-    this.ledgerClickHouseSink.onLedgerDeleted(deletedRows);
+    // Queues the negated ledger deltas to the ClickHouse analytics store,
+    // once the delete is committed.
+    this.afterCommit(trx, () =>
+      this.ledgerClickHouseSink.onLedgerDeleted(deletedRows),
+    );
   };
+
+  /**
+   * Runs the given work once the transaction commits (skipped if it is
+   * rolled back), or straight away when there is no transaction.
+   * @param {Knex.Transaction} trx
+   * @param {() => void} work
+   */
+  private afterCommit(trx: Knex.Transaction | undefined, work: () => void) {
+    if (!trx) {
+      work();
+      return;
+    }
+    runAfterTransaction(trx, work);
+  }
 
   /**
    * Deletes the ledger entries by the given reference.

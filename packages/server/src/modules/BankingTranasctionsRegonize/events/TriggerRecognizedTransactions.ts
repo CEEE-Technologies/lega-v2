@@ -29,7 +29,8 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize uncategorized transactions job on rule created.
    * @param {IBankRuleEventCreatedPayload} payload -
    */
-  @OnEvent(events.bankRules.onCreated)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onCreated, { suppressErrors: true })
   async recognizedTransactionsOnRuleCreated({
     bankRule,
   }: IBankRuleEventCreatedPayload) {
@@ -49,7 +50,8 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize uncategorized transactions job on rule edited.
    * @param {IBankRuleEventEditedPayload} payload -
    */
-  @OnEvent(events.bankRules.onEdited)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onEdited, { suppressErrors: true })
   async recognizedTransactionsOnRuleEdited({
     editRuleDTO: _editRuleDTO,
     oldBankRule,
@@ -85,7 +87,8 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize uncategorized transactions job on rule deleted.
    * @param {IBankRuleEventDeletedPayload} payload -
    */
-  @OnEvent(events.bankRules.onDeleted)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onDeleted, { suppressErrors: true })
   async recognizedTransactionsOnRuleDeleted({
     ruleId,
   }: IBankRuleEventDeletedPayload) {
@@ -106,7 +109,8 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize bank transactions once the imported file commit.
    * @param {IImportFileCommitedEventPayload} payload -
    */
-  @OnEvent(events.import.onImportCommitted)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.import.onImportCommitted, { suppressErrors: true })
   async triggerRecognizeTransactionsOnImportCommitted({
     importId: _importId,
 
