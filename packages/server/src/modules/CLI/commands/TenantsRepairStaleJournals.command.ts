@@ -120,7 +120,9 @@ export class TenantsRepairStaleJournalsCommand extends BaseCommand {
 
   /**
    * Boots the application (this code, not a running server) once, and
-   * runs the work in each organization's tenant context.
+   * runs the work in each organization's tenant context. The dynamic
+   * imports use relative paths: the build doesn't rewrite the `@/` alias
+   * inside them, so `node dist/cli.js` couldn't load an aliased one.
    */
   private async withApp(
     work: (
@@ -132,9 +134,9 @@ export class TenantsRepairStaleJournalsCommand extends BaseCommand {
   ) {
     const { NestFactory } = await import('@nestjs/core');
     const { ClsService } = await import('nestjs-cls');
-    const { AppModule } = await import('@/modules/App/App.module');
+    const { AppModule } = await import('../../App/App.module');
     const { StaleJournalsRepairService } = await import(
-      '@/modules/AccountingBasis/StaleJournalsRepair.service'
+      '../../AccountingBasis/StaleJournalsRepair.service'
     );
     const app = await NestFactory.create(AppModule, {
       logger: ['error', 'warn'],
