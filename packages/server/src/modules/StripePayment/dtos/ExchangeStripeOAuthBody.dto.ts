@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class ExchangeStripeOAuthBodyDto {
   @ApiProperty({
@@ -8,4 +8,13 @@ export class ExchangeStripeOAuthBodyDto {
   })
   @IsString()
   code: string;
+
+  @ApiProperty({
+    description:
+      'The state of the Stripe connect link, returned by Stripe unchanged',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  state?: string;
 }

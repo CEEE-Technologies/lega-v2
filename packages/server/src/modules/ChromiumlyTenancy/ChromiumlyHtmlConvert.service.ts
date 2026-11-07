@@ -1,48 +1,36 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import * as os from 'os';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 import { PageProperties, PdfFormat } from '@/libs/chromiumly/_types';
-import { UrlConverter } from '@/libs/chromiumly/UrlConvert';
-import { Chromiumly } from '@/libs/chromiumly/Chromiumly';
-import { getPdfFilePath, getPdfFilesStorageDir } from './utils';
-import { Document } from './models/Document';
-import { TenantModelProxy } from '../System/models/TenantBaseModel';
+import { HtmlConverter } from '@/libs/chromiumly/HTMLConvert';
 
 @Injectable()
 export class ChromiumlyHtmlConvert {
   /**
-   * @param {TenantModelProxy<typeof Document>} documentModel - Document model.
-   */
-  constructor(
-    @Inject(Document.name)
-    private documentModel: TenantModelProxy<typeof Document>,
-  ) {}
-
-  /**
-   * Write HTML content to temporary file.
+   * Writes the HTML to a new private temporary folder. Gotenberg needs the
+   * file to be called `index.html`; the folder name is random.
    * @param {string} content - HTML content.
-   * @returns {Promise<[string, () => Promise<void>]>}
+   * @returns {Promise<[string, () => Promise<void>]>} The file path and a
+   * function that deletes the folder.
    */
   async writeTempHtmlFile(
     content: string,
   ): Promise<[string, () => Promise<void>]> {
-    const filename = `document-print-${Date.now()}.html`;
-    const filePath = getPdfFilePath(filename);
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'lega-print-'));
+    const filePath = path.join(dir, 'index.html');
 
-    await fs.writeFile(filePath, content);
-    await this.documentModel()
-      .query()
-      .insert({ key: filename, mimeType: 'text/html' });
+    await fs.writeFile(filePath, content, { mode: 0o600 });
 
     const cleanup = async () => {
-      await fs.unlink(filePath);
-      await this.documentModel().query().where('key', filename).delete();
+      await fs.rm(dir, { recursive: true, force: true });
     };
-    return [filename, cleanup];
+    return [filePath, cleanup];
   }
 
   /**
-   * Converts the given HTML content to PDF.
+   * Converts the given HTML content to PDF. The HTML is sent to Gotenberg
+   * with the request, so nothing is written to the public folder.
    * @param {string} html
    * @param {PageProperties} properties
    * @param {PdfFormat} pdfFormat
@@ -53,19 +41,18 @@ export class ChromiumlyHtmlConvert {
     properties?: PageProperties,
     pdfFormat?: PdfFormat,
   ): Promise<Buffer> {
-    const [filename, cleanupTempFile] = await this.writeTempHtmlFile(html);
-    const fileDir = getPdfFilesStorageDir(filename);
+    const [filePath, cleanupTempFile] = await this.writeTempHtmlFile(html);
 
-    const url = path.join(Chromiumly.GOTENBERG_DOCS_ENDPOINT, fileDir);
-    const urlConverter = new UrlConverter();
+    try {
+      const htmlConverter = new HtmlConverter();
 
-    const buffer = await urlConverter.convert({
-      url,
-      properties,
-      pdfFormat,
-    });
-    await cleanupTempFile();
-
-    return buffer;
+      return await htmlConverter.convert({
+        html: filePath,
+        properties,
+        pdfFormat,
+      });
+    } finally {
+      await cleanupTempFile();
+    }
   }
 }

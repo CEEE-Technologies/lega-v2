@@ -20,8 +20,25 @@ export class GetMatchedTransactionBillsTransformer extends Transformer {
       'transactionNormal',
       'referenceId',
       'referenceType',
+      'currencyCode',
+      'exchangeRate',
     ];
   };
+
+  /**
+   * The document's currency. A match in another currency than the base
+   * currency needs an exchange rate.
+   */
+  protected currencyCode(bill) {
+    return bill.currencyCode;
+  }
+
+  /**
+   * The document's own exchange rate, to pre-fill the match's rate.
+   */
+  protected exchangeRate(bill) {
+    return bill.exchangeRate;
+  }
 
   /**
    * Exclude all attributes.

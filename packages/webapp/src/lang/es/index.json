@@ -1,4 +1,5 @@
 {
+  "workspaces.access_deactivated": "Tu acceso fue desactivado",
   "hello_world": "Hola Mundo",
   "email_or_phone_number": "Correo electrónico o número de teléfono",
   "password": "Contraseña",
@@ -1539,6 +1540,7 @@
   "roles.label.role_name_": "Nombre del rol",
   "roles.error.role_is_predefined": "El rol está predefinido, no puedes eliminar roles predefinidos.",
   "roles.error.you_cannot_change_your_own_role": "No puedes cambiar tu propio rol.",
+  "roles.error.admin_only": "Solo un administrador puede hacer esto.",
   "roles.permission_schema.success_message": "El rol se ha creado con éxito.",
   "roles.permission_schema.upload_message": "El rol dado se ha actualizado con éxito.",
   "roles.permission_schema.delete.alert_message": "El rol dado se ha eliminado con éxito.",

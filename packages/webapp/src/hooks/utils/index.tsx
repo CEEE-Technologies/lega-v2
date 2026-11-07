@@ -5,6 +5,7 @@ export * from './useWatch';
 export * from './useWhen';
 export * from './useIntersectionObserver';
 export * from './useAbilityContext';
+export * from './useAssignableRoles';
 export * from './useCustomCompareEffect';
 export * from './useDeepCompareEffect';
 export * from './useFlattenInfinityPages';

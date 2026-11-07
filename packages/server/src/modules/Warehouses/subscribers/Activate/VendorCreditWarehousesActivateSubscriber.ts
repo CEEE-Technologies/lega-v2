@@ -18,9 +18,11 @@ export class VendorCreditsActivateWarehousesSubscriber {
   @OnEvent(events.warehouse.onActivated)
   async updateCreditsWithWarehouseOnActivated({
     primaryWarehouse,
+    trx,
   }: IWarehousesActivatedPayload) {
     await this.creditsActivateWarehouses.updateCreditsWithWarehouse(
       primaryWarehouse,
+      trx,
     );
   }
 }

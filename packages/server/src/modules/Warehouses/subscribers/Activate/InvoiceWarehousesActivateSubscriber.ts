@@ -18,9 +18,11 @@ export class InvoicesActivateWarehousesSubscriber {
   @OnEvent(events.warehouse.onActivated)
   async updateInvoicesWithWarehouseOnActivated({
     primaryWarehouse,
+    trx,
   }: IWarehousesActivatedPayload) {
     await this.invoicesActivateWarehouses.updateInvoicesWithWarehouse(
       primaryWarehouse,
+      trx,
     );
   }
 }

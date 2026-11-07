@@ -76,7 +76,7 @@ describe('LandedCostsBridgeProvider', () => {
   });
 
   describe('validateBillEntries', () => {
-    it('throws an error when a landed cost entry is not an inventory item', async () => {
+    it('throws an error when a landed cost entry is an inventory item', async () => {
       mockItemsQuery([
         { id: 1, type: 'inventory' },
         { id: 2, type: 'service' },
@@ -90,21 +90,23 @@ describe('LandedCostsBridgeProvider', () => {
         throw new Error('Expected the provider to throw');
       } catch (error) {
         expect((error as ServiceError).errorType).toBe(
-          ERRORS.LANDED_COST_ENTRIES_SHOULD_BE_INVENTORY_ITEMS,
+          ERRORS.LANDED_COST_ENTRIES_SHOULD_NOT_BE_INVENTORY_ITEMS,
         );
       }
     });
 
-    it('resolves when the landed cost entries are inventory items', async () => {
+    it('resolves when the landed cost entries are service or non-inventory items', async () => {
       mockItemsQuery([
         { id: 1, type: 'inventory' },
         { id: 2, type: 'service' },
+        { id: 3, type: 'non-inventory' },
       ]);
 
       await expect(
         provider.validateBillEntries([
-          { itemId: 1, landedCost: true },
-          { itemId: 2, landedCost: false },
+          { itemId: 1, landedCost: false },
+          { itemId: 2, landedCost: true },
+          { itemId: 3, landedCost: true },
         ]),
       ).resolves.toBeUndefined();
     });

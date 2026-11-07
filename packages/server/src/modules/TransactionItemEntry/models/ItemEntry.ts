@@ -174,11 +174,16 @@ export class ItemEntry extends BaseModel {
   }
 
   /**
-   * Remain unallocated landed cost.
+   * Remain unallocated landed cost: the line after discount and without
+   * tax (what the bill posted to the line's cost account), less what is
+   * allocated already.
    * @return {number}
    */
   get unallocatedCostAmount() {
-    return Math.max(subtractMoney(this.amount, this.allocatedCostAmount), 0);
+    return Math.max(
+      subtractMoney(this.totalExcludingTax, this.allocatedCostAmount),
+      0,
+    );
   }
 
   static calcAmount(itemEntry) {

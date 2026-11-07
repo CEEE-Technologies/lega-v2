@@ -4,7 +4,6 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
-  IsDecimal,
   IsInt,
   IsNumber,
   IsNotEmpty,
@@ -14,6 +13,7 @@ import {
   ValidateNested,
   ArrayMinSize,
   IsDateString,
+  Min,
 } from 'class-validator';
 
 export class WarehouseTransferEntryDto {
@@ -34,8 +34,13 @@ export class WarehouseTransferEntryDto {
   @IsPositive()
   quantity: number;
 
+  // The unit cost of the moved stock: a number of zero or more (a numeric
+  // string like "12.5" is accepted too). Left out, the item's average cost
+  // is used.
   @IsOptional()
-  @IsDecimal()
+  @ToNumber()
+  @IsNumber()
+  @Min(0)
   cost?: number;
 }
 

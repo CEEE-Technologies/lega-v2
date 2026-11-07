@@ -55,7 +55,8 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "@nestjs/event-emitter@2.1.1": "patches/@nestjs__event-emitter@2.1.1.patch"
+      "@nestjs/event-emitter@2.1.1": "patches/@nestjs__event-emitter@2.1.1.patch",
+      "eventemitter2@6.4.9": "patches/eventemitter2@6.4.9.patch"
     }
   }
 }

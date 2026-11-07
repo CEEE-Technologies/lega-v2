@@ -42,11 +42,50 @@ describe('PreventDeleteTransactionOnDeleteSubscriber', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('skips the lookup for a transaction not made from a bank line', async () => {
-    const { subscriber, modelProxy } = setup([{ id: 1 }]);
-    await subscriber.preventDeleteCashflowTransactionHasUncategorizedTransaction(
-      payload(null),
-    );
-    expect(modelProxy).not.toHaveBeenCalled();
+  // B3: categorizing never sets the deposit's `uncategorizedTransactionId`,
+  // so the line is looked up by the deposit's own id.
+  it('looks the bank line up by the deposit id when uncategorizedTransactionId is empty', async () => {
+    const { subscriber, where } = setup([{ id: 1 }]);
+    await expect(
+      subscriber.preventDeleteCashflowTransactionHasUncategorizedTransaction(
+        payload(null),
+      ),
+    ).rejects.toMatchObject({
+      errorType: 'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+    });
+    expect(where).toHaveBeenCalledWith({
+      categorized: true,
+      categorizeRefId: 9,
+      categorizeRefType: 'CashflowTransaction',
+    });
+  });
+
+  // B3, expense part: an expense a bank line was categorized to.
+  it('refuses deleting an expense a bank line is categorized to', async () => {
+    const { subscriber, where, query } = setup([{ id: 4 }]);
+    await expect(
+      subscriber.preventDeleteExpenseHasUncategorizedTransaction({
+        oldExpense: { id: 12 },
+        trx: { id: 'trx' },
+      } as any),
+    ).rejects.toMatchObject({
+      errorType: 'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+    });
+    expect(query).toHaveBeenCalledWith({ id: 'trx' });
+    expect(where).toHaveBeenCalledWith({
+      categorized: true,
+      categorizeRefId: 12,
+      categorizeRefType: 'Expense',
+    });
+  });
+
+  it('allows deleting an expense no bank line points at', async () => {
+    const { subscriber } = setup([]);
+    await expect(
+      subscriber.preventDeleteExpenseHasUncategorizedTransaction({
+        oldExpense: { id: 12 },
+        trx: { id: 'trx' },
+      } as any),
+    ).resolves.toBeUndefined();
   });
 });

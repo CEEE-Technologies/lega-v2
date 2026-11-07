@@ -21,3 +21,7 @@ export const ERROR = {
   ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED:
     'ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED',
 } as const;
+
+/** Shown when a delete is refused because a bank line is matched to it. */
+export const MATCHED_TRANSACTION_MESSAGE =
+  'This transaction is matched to a bank line. Unmatch it first.';

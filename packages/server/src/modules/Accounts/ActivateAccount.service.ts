@@ -52,8 +52,9 @@ export class ActivateAccount {
         await this.accountRepository.inactivateByIds(patchAccountsIds, trx);
       }
 
-      // Triggers `onAccountActivated` event.
-      this.eventEmitter.emitAsync(events.accounts.onActivated, {
+      // Triggers `onAccountActivated` event, inside the save (the audit
+      // log writes with this transaction, so it must not be closed yet).
+      await this.eventEmitter.emitAsync(events.accounts.onActivated, {
         accountId,
         activate,
         account: oldAccount,

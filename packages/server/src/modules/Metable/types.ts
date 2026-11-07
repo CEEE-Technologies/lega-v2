@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 export interface IMetadata {
   key: string;
   value: string | boolean | number;
@@ -24,5 +25,5 @@ export interface IMetableStore {
 }
 
 export interface IMetableStoreStorage {
-  save(): Promise<void>;
+  save(trx?: Knex.Transaction): Promise<void>;
 }

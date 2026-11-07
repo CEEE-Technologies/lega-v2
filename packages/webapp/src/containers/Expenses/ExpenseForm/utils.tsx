@@ -32,11 +32,16 @@ const ERROR = {
   EXPENSE_ALREADY_PUBLISHED: 'EXPENSE.ALREADY.PUBLISHED',
   ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED:
     'ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED',
+  LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES:
+    'LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES',
 };
 
 export const MIN_LINES_NUMBER = 1;
 
 export const defaultExpenseEntry: ExpenseEntry = {
+  // Kept on edit, so the server updates the line instead of replacing it
+  // (a landed cost allocated from the line stays linked to it).
+  id: '',
   amount: '',
   expenseAccountId: '',
   description: '',
@@ -74,13 +79,19 @@ export const transformErrors = (
       }),
     );
   }
-  if (hasError(ERROR.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED)) {
-    setErrors(
-      AppToaster.show({
-        intent: Intent.DANGER,
-        message: 'ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED',
-      }),
-    );
+  const landedCostError = errors.find(
+    (e) =>
+      e.type === ERROR.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED ||
+      e.type === ERROR.LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES,
+  );
+  if (landedCostError) {
+    // The server names the bill the landed cost was allocated to.
+    AppToaster.show({
+      intent: Intent.DANGER,
+      message:
+        landedCostError.message ||
+        "This line is used as landed cost on a bill, so it can't be removed or reduced. Remove the landed cost there first.",
+    });
   }
 };
 
@@ -154,7 +165,12 @@ export const transformFormValuesToRequest = (values: ExpenseFormValues) => {
 
   return {
     ...values,
-    categories: FF.pipe(categories, orderingLinesIndexes),
+    categories: FF.pipe(
+      categories.map(({ id, ...category }) =>
+        id ? { id, ...category } : category,
+      ),
+      orderingLinesIndexes,
+    ),
     attachments,
   };
 };

@@ -18,6 +18,8 @@ import { ERRORS } from '../Users.constants';
 import { UserInvite } from '../models/InviteUser.model';
 import { ModelObject } from 'objection';
 import { InviteUserDto } from '../dtos/InviteUser.dto';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { TenantUser } from '@/modules/Tenancy/TenancyModels/models/TenantUser.model';
 
 interface InviteAcceptResponseDto {
   inviteToken: { email: string; token: string; createdAt: Date };
@@ -42,6 +44,9 @@ export class AcceptInviteUserService {
     private readonly cls: ClsService,
     @Inject(SystemKnexConnection)
     private readonly systemKnex: Knex,
+
+    @Inject(TenantUser.name)
+    private readonly tenantUserModel: TenantModelProxy<typeof TenantUser>,
   ) {}
 
   /**
@@ -69,6 +74,18 @@ export class AcceptInviteUserService {
           .findById(inviteToken.userId)
           .throwIfNotFound();
 
+        // Retrieve the tenant to get the organizationId for CLS.
+        const tenant = await this.tenantModel
+          .query(trx)
+          .findById(inviteToken.tenantId)
+          .throwIfNotFound();
+
+        // The invite must match a user on that organization's Users page.
+        // Otherwise accepting it would make a member nobody can see or
+        // remove (invites sent before the fix could point at the inviter's
+        // first organization instead of the one they invited from).
+        await this.validateInvitedUserExists(tenant, inviteToken.userId);
+
         // An invite to someone who already has a login joins that login to
         // this organization. Its password and name stay as they are, and the
         // person proves it is theirs with the current password.
@@ -85,13 +102,13 @@ export class AcceptInviteUserService {
                 inviteAcceptedAt: moment().format('YYYY-MM-DD'),
                 password: hashedPassword,
               });
-        // Clear invite token by the given user id.
-        await this.clearInviteTokensByUserId(inviteToken.userId, trx);
-
-        // Retrieve the tenant to get the organizationId for CLS.
-        const tenant = await this.tenantModel
-          .query(trx)
-          .findById(inviteToken.tenantId);
+        // Clear this organization's invite tokens of the user. Invites
+        // from other organizations stay valid.
+        await this.clearInviteTokensByUserId(
+          inviteToken.userId,
+          inviteToken.tenantId,
+          trx,
+        );
 
         // Link the invited user to the tenant as a member so they can sign in.
         const membership = await this.userTenantModel
@@ -117,6 +134,33 @@ export class AcceptInviteUserService {
       user: systemUser,
       inviteUserDTO,
     } as IAcceptInviteEventPayload);
+  }
+
+  /**
+   * Throws when the organization has no user record for the invited login.
+   * @param {TenantModel} tenant - The organization of the invite.
+   * @param {number} systemUserId - The invited login.
+   */
+  private async validateInvitedUserExists(
+    tenant: TenantModel,
+    systemUserId: number,
+  ): Promise<void> {
+    const previousOrganizationId = this.cls.get('organizationId');
+    this.cls.set('organizationId', tenant.organizationId);
+    try {
+      const tenantUser = await this.tenantUserModel()
+        .query()
+        .findOne({ systemUserId });
+
+      if (!tenantUser) {
+        throw new ServiceError(
+          ERRORS.INVITE_TOKEN_INVALID,
+          'This invite is no longer valid. Ask for a new one.',
+        );
+      }
+    } finally {
+      this.cls.set('organizationId', previousOrganizationId);
+    }
   }
 
   /**
@@ -211,8 +255,9 @@ export class AcceptInviteUserService {
    */
   private clearInviteTokensByUserId = async (
     userId: number,
+    tenantId: number,
     trx?: Knex.Transaction,
   ) => {
-    await this.userInviteModel.query(trx).where('user_id', userId).delete();
+    await this.userInviteModel.query(trx).where({ userId, tenantId }).delete();
   };
 }
