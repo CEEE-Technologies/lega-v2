@@ -29,6 +29,7 @@ export interface IBankTransactionUnmatchedEventPayload {
 export interface IMatchTransactionDTO {
   referenceType: string;
   referenceId: number;
+  exchangeRate?: number;
 }
 
 export interface IMatchTransactionsDTO {
@@ -70,4 +71,5 @@ export const ERRORS = {
   TRANSACTION_ALREADY_MATCHED: 'TRANSACTION_ALREADY_MATCHED',
   CANNOT_MATCH_EXCLUDED_TRANSACTION: 'CANNOT_MATCH_EXCLUDED_TRANSACTION',
   CANNOT_DELETE_TRANSACTION_MATCHED: 'CANNOT_DELETE_TRANSACTION_MATCHED',
+  EXCHANGE_RATE_REQUIRED: 'EXCHANGE_RATE_REQUIRED',
 };

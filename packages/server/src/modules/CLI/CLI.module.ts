@@ -18,6 +18,7 @@ import { AnalyticsCoreModule } from '../Analytics/AnalyticsCore.module';
 import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBasis.command';
 import { TenantsMoneyHealthCheckCommand } from './commands/TenantsMoneyHealthCheck.command';
 import { TenantsMoneyRepairCommand } from './commands/TenantsMoneyRepair.command';
+import { TenantsRepairStaleJournalsCommand } from './commands/TenantsRepairStaleJournals.command';
 import { TenantsRepairRefundJournalsCommand } from './commands/TenantsRepairRefundJournals.command';
 
 @Module({
@@ -45,6 +46,7 @@ import { TenantsRepairRefundJournalsCommand } from './commands/TenantsRepairRefu
     TenantsRebuildCashBasisCommand,
     TenantsMoneyHealthCheckCommand,
     TenantsMoneyRepairCommand,
+    TenantsRepairStaleJournalsCommand,
     TenantsRepairRefundJournalsCommand,
   ],
 })

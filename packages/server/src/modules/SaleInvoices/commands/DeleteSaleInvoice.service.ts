@@ -70,12 +70,29 @@ export class DeleteSaleInvoice {
       .withGraphFetched('paymentMethods')
       .throwIfNotFound();
 
+    // A written-off invoice keeps its write-off entries (Dr bad debt /
+    // Cr receivable) until the write-off is cancelled, so it can't go first.
+    this.validateInvoiceNotWrittenOff(oldSaleInvoice);
+
     // Validate the sale invoice has no associated payment entries.
     await this.validateInvoiceHasNoPaymentEntries(saleInvoiceId, trx);
 
     // Validate the sale invoice has applied to credit note transaction.
     await this.validateInvoiceHasNoAppliedToCredit(saleInvoiceId, trx);
     return oldSaleInvoice;
+  }
+
+  /**
+   * Validates the sale invoice is not written off.
+   * @param {SaleInvoice} saleInvoice
+   */
+  private validateInvoiceNotWrittenOff(saleInvoice: SaleInvoice) {
+    if (saleInvoice.writtenoffAt) {
+      throw new ServiceError(
+        ERRORS.SALE_INVOICE_IS_WRITTEN_OFF,
+        'This invoice is written off. Cancel the write-off first, then delete the invoice.',
+      );
+    }
   }
 
   /**

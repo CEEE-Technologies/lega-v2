@@ -48,7 +48,11 @@ export class TransactionLandedCostEntriesService {
       newCommonEntriesDTO,
     );
     if (entriesDeleted.length > 0) {
-      throw new ServiceError(ERRORS.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED);
+      throw new ServiceError(
+        ERRORS.ENTRIES_ALLOCATED_COST_COULD_NOT_DELETED,
+        "This line is used as landed cost on another bill, so it can't be removed. Remove the landed cost there first.",
+        { entriesIds: entriesDeleted.map((entry) => entry.id) },
+      );
     }
   }
 
@@ -69,6 +73,8 @@ export class TransactionLandedCostEntriesService {
       if (oldEntry && moneyGt(oldEntry.allocatedCostAmount, entry.amount)) {
         throw new ServiceError(
           ERRORS.LOCATED_COST_ENTRIES_SHOULD_BIGGE_THAN_NEW_ENTRIES,
+          `This line is used as landed cost on another bill: it can't be less than the ${oldEntry.allocatedCostAmount} allocated from it. Remove the landed cost there first.`,
+          { entriesIds: [entry.id] },
         );
       }
     });

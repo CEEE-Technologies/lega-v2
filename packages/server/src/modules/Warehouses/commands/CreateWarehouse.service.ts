@@ -42,9 +42,11 @@ export class CreateWarehouse {
   /**
    * Creates a new warehouse on the system.
    * @param {ICreateWarehouseDTO} warehouseDTO
+   * @param {Knex.Transaction} trx - An outer transaction to join.
    */
   public createWarehouse = async (
     warehouseDTO: CreateWarehouseDto,
+    trx?: Knex.Transaction,
   ): Promise<Warehouse> => {
     // Authorize warehouse before creating.
     await this.authorize(warehouseDTO);
@@ -71,6 +73,6 @@ export class CreateWarehouse {
       } as IWarehouseCreatedPayload);
 
       return warehouse;
-    });
+    }, trx);
   };
 }

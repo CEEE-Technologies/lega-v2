@@ -201,7 +201,11 @@ function OrganizationsListTable({
             >
               {!isCurrentOrganization && (
                 <Tooltip
-                  content={`Switch to ${workspaceName}`}
+                  content={
+                    workspace.isUserInactive
+                      ? intl.get('workspaces.access_deactivated')
+                      : `Switch to ${workspaceName}`
+                  }
                   position={Position.TOP}
                 >
                   <Button

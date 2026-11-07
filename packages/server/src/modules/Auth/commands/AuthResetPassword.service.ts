@@ -1,4 +1,5 @@
 import * as moment from 'moment';
+import { raw } from 'objection';
 import { ConfigService } from '@nestjs/config';
 import { Inject, Injectable } from '@nestjs/common';
 import { SystemUser } from '@/modules/System/models/SystemUser';
@@ -66,10 +67,14 @@ export class AuthResetPasswordService {
     }
     const hashedPassword = await hashPassword(password);
 
+    // Raising the session version ends every session made before the reset.
     await this.systemUserModel
       .query()
       .findById(user.id)
-      .update({ password: hashedPassword });
+      .update({
+        password: hashedPassword,
+        sessionVersion: raw('session_version + 1'),
+      } as any);
 
     // Deletes the used token.
     await this.deletePasswordResetToken(tokenModel.email);

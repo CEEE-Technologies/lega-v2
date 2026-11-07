@@ -121,7 +121,10 @@ export const useSetStripeAccountCallback = (
 
   return useMutation({
     mutationFn: (values: ExchangeStripeOAuthBody) =>
-      fetchExchangeStripeOAuth(fetcher, { code: values.code }).then(
+      fetchExchangeStripeOAuth(fetcher, {
+        code: values.code,
+        state: values.state,
+      }).then(
         () => ({ success: true }) as StripeAccountCallbackMutationResponse,
       ),
     ...options,

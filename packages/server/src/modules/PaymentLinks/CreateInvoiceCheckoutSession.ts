@@ -10,6 +10,8 @@ import { StripeInvoiceCheckoutSessionPOJO } from '../StripePayment/StripePayment
 import { ModelObject } from 'objection';
 import { ConfigService } from '@nestjs/config';
 import { assertPaymentLinkAccessible } from './payment-link.utils';
+import { signStripeCheckout } from '../StripePayment/StripeCheckoutSignature';
+import { ServiceError } from '../Items/ServiceError';
 
 const origin = 'http://localhost';
 
@@ -65,20 +67,40 @@ export class CreateInvoiceCheckoutSession {
     const invoice = await this.saleInvoiceModel()
       .query()
       .findById(paymentLink.resourceId)
-      .withGraphFetched('paymentMethods')
+      .withGraphFetched('paymentMethods.paymentIntegration')
       .throwIfNotFound();
 
     // It will be only one Stripe payment method associated to the invoice.
     const stripePaymentMethod = invoice.paymentMethods?.find(
-      (method) => method.paymentIntegration?.service === 'Stripe',
+      (method) =>
+        method.enable && method.paymentIntegration?.service === 'Stripe',
     );
     const stripeAccountId = stripePaymentMethod?.paymentIntegration?.accountId;
-    const _paymentIntegrationId = stripePaymentMethod?.paymentIntegration?.id;
 
+    // Without the organization's own Stripe account the checkout would be
+    // made on the platform account, so the money wouldn't reach them.
+    if (!stripeAccountId) {
+      throw new ServiceError(
+        'STRIPE_NOT_ENABLED_FOR_INVOICE',
+        'Card payment is not set up for this invoice.',
+      );
+    }
+    // Signs the company, invoice and payment link of the checkout. The
+    // payment notice is only recorded when this signature matches.
+    const signedFields = {
+      tenantId: paymentLink.tenantId,
+      saleInvoiceId: invoice.id,
+      paymentLinkId: paymentLink.id,
+    };
+    const checkoutSignature = signStripeCheckout(
+      this.configService.get<string>('jwt.secret'),
+      signedFields,
+    );
     // Creates checkout session for the given invoice.
     const session = await this.createCheckoutSession(invoice, stripeAccountId, {
       tenantId: paymentLink.tenantId,
       paymentLinkId: paymentLink.id,
+      checkoutSignature,
     });
     return {
       sessionId: session.id,

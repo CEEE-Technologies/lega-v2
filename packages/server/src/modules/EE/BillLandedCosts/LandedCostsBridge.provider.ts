@@ -1,5 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { Knex } from 'knex';
+import { uniq } from 'lodash';
 import {
   BillLandedCostsBridge,
   IBillLandedCostEntryDTO,
@@ -57,8 +58,42 @@ export class LandedCostsBridgeProvider
   }
 
   /**
-   * Validates the bill entries that have landed cost flag should be
-   * inventory items.
+   * Validates no landed cost was allocated from the given bill. Deleting it
+   * would leave the cost in the target bill's stock with nothing paying it.
+   * @param {number} billId - Bill id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public async validateBillNotLandedCostSource(
+    billId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    const landedCosts = await this.billLandedCostModel()
+      .query(trx)
+      .where('fromTransactionType', 'Bill')
+      .where('fromTransactionId', billId)
+      .withGraphFetched('bill');
+
+    if (landedCosts.length > 0) {
+      const bills = uniq(
+        landedCosts.map((cost) => cost.bill?.billNumber || `#${cost.billId}`),
+      );
+      throw new ServiceError(
+        ERRORS.BILL_USED_AS_LANDED_COST,
+        `Used as landed cost on ${bills.length > 1 ? 'bills' : 'bill'} ${bills.join(', ')}; remove it there first.`,
+        { billIds: uniq(landedCosts.map((cost) => cost.billId)) },
+      );
+    }
+  }
+
+  /**
+   * Validates that the bill lines flagged as landed cost are service or
+   * non-inventory lines (decision D7, the rule the screens use).
+   *
+   * The landed cost line is posted to its cost account (freight, customs)
+   * by the bill; allocating it then moves it from that account into the
+   * stock of the target items, so it is counted in stock once. An
+   * inventory line would already be stock of its own item, so allocating
+   * it too would count the freight in stock twice.
    * @param {IBillLandedCostEntryDTO[]} entries - Bill entries.
    */
   public async validateBillEntries(
@@ -71,14 +106,15 @@ export class LandedCostsBridgeProvider
 
     const entriesItemsById = transformToMap(entriesItems, 'id');
 
-    const nonInventoryHasCost = entries.filter((entry) => {
+    const inventoryHasCost = entries.filter((entry) => {
       const item = entriesItemsById.get(entry.itemId);
 
-      return entry.landedCost && item.type !== 'inventory';
+      return entry.landedCost && item?.type === 'inventory';
     });
-    if (nonInventoryHasCost.length > 0) {
+    if (inventoryHasCost.length > 0) {
       throw new ServiceError(
-        ERRORS.LANDED_COST_ENTRIES_SHOULD_BE_INVENTORY_ITEMS,
+        ERRORS.LANDED_COST_ENTRIES_SHOULD_NOT_BE_INVENTORY_ITEMS,
+        'Landed cost can only be on service or non-inventory lines. An inventory line already adds its cost to stock.',
       );
     }
   }

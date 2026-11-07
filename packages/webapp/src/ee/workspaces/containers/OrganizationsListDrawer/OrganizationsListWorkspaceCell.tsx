@@ -1,6 +1,7 @@
 import { Spinner, Tag, Icon } from '@blueprintjs/core';
 import { x } from '@xstyled/emotion';
 import React from 'react';
+import intl from 'react-intl-universal';
 import { firstLettersArgs } from '@/utils';
 
 /** Workspace row shape used by the organizations list table (camelCase API). */
@@ -9,6 +10,7 @@ export type OrganizationsListWorkspaceRow = {
   metadata?: { name?: string; logoUri?: string } | null;
   isBuildRunning?: boolean;
   isDefault?: boolean;
+  isUserInactive?: boolean;
 };
 
 export type OrganizationsListWorkspaceCellProps = {
@@ -93,6 +95,15 @@ export function OrganizationsListWorkspaceCell({
             <Icon icon="star" size={14} color="#f5a623" />
           )}
         </x.div>
+        {workspace.isUserInactive && (
+          <x.span
+            fontSize="12px"
+            color="var(--color-muted-text)"
+            data-testId={`company-${workspace.organizationId}-deactivated`}
+          >
+            {intl.get('workspaces.access_deactivated')}
+          </x.span>
+        )}
       </x.div>
     </x.div>
   );

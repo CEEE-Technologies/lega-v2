@@ -147,9 +147,12 @@ describe('High-severity fixes (e2e)', () => {
         .post(`/auth/reset_password/${token}`)
         .send({ password: 'Brand-New-Passw0rd!' });
       expect(reset.status).toBeLessThan(300);
-      expect((await signin(app, email, 'Brand-New-Passw0rd!')).status).toBe(
-        201,
-      );
+      // The reset ends the owner's older sessions (S10, round 3).
+      expect((await inCompany().get('/users')).status).toBe(401);
+      const fresh = await signin(app, email, 'Brand-New-Passw0rd!');
+      expect(fresh.status).toBe(201);
+      company.owner.token = fresh.body.access_token;
+      expect((await inCompany().get('/users')).status).toBe(200);
       expect((await signin(app, email, PASSWORD)).status).not.toBe(201);
 
       // Used once: the link no longer works.

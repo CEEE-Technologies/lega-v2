@@ -38,8 +38,8 @@ export class ValidateWarehouseExistance {
    * Validate warehouse existance.
    * @param {number} warehouseId - Warehouse id.
    */
-  public validateWarehouseExistance = (warehouseId: number) => {
-    const warehouse = this.warehouseModel().query().findById(warehouseId);
+  public validateWarehouseExistance = async (warehouseId: number) => {
+    const warehouse = await this.warehouseModel().query().findById(warehouseId);
 
     if (!warehouse) {
       throw new ServiceError(ERRORS.WAREHOUSE_ID_NOT_FOUND);

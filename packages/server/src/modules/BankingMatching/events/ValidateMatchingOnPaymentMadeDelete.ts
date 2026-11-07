@@ -19,10 +19,14 @@ export class ValidateMatchingOnPaymentMadeDeleteSubscriber {
     oldBillPayment,
     trx,
   }: IBillPaymentEventDeletedPayload) {
-    await this.validateNoMatchingLinkedService.validateTransactionNoMatchLinking(
-      'PaymentMade',
-      oldBillPayment.id,
-      trx,
-    );
+    // Matches save a bill payment as `BillPayment`; `PaymentMade` is kept
+    // for any link saved under the old name.
+    for (const referenceType of ['BillPayment', 'PaymentMade']) {
+      await this.validateNoMatchingLinkedService.validateTransactionNoMatchLinking(
+        referenceType,
+        oldBillPayment.id,
+        trx,
+      );
+    }
   }
 }

@@ -70,14 +70,14 @@ export class WriteTaxTransactionsItemEntries {
     referenceId: number,
     trx?: Knex.Transaction,
   ) {
-    await Promise.all([
-      this.removeTaxTransactionsFromItemEntries(
-        referenceId,
-        referenceType,
-        trx,
-      ),
-      this.writeTaxTransactionsFromItemEntries(itemEntries, trx),
-    ]);
+    // One after the other: run together, the removal could run last and
+    // delete the rows just written.
+    await this.removeTaxTransactionsFromItemEntries(
+      referenceId,
+      referenceType,
+      trx,
+    );
+    await this.writeTaxTransactionsFromItemEntries(itemEntries, trx);
   }
 
   /**

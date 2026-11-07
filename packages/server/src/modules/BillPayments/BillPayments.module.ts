@@ -66,6 +66,7 @@ import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLo
   ],
   exports: [
     BillPaymentValidators,
+    DeleteBillPayment,
     BillPaymentGLEntries,
     CreateBillPaymentService,
     BillPaymentsExportable,

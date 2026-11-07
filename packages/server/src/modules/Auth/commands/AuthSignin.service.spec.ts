@@ -88,7 +88,7 @@ describe('AuthSigninService token claims', () => {
       service.signToken(user);
 
       expect(jwtService.sign).toHaveBeenCalledWith(
-        { sub: String(userId) },
+        { sub: String(userId), sv: 0 },
         {
           expiresIn: '1d',
           issuer: JWT_ISSUER,
@@ -103,9 +103,65 @@ describe('AuthSigninService token claims', () => {
       service.signToken(user, true);
 
       expect(jwtService.sign).toHaveBeenCalledWith(
-        { sub: String(userId) },
+        { sub: String(userId), sv: 0 },
         expect.objectContaining({ expiresIn: '30d' }),
       );
     });
+  });
+});
+
+describe('AuthSigninService session version', () => {
+  const createService = (sessionVersion: number | undefined) => {
+    const foundUser = { id: 7, email: 'a@b.com', sessionVersion } as any;
+    const findOne = jest.fn().mockImplementation(() => {
+      const result = Promise.resolve(foundUser);
+      (result as any).throwIfNotFound = () => result;
+      return result;
+    });
+    const systemUserModel = { query: jest.fn(() => ({ findOne })) } as any;
+    const jwtService = { sign: jest.fn().mockReturnValue('signed') } as any;
+    const clsService = { set: jest.fn() } as any;
+    const service = new AuthSigninService(
+      systemUserModel,
+      {} as any,
+      {} as any,
+      jwtService,
+      clsService,
+    );
+    return { service, jwtService, clsService, foundUser };
+  };
+  const payload = (sv?: number) => ({
+    sub: '7',
+    sv,
+    iss: JWT_ISSUER,
+    aud: JWT_AUDIENCE,
+    iat: 1,
+    exp: 2,
+  });
+
+  it('a new token carries the login session version', () => {
+    const { service, jwtService, foundUser } = createService(3);
+    service.signToken(foundUser);
+    expect(jwtService.sign.mock.calls[0][0]).toEqual({ sub: '7', sv: 3 });
+  });
+
+  it('a token from an older session version is refused', async () => {
+    const { service, clsService } = createService(2);
+    await expect(service.verifyPayload(payload(1))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(clsService.set).not.toHaveBeenCalled();
+  });
+
+  it('a token with the current version works; old tokens count as 0', async () => {
+    await expect(
+      createService(2).service.verifyPayload(payload(2)),
+    ).resolves.toBeDefined();
+    await expect(
+      createService(0).service.verifyPayload(payload(undefined)),
+    ).resolves.toBeDefined();
+    await expect(
+      createService(1).service.verifyPayload(payload(undefined)),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

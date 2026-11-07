@@ -336,13 +336,17 @@ export class PaymentReceivedValidators {
   /**
    * Validate the deposit account id existance.
    * @param {number} depositAccountId - Deposit account id.
+   * @param {Knex.Transaction} trx - Database transaction.
    * @return {Promise<IAccount>}
    */
   async getDepositAccountOrThrowError(
     depositAccountId: number,
+    trx?: Knex.Transaction,
   ): Promise<Account> {
+    // Read inside the save: the account may have been created by it (the
+    // Stripe clearing account is created on the first card payment).
     const depositAccount = await this.accountModel()
-      .query()
+      .query(trx)
       .findById(depositAccountId);
 
     if (!depositAccount) {

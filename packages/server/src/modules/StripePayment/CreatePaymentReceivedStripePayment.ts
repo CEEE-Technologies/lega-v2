@@ -18,8 +18,13 @@ export class CreatePaymentReceiveStripePayment {
    * Creates a payment received transaction associated to the given invoice.
    * @param {number} saleInvoiceId - Sale invoice id.
    * @param {number} paidAmount - Paid amount.
+   * @param {string} referenceNo - The Stripe checkout id.
    */
-  async createPaymentReceived(saleInvoiceId: number, paidAmount: number) {
+  async createPaymentReceived(
+    saleInvoiceId: number,
+    paidAmount: number,
+    referenceNo: string = '',
+  ) {
     // Create a payment received transaction under UOW envirement.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
       // Finds or creates a new stripe payment clearing account (current asset).
@@ -37,7 +42,7 @@ export class CreatePaymentReceiveStripePayment {
         paymentDate: new Date(),
         amount: paidAmount,
         exchangeRate: 1,
-        referenceNo: '',
+        referenceNo,
         statement: '',
         depositAccountId: stripeClearingAccount.id,
         branchId: invoice.branchId,

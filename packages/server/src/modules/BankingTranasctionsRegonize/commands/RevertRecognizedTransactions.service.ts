@@ -40,7 +40,12 @@ export class RevertRecognizedTransactionsService {
     transactionsCriteria?: RevertRecognizedTransactionsCriteria,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    const rulesIds = castArray(ruleId);
+    // No rule given means every rule. An empty list means no rule, so there
+    // is nothing to revert (it used to drop the filter and revert the
+    // suggestions of every rule in every bank account).
+    const rulesIds =
+      ruleId === undefined || ruleId === null ? [] : castArray(ruleId);
+    if (Array.isArray(ruleId) && ruleId.length === 0) return;
 
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
       // Retrieves all the recognized transactions of the banbk rule.

@@ -675,8 +675,9 @@ describe('Inventory quantities and cost of sales (e2e)', () => {
 
     const setup = async () => {
       const item = await createInventoryItem();
-      // A landed cost line has to be an inventory item.
-      const freightItem = await createInventoryItem();
+      // A landed cost line is a service line (decision D7): its cost
+      // account is moved into the target's stock.
+      const freightItemId = await createServiceItem();
       const target = await createBill(
         [{ itemId: item.id, quantity: 10, rate: 100 }],
         { billDate: day('07-01') },
@@ -684,7 +685,7 @@ describe('Inventory quantities and cost of sales (e2e)', () => {
       const freight = await createBill(
         [
           {
-            itemId: freightItem.id,
+            itemId: freightItemId,
             quantity: 1,
             rate: 2000,
             costAccountId: freightAccountId,

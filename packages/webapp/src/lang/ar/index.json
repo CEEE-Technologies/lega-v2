@@ -1,4 +1,5 @@
 {
+  "workspaces.access_deactivated": "تم إلغاء تفعيل وصولك",
   "hello_world": "مرحبا بالعالم",
   "email_or_phone_number": "البريد الإلكتروني أو رقم الهاتف",
   "password": "كلمه السر",
@@ -1533,6 +1534,7 @@
   "roles.label.role_name": "اسم الدور",
   "roles.error.role_is_predefined": "دور المستخدم معرَّف مسبقًا ، ولا يمكنك حذف دور المستخدمين المحددة مسبقًا ",
   "roles.error.you_cannot_change_your_own_role": "لا يمكنك تغيير دور المستخدم الخاص بك.",
+  "roles.error.admin_only": "يمكن للمسؤول فقط القيام بذلك.",
   "roles.label.role_name_": "اسم دور المستخدم ",
   "roles.permission_schema.success_message": "تم اضافة دور المستخدم بنجاح.",
   "roles.permission_schema.upload_message": "تم تحديث دور المستخدم بنجاح.",
