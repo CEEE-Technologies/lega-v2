@@ -226,23 +226,21 @@ describe('UnmatchMatchedBankTransaction', () => {
 
   it('still unmatches when the created payment was already deleted', async () => {
     existingPayments = {};
-    const { service, eventPublisher, deleteBillPayment, deletedLines } = setup(
-      {
-        line: { id: 5, accountId: 1 },
-        matches: [
-          {
-            uncategorizedTransactionId: 5,
-            referenceType: 'Bill',
-            referenceId: 8,
-          },
-          {
-            uncategorizedTransactionId: 5,
-            referenceType: 'BillPayment',
-            referenceId: 13,
-          },
-        ],
-      },
-    );
+    const { service, eventPublisher, deleteBillPayment, deletedLines } = setup({
+      line: { id: 5, accountId: 1 },
+      matches: [
+        {
+          uncategorizedTransactionId: 5,
+          referenceType: 'Bill',
+          referenceId: 8,
+        },
+        {
+          uncategorizedTransactionId: 5,
+          referenceType: 'BillPayment',
+          referenceId: 13,
+        },
+      ],
+    });
     await service.unmatchMatchedTransaction(5);
     expect(deletedLines).toEqual([[5]]);
     expect(deleteBillPayment.deleteBillPayment).not.toHaveBeenCalled();

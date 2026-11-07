@@ -128,7 +128,7 @@ describe('withSavepoint', () => {
       expect(ran).toEqual([]);
     });
 
-    it('drops an inner step\'s work with it, keeping the outer step\'s', async () => {
+    it("drops an inner step's work with it, keeping the outer step's", async () => {
       const { trx, finish } = committableTrx();
       const ran: string[] = [];
       await withSavepoint(trx, async () => {
