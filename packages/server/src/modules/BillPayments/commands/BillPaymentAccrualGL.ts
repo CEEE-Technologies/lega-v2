@@ -3,7 +3,6 @@ import {
   multiplyMoney,
   roundMoney,
   subtractMoney,
-  sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
 import { BillPayment } from '../models/BillPayment';
@@ -11,7 +10,10 @@ import { AccountNormal } from '@/interfaces/Account';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
+import {
+  getExchangeGainLossEntries,
+  getRunningTotalRelief,
+} from '@/utils/exchange-gain-loss';
 import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import { IOpeningBalancePaidBefore } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
@@ -127,13 +129,8 @@ export class BillPaymentAccrualGL {
       sumMoneyBy(entries, 'paymentAmount'),
       this.billPayment.exchangeRate,
     );
-    // The A/P relief at the document rate is a running total (see the
-    // payment received accrual GL): no cent left once paid in parts.
-    const relief = (amount: number, before: number, rate: number) =>
-      subtractMoney(
-        multiplyMoney(sumMoney(before, amount), rate),
-        multiplyMoney(before, rate),
-      );
+    // The A/P relief at the document rate is a running total: no cent
+    // left once paid in parts.
     const paidAtBillRates = sumMoneyBy(entries, (entry) => {
       // An opening balance line relieves A/P at the rate the opening
       // balance was posted at, so a different payment rate posts an
@@ -145,7 +142,7 @@ export class BillPaymentAccrualGL {
             this.billPayment.exchangeRate,
           );
         }
-        return relief(
+        return getRunningTotalRelief(
           entry.paymentAmount,
           this.openingBalance.paidBefore,
           this.openingBalance.exchangeRate,
@@ -159,7 +156,7 @@ export class BillPaymentAccrualGL {
         );
       }
       const rate = entry.bill.exchangeRate ?? this.billPayment.exchangeRate;
-      return relief(
+      return getRunningTotalRelief(
         entry.paymentAmount,
         this.paidBefore[entry.billId] ?? 0,
         rate,
@@ -173,41 +170,27 @@ export class BillPaymentAccrualGL {
    * @returns {ILedgerEntry[]}
    */
   private get paymentExGainOrLossEntries(): ILedgerEntry[] {
-    const commonEntry = this.paymentCommonEntry;
-    const totalExGainOrLoss = this.paymentExGainOrLoss;
-    const absExGainOrLoss = Math.abs(totalExGainOrLoss);
-
-    return totalExGainOrLoss
-      ? [
-          {
-            ...commonEntry,
-            currencyCode: this.baseCurrency,
-            exchangeRate: 1,
-            credit: totalExGainOrLoss > 0 ? absExGainOrLoss : 0,
-            debit: totalExGainOrLoss < 0 ? absExGainOrLoss : 0,
-            ...NO_FOREIGN_AMOUNT,
-            accountId: this.gainLossAccountId,
-            index: 2,
-            indexGroup: 20,
-            accountNormal: AccountNormal.DEBIT,
-          },
-          {
-            ...commonEntry,
-            currencyCode: this.baseCurrency,
-            exchangeRate: 1,
-            debit: totalExGainOrLoss > 0 ? absExGainOrLoss : 0,
-            credit: totalExGainOrLoss < 0 ? absExGainOrLoss : 0,
-            ...NO_FOREIGN_AMOUNT,
-            accountId: this.APAccountId,
-            // On the vendor, as the A/R line of a payment received is on
-            // the customer: without it the vendor's A/P balance missed
-            // every exchange difference.
-            contactId: this.billPayment.vendorId,
-            index: 3,
-            accountNormal: AccountNormal.DEBIT,
-          },
-        ]
-      : [];
+    const entries = getExchangeGainLossEntries({
+      commonEntry: this.paymentCommonEntry,
+      amount: this.paymentExGainOrLoss,
+      baseCurrencyCode: this.baseCurrency,
+      gainLossEntry: {
+        accountId: this.gainLossAccountId,
+        index: 2,
+        indexGroup: 20,
+        accountNormal: AccountNormal.DEBIT,
+      },
+      contactEntry: {
+        accountId: this.APAccountId,
+        // On the vendor, as the A/R line of a payment received is on
+        // the customer: without it the vendor's A/P balance missed
+        // every exchange difference.
+        contactId: this.billPayment.vendorId,
+        index: 3,
+        accountNormal: AccountNormal.DEBIT,
+      },
+    });
+    return entries ? [entries.gainLossEntry, entries.contactEntry] : [];
   }
 
   /**

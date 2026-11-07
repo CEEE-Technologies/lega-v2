@@ -2,28 +2,29 @@ import { RefundVendorCreditGLEntriesSubscriber } from './RefundVendorCreditGLEnt
 import { RefundVendorCreditGLEntries } from '../commands/RefundVendorCreditGLEntries';
 
 describe('RefundVendorCreditGLEntriesSubscriber — vendor credit edited', () => {
-  it('rewrites the refunds cash entries of the edited vendor credit', async () => {
-    const glEntries = { rewriteVendorCreditRefundsCashGLEntries: jest.fn() };
+  it('rewrites the refunds of the edited vendor credit', async () => {
+    const glEntries = { rewriteVendorCreditRefundsGLEntries: jest.fn() };
     const subscriber = new RefundVendorCreditGLEntriesSubscriber(
       glEntries as any,
       { validateLinkedTransactionsNotLocked: jest.fn() } as any,
     );
     const trx = { trx: true } as any;
 
-    await subscriber.rewriteRefundsCashGLEntriesOnceVendorCreditEdited({
+    await subscriber.rewriteRefundsGLEntriesOnceVendorCreditEdited({
       vendorCredit: { id: 8 },
       oldVendorCredit: { id: 8 },
       trx,
     } as any);
 
-    expect(
-      glEntries.rewriteVendorCreditRefundsCashGLEntries,
-    ).toHaveBeenCalledWith(8, trx);
+    expect(glEntries.rewriteVendorCreditRefundsGLEntries).toHaveBeenCalledWith(
+      8,
+      trx,
+    );
   });
 });
 
-describe('RefundVendorCreditGLEntries.rewriteVendorCreditRefundsCashGLEntries', () => {
-  it('rewrites the cash set of every refund of the vendor credit', async () => {
+describe('RefundVendorCreditGLEntries.rewriteVendorCreditRefundsGLEntries', () => {
+  it('rewrites every refund of the vendor credit, in order', async () => {
     const trx = { trx: true } as any;
     const refundModel = () => ({
       query: () => ({
@@ -37,10 +38,10 @@ describe('RefundVendorCreditGLEntries.rewriteVendorCreditRefundsCashGLEntries', 
       refundModel as any,
     );
     const rewrite = jest
-      .spyOn(service, 'rewriteRefundVendorCreditCashGLEntries')
+      .spyOn(service as any, 'rewriteRefundOnChange')
       .mockResolvedValue(undefined);
 
-    await service.rewriteVendorCreditRefundsCashGLEntries(8, trx);
+    await service.rewriteVendorCreditRefundsGLEntries(8, trx);
 
     expect(rewrite.mock.calls).toEqual([
       [1, trx],

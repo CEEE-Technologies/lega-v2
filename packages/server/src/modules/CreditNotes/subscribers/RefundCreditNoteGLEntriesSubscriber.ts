@@ -88,17 +88,18 @@ export class RefundCreditNoteGLEntriesSubscriber {
   }
 
   /**
-   * Rewrites the refunds cash basis entries once the credit note is edited,
-   * so they follow the edited credit note composition.
+   * Rewrites the refunds once the credit note is edited: their cash basis
+   * entries follow the edited composition, and in a foreign currency their
+   * A/R relief and exchange gain/loss follow the edited rate.
    * @param {ICreditNoteEditedPayload} payload -
    */
   @OnEvent(events.creditNote.onEdited)
-  async rewriteRefundsCashGLEntriesOnceCreditNoteEdited({
+  async rewriteRefundsGLEntriesOnceCreditNoteEdited({
     creditNote,
     oldCreditNote,
     trx,
   }: ICreditNoteEditedPayload) {
-    await this.refundCreditGLEntries.rewriteCreditNoteRefundsCashGLEntries(
+    await this.refundCreditGLEntries.rewriteCreditNoteRefundsGLEntries(
       creditNote?.id ?? oldCreditNote.id,
       trx,
     );

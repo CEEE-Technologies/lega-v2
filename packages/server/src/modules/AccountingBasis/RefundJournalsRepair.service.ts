@@ -86,7 +86,11 @@ const netByBasisAndAccount = (rows: IRow[]): Map<string, number> => {
  * - a credit note refund debited the base currency A/R, not the A/R of its
  *   currency that the credit note credited;
  * - a vendor credit refund's cash basis lines were converted at the vendor
- *   credit's rate, not the refund's.
+ *   credit's rate, not the refund's;
+ * - a refund at another rate than its credit note's (vendor credit's) put
+ *   the whole converted amount on A/R (A/P), leaving the exchange
+ *   difference there; it now relieves A/R (A/P) at the document's rate and
+ *   posts the difference to exchange gain/loss, as payments do.
  *
  * Only refunds in a currency other than the base currency (or at a rate
  * other than 1) are looked at: a base currency refund didn't change. A

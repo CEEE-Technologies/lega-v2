@@ -135,3 +135,90 @@ describe('RefundVendorCreditCashGL — foreign currency', () => {
     expect(sumBy(entries, 'credit')).toBeCloseTo(65.18, 2);
   });
 });
+
+/**
+ * The vendor credit debited A/P at its own rate (EUR 100 at 1.20 = USD
+ * 120). A refund at another rate relieves A/P at the vendor credit rate, as
+ * a bill payment relieves it at the bill rate, and the difference goes to
+ * exchange gain/loss. Without it the difference stayed on A/P.
+ */
+describe('RefundVendorCreditGLEntries — exchange gain/loss', () => {
+  const GAIN_LOSS = 700;
+  const entriesOf = (refund: any, refundedBefore = 0) =>
+    new RefundVendorCreditGLEntries(
+      {} as any,
+      {} as any,
+      (() => ({})) as any,
+      (() => ({})) as any,
+    ).getRefundVendorCreditGLEntries(refund, AP, {
+      exchangeGainOrLossAccountId: GAIN_LOSS,
+      baseCurrencyCode: 'USD',
+      refundedBefore,
+    });
+
+  const netOf = (entries: any[], accountId: number) =>
+    entries
+      .filter((e) => e.accountId === accountId)
+      .reduce((sum, e) => sum + toCents(e.debit) - toCents(e.credit), 0) / 100;
+
+  it('relieves A/P at the vendor credit rate and posts the gain', () => {
+    // EUR 100 back at 1.23: the bank gets 123, A/P gives back 120.
+    const entries = entriesOf(buildRefund({ amount: 100 }));
+
+    expect(netOf(entries, BANK)).toBe(123);
+    expect(netOf(entries, AP)).toBe(-120);
+    expect(netOf(entries, GAIN_LOSS)).toBe(-3);
+    expectBalanced(entries);
+  });
+
+  it('posts a loss when the refund rate is below the vendor credit rate', () => {
+    const entries = entriesOf(buildRefund({ amount: 100, exchangeRate: 1.15 }));
+
+    expect(netOf(entries, BANK)).toBe(115);
+    expect(netOf(entries, AP)).toBe(-120);
+    expect(netOf(entries, GAIN_LOSS)).toBe(5);
+    expectBalanced(entries);
+  });
+
+  it('puts the A/P adjustment on the vendor, in the base currency', () => {
+    const entries = entriesOf(buildRefund({ amount: 100 }));
+    const apAdjustment = entries.filter(
+      (e) => e.accountId === AP && !e.foreignDebit && !e.foreignCredit,
+    );
+    expect(apAdjustment).toHaveLength(1);
+    expect(apAdjustment[0].contactId).toBe(60);
+    expect(apAdjustment[0].currencyCode).toBe('USD');
+    expect(apAdjustment[0].exchangeRate).toBe(1);
+  });
+
+  it('relieves A/P as a running total, so refunds in parts end at the vendor credit', () => {
+    const parts = [33.33, 33.33, 33.34];
+    let before = 0;
+    let apTotal = 0;
+    parts.forEach((amount) => {
+      const entries = entriesOf(
+        buildRefund({ amount, exchangeRate: 1.2345 }),
+        before,
+      );
+      apTotal += netOf(entries, AP);
+      before += amount;
+      expectBalanced(entries);
+    });
+    expect(Math.round(apTotal * 100) / 100).toBe(-120);
+  });
+
+  it('posts no gain/loss at the vendor credit rate', () => {
+    const entries = entriesOf(buildRefund({ amount: 100, exchangeRate: 1.2 }));
+    expect(entries.some((e) => e.accountId === GAIN_LOSS)).toBe(false);
+    expect(entries).toHaveLength(2);
+  });
+
+  it('leaves the cash basis set without A/P or gain/loss: expense goes at the refund rate, as a bill payment', () => {
+    const entries = cashEntries(buildRefund({ amount: 100 }));
+    expect(netOf(entries, BANK)).toBe(123);
+    expect(netOf(entries, 500)).toBe(-123);
+    expect(entries.some((e) => [AP, GAIN_LOSS].includes(e.accountId))).toBe(
+      false,
+    );
+  });
+});
