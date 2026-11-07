@@ -14,11 +14,13 @@ import { AccountsModule } from '../Accounts/Accounts.module';
 import { TenancyModule } from '../Tenancy/Tenancy.module';
 import { CreditApplicationsGLService } from './CreditApplicationsGL.service';
 import { CreditApplicationsGLSubscriber } from './CreditApplicationsGL.subscriber';
+import { StaleJournalsRepairService } from './StaleJournalsRepair.service';
 
 /**
  * Maintenance of the cash basis ledger: rebuilds the cash basis entries of
  * the payments and refunds from their documents. Also posts the exchange
- * lines of the credits applied to invoices and bills.
+ * lines of the credits applied to invoices and bills, and repairs the
+ * journals older fixes only correct on the next save (stale journals).
  */
 @Module({
   imports: [
@@ -38,7 +40,12 @@ import { CreditApplicationsGLSubscriber } from './CreditApplicationsGL.subscribe
     CashBasisAutoRebuildService,
     CreditApplicationsGLService,
     CreditApplicationsGLSubscriber,
+    StaleJournalsRepairService,
   ],
-  exports: [CashBasisRebuildService, CreditApplicationsGLService],
+  exports: [
+    CashBasisRebuildService,
+    CreditApplicationsGLService,
+    StaleJournalsRepairService,
+  ],
 })
 export class AccountingBasisModule {}
