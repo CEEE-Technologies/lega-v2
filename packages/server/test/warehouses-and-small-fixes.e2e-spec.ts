@@ -357,7 +357,6 @@ describe('Warehouses and smaller fixes (e2e)', () => {
     });
 
     it('Q3: the migration merges existing duplicates and adds the unique rule (down, up)', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const migration = require('../src/database/tenant/migrations/20261107130000_unique_items_warehouses_quantity');
       const itemId = await createItem(wh, whAccounts, 'inventory');
       primaryWarehouseId = await primaryWarehouse();
@@ -812,7 +811,6 @@ describe('Warehouses and smaller fixes (e2e)', () => {
 
     // Loaded lazily, so the other tests run on a branch without it.
     const repairService = () =>
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       require('../src/modules/AccountingBasis/StaleJournalsRepair.service')
         .StaleJournalsRepairService;
 

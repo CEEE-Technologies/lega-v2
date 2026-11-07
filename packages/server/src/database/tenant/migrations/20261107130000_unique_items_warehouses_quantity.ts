@@ -72,7 +72,6 @@ exports.up = async function (knex) {
         warehouse_id: row.w,
         quantity_on_hand: row.q,
       });
-      // eslint-disable-next-line no-console
       console.log(
         `[items_warehouses_quantity] item ${row.i} / warehouse ${row.w}: merged ${row.n} rows into one of ${row.q}.`,
       );
