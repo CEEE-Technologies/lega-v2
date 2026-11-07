@@ -2,7 +2,6 @@ import {
   multiplyMoney,
   roundMoney,
   subtractMoney,
-  sumMoney,
   sumMoneyBy,
 } from '@bigcapital/utils';
 import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
@@ -10,7 +9,10 @@ import { PaymentReceived } from '../models/PaymentReceived';
 import { AccountNormal } from '@/interfaces/Account';
 import { Ledger } from '@/modules/Ledger/Ledger';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { NO_FOREIGN_AMOUNT } from '@/utils/ledger-rounding';
+import {
+  getExchangeGainLossEntries,
+  getRunningTotalRelief,
+} from '@/utils/exchange-gain-loss';
 import { isOpeningBalanceEntry } from '@/modules/Contacts/ContactOpeningBalance.constants';
 import { IOpeningBalancePaidBefore } from '@/modules/AccountingBasis/CashBasisPaidBefore';
 
@@ -99,11 +101,6 @@ export class PaymentReceivedAccrualGL {
     // far, this payment included) at the rate less (paid before) at the
     // rate. Rounding each payment alone left a cent on A/R once a foreign
     // currency invoice was paid in parts.
-    const relief = (amount: number, before: number, rate: number) =>
-      subtractMoney(
-        multiplyMoney(sumMoney(before, amount), rate),
-        multiplyMoney(before, rate),
-      );
     const paidAtInvoiceRates = sumMoneyBy(entries, (entry) => {
       // An opening balance line relieves A/R at the rate the opening
       // balance was posted at, so a different payment rate posts an
@@ -115,7 +112,7 @@ export class PaymentReceivedAccrualGL {
             this.paymentReceived.exchangeRate,
           );
         }
-        return relief(
+        return getRunningTotalRelief(
           entry.paymentAmount,
           this.openingBalance.paidBefore,
           this.openingBalance.exchangeRate,
@@ -130,7 +127,7 @@ export class PaymentReceivedAccrualGL {
       }
       const rate =
         entry.invoice.exchangeRate ?? this.paymentReceived.exchangeRate;
-      return relief(
+      return getRunningTotalRelief(
         entry.paymentAmount,
         this.paidBefore[entry.invoiceId] ?? 0,
         rate,
@@ -175,37 +172,23 @@ export class PaymentReceivedAccrualGL {
    * @returns {ILedgerEntry[]}
    */
   private get paymentExchangeGainLossEntry(): ILedgerEntry[] {
-    const commonJournal = this.paymentReceiveCommonEntry;
-    const gainOrLoss = this.paymentExGainOrLoss();
-    const absGainOrLoss = Math.abs(gainOrLoss);
-
-    return gainOrLoss
-      ? [
-          {
-            ...commonJournal,
-            currencyCode: this.baseCurrencyCode,
-            exchangeRate: 1,
-            debit: gainOrLoss > 0 ? absGainOrLoss : 0,
-            credit: gainOrLoss < 0 ? absGainOrLoss : 0,
-            ...NO_FOREIGN_AMOUNT,
-            accountId: this.ARAccountId,
-            contactId: this.paymentReceived.customerId,
-            index: 3,
-            accountNormal: AccountNormal.CREDIT,
-          },
-          {
-            ...commonJournal,
-            currencyCode: this.baseCurrencyCode,
-            exchangeRate: 1,
-            credit: gainOrLoss > 0 ? absGainOrLoss : 0,
-            debit: gainOrLoss < 0 ? absGainOrLoss : 0,
-            ...NO_FOREIGN_AMOUNT,
-            accountId: this.exchangeGainOrLossAccountId,
-            index: 3,
-            accountNormal: AccountNormal.DEBIT,
-          },
-        ]
-      : [];
+    const entries = getExchangeGainLossEntries({
+      commonEntry: this.paymentReceiveCommonEntry,
+      amount: this.paymentExGainOrLoss(),
+      baseCurrencyCode: this.baseCurrencyCode,
+      contactEntry: {
+        accountId: this.ARAccountId,
+        contactId: this.paymentReceived.customerId,
+        index: 3,
+        accountNormal: AccountNormal.CREDIT,
+      },
+      gainLossEntry: {
+        accountId: this.exchangeGainOrLossAccountId,
+        index: 3,
+        accountNormal: AccountNormal.DEBIT,
+      },
+    });
+    return entries ? [entries.contactEntry, entries.gainLossEntry] : [];
   }
 
   /**

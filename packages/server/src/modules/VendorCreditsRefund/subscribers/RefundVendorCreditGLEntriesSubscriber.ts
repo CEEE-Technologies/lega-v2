@@ -89,17 +89,18 @@ export class RefundVendorCreditGLEntriesSubscriber {
   }
 
   /**
-   * Rewrites the refunds cash basis entries once the vendor credit is edited,
-   * so they follow the edited vendor credit composition.
+   * Rewrites the refunds once the vendor credit is edited: their cash basis
+   * entries follow the edited composition, and in a foreign currency their
+   * A/P relief and exchange gain/loss follow the edited rate.
    * @param {IVendorCreditEditedPayload} payload -
    */
   @OnEvent(events.vendorCredit.onEdited)
-  async rewriteRefundsCashGLEntriesOnceVendorCreditEdited({
+  async rewriteRefundsGLEntriesOnceVendorCreditEdited({
     vendorCredit,
     oldVendorCredit,
     trx,
   }: IVendorCreditEditedPayload) {
-    await this.refundVendorCreditGLEntries.rewriteVendorCreditRefundsCashGLEntries(
+    await this.refundVendorCreditGLEntries.rewriteVendorCreditRefundsGLEntries(
       vendorCredit?.id ?? oldVendorCredit.id,
       trx,
     );

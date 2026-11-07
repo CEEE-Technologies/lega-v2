@@ -2,23 +2,24 @@ import { RefundCreditNoteGLEntriesSubscriber } from './RefundCreditNoteGLEntries
 import { RefundCreditNoteGLEntries } from '@/modules/CreditNoteRefunds/commands/RefundCreditNoteGLEntries';
 
 describe('RefundCreditNoteGLEntriesSubscriber — credit note edited', () => {
-  it('rewrites the refunds cash entries of the edited credit note', async () => {
-    const glEntries = { rewriteCreditNoteRefundsCashGLEntries: jest.fn() };
+  it('rewrites the refunds of the edited credit note', async () => {
+    const glEntries = { rewriteCreditNoteRefundsGLEntries: jest.fn() };
     const subscriber = new RefundCreditNoteGLEntriesSubscriber(
       glEntries as any,
       { validateLinkedTransactionsNotLocked: jest.fn() } as any,
     );
     const trx = { trx: true } as any;
 
-    await subscriber.rewriteRefundsCashGLEntriesOnceCreditNoteEdited({
+    await subscriber.rewriteRefundsGLEntriesOnceCreditNoteEdited({
       creditNote: { id: 6 },
       oldCreditNote: { id: 6 },
       trx,
     } as any);
 
-    expect(
-      glEntries.rewriteCreditNoteRefundsCashGLEntries,
-    ).toHaveBeenCalledWith(6, trx);
+    expect(glEntries.rewriteCreditNoteRefundsGLEntries).toHaveBeenCalledWith(
+      6,
+      trx,
+    );
   });
 });
 

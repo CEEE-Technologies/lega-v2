@@ -17,7 +17,9 @@ interface TenantsRepairRefundJournalsOptions {
   name: 'tenants:repair-refund-journals',
   description:
     'Lists the foreign currency refunds (credit note and vendor credit refunds) posted before they were converted ' +
-    'to the base currency: their A/R or A/P and bank lines hold the refund amount unconverted. Dry run by default: ' +
+    'to the base currency (their A/R or A/P and bank lines hold the refund amount unconverted), or before a refund at ' +
+    'another rate than its credit note or vendor credit posted the exchange gain/loss (the difference stayed on A/R ' +
+    'or A/P). Dry run by default: ' +
     'nothing is changed. --apply (with --organization, after a database backup) rewrites only those refund ' +
     'journals the way saving the refund again would; refunds in a locked period are listed and skipped.',
 })

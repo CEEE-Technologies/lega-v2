@@ -77,7 +77,13 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
   let db: Knex;
   const api = () => as(app, company.owner, company.organizationId);
 
-  let accounts: { bank: number; income: number; cogs: number; baseAR: number };
+  let accounts: {
+    bank: number;
+    income: number;
+    cogs: number;
+    baseAR: number;
+    gainLoss: number;
+  };
   let itemId: number;
   let eurCustomerId: number;
   let eurVendorId: number;
@@ -196,6 +202,9 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
       baseAR: (
         await db('accounts').where({ slug: 'accounts-receivable' }).first('id')
       ).id,
+      gainLoss: (
+        await db('accounts').where({ slug: 'exchange-grain-loss' }).first('id')
+      ).id,
     };
     await api()
       .post('/currencies')
@@ -237,7 +246,7 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
   });
 
   describe('posting', () => {
-    it('a EUR credit note refund: A/R and bank at amount x the refund rate', async () => {
+    it('a EUR credit note refund: bank at amount x the refund rate, A/R at the credit note rate', async () => {
       const creditNoteId = await createCreditNote(eurCustomerId, 100, 1.2);
       const refund = await refundCreditNote(creditNoteId, {
         amount: 65.18,
@@ -248,12 +257,16 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
 
       const accrual = await accrualRows('RefundCreditNote', refund.id);
       const net = netByAccount(accrual);
-      // 65.18 x 1.23 = 80.17, on the EUR A/R the credit note credited.
+      // 65.18 x 1.23 = 80.17 from the bank; 65.18 x 1.20 = 78.22 off the
+      // EUR A/R the credit note credited; 1.95 exchange loss.
       expect(net[accounts.bank]).toBe(-80.17);
-      expect(net[eurAR]).toBe(80.17);
+      expect(net[eurAR]).toBe(78.22);
+      expect(net[accounts.gainLoss]).toBe(1.95);
       expect(net[accounts.baseAR]).toBeUndefined();
       expect(sumOf(accrual, 'debit')).toBe(sumOf(accrual, 'credit'));
-      const arRow = accrual.find((row) => row.accountId === eurAR);
+      const arRow = accrual.find(
+        (row) => row.accountId === eurAR && Number(row.foreignDebit) > 0,
+      );
       expect(Number(arRow.foreignDebit)).toBe(65.18);
 
       // The credit note's EUR A/R is relieved by the refund at its rate.
@@ -269,7 +282,7 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
       expect(sumOf(cash, 'debit')).toBe(sumOf(cash, 'credit'));
     });
 
-    it('a EUR vendor credit refund: A/P and bank at amount x the refund rate', async () => {
+    it('a EUR vendor credit refund: bank at amount x the refund rate, A/P at the vendor credit rate', async () => {
       const vendorCreditId = await createVendorCredit(eurVendorId, 100, 1.2);
       const refund = await refundVendorCredit(vendorCreditId, {
         amount: 65.18,
@@ -281,7 +294,8 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
       const accrual = await accrualRows('RefundVendorCredit', refund.id);
       const net = netByAccount(accrual);
       expect(net[accounts.bank]).toBe(80.17);
-      expect(net[eurAP]).toBe(-80.17);
+      expect(net[eurAP]).toBe(-78.22);
+      expect(net[accounts.gainLoss]).toBe(-1.95);
       expect(sumOf(accrual, 'debit')).toBe(sumOf(accrual, 'credit'));
 
       const cash = await cashRows('RefundVendorCredit', refund.id);
@@ -360,6 +374,20 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
         referenceType,
         referenceId: refund.id,
       });
+      // The old code wrote no exchange gain/loss pair.
+      await rows
+        .clone()
+        .where((b) =>
+          b
+            .where('accountId', accounts.gainLoss)
+            .orWhere((c) =>
+              c
+                .whereIn('accountId', [eurAR, eurAP])
+                .where('foreignDebit', 0)
+                .where('foreignCredit', 0),
+            ),
+        )
+        .delete();
       await rows
         .clone()
         .where('debit', '>', 0)
@@ -482,7 +510,7 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
             basis: 'accrual',
             accountId: eurAR,
             stored: 0,
-            expected: 80.17,
+            expected: 78.22,
           },
         ]),
       );
@@ -525,7 +553,8 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
         await accrualRows('RefundCreditNote', creditRefundId),
       );
       expect(credit[accounts.bank]).toBe(-80.17);
-      expect(credit[eurAR]).toBe(80.17);
+      expect(credit[eurAR]).toBe(78.22);
+      expect(credit[accounts.gainLoss]).toBe(1.95);
       expect(credit[accounts.baseAR]).toBeUndefined();
       const creditCash = netByAccount(
         await cashRows('RefundCreditNote', creditRefundId),
@@ -536,7 +565,8 @@ describe('Foreign currency refunds are posted in the base currency (e2e)', () =>
         await accrualRows('RefundVendorCredit', vendorRefundId),
       );
       expect(vendor[accounts.bank]).toBe(80.17);
-      expect(vendor[eurAP]).toBe(-80.17);
+      expect(vendor[eurAP]).toBe(-78.22);
+      expect(vendor[accounts.gainLoss]).toBe(-1.95);
 
       // The one at the rate 1 keeps its rows.
       const rateOne = netByAccount(

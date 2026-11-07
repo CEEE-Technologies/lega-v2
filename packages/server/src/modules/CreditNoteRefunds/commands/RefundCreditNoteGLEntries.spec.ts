@@ -152,3 +152,116 @@ describe('RefundCreditNoteCashGL — foreign currency', () => {
     expect(sumBy(entries, 'debit')).toBeCloseTo(65.18, 2);
   });
 });
+
+/**
+ * The credit note credited A/R at its own rate (EUR 100 at 1.20 = USD 120).
+ * A refund at another rate relieves A/R at the credit note rate, as a
+ * payment relieves it at the invoice rate, and the difference goes to
+ * exchange gain/loss. Without it the difference stayed on A/R.
+ */
+describe('RefundCreditNoteGLEntries — exchange gain/loss', () => {
+  const GAIN_LOSS = 700;
+  const fx = (refundedBefore = 0) => ({
+    exchangeGainOrLossAccountId: GAIN_LOSS,
+    baseCurrencyCode: 'USD',
+    refundedBefore,
+  });
+  const entriesOf = (refund: any, refundedBefore = 0) =>
+    new RefundCreditNoteGLEntries(
+      {} as any,
+      {} as any,
+      (() => ({})) as any,
+      (() => ({})) as any,
+    ).getRefundCreditGLEntries(refund, AR, fx(refundedBefore));
+
+  const netOf = (entries: any[], accountId: number) =>
+    entries
+      .filter((e) => e.accountId === accountId)
+      .reduce((sum, e) => sum + toCents(e.debit) - toCents(e.credit), 0) / 100;
+
+  it('relieves A/R at the credit note rate and posts the loss', () => {
+    // EUR 100 refunded at 1.23: the bank pays 123, A/R takes back 120.
+    const entries = entriesOf(buildRefund({ amount: 100 }));
+
+    expect(netOf(entries, BANK)).toBe(-123);
+    expect(netOf(entries, AR)).toBe(120);
+    expect(netOf(entries, GAIN_LOSS)).toBe(3);
+    expectBalanced(entries);
+  });
+
+  it('posts a gain when the refund rate is below the credit note rate', () => {
+    const entries = entriesOf(buildRefund({ amount: 100, exchangeRate: 1.15 }));
+
+    expect(netOf(entries, BANK)).toBe(-115);
+    expect(netOf(entries, AR)).toBe(120);
+    expect(netOf(entries, GAIN_LOSS)).toBe(-5);
+    expectBalanced(entries);
+  });
+
+  it('puts the gain/loss lines in the base currency, A/R on the customer', () => {
+    const entries = entriesOf(buildRefund({ amount: 100 }));
+    const gainLoss = entries.filter((e) => e.accountId === GAIN_LOSS);
+    const arAdjustment = entries.filter(
+      (e) => e.accountId === AR && !e.foreignDebit && !e.foreignCredit,
+    );
+    expect(gainLoss).toHaveLength(1);
+    expect(arAdjustment).toHaveLength(1);
+    [...gainLoss, ...arAdjustment].forEach((e) => {
+      expect(e.currencyCode).toBe('USD');
+      expect(e.exchangeRate).toBe(1);
+      expect(e.foreignDebit).toBe(0);
+      expect(e.foreignCredit).toBe(0);
+    });
+    expect(arAdjustment[0].contactId).toBe(50);
+    // The foreign amount stays on the A/R line at the refund rate.
+    expect(
+      entries
+        .filter((e) => e.accountId === AR)
+        .reduce((sum, e) => sum + (e.foreignDebit || 0), 0),
+    ).toBe(100);
+  });
+
+  it('relieves A/R as a running total, so refunds in parts end at the credit note', () => {
+    // EUR 33.33 + 33.33 + 33.34 at 1.2345: each part alone at 1.20 rounds
+    // to 40.00 + 40.00 + 40.01; the running total ends at 120.00.
+    const parts = [33.33, 33.33, 33.34];
+    let before = 0;
+    let arTotal = 0;
+    parts.forEach((amount) => {
+      const entries = entriesOf(
+        buildRefund({ amount, exchangeRate: 1.2345 }),
+        before,
+      );
+      arTotal += netOf(entries, AR);
+      before += amount;
+      expectBalanced(entries);
+    });
+    expect(Math.round(arTotal * 100) / 100).toBe(120);
+  });
+
+  it('posts no gain/loss at the credit note rate', () => {
+    const entries = entriesOf(buildRefund({ amount: 100, exchangeRate: 1.2 }));
+    expect(entries.some((e) => e.accountId === GAIN_LOSS)).toBe(false);
+    expect(entries).toHaveLength(2);
+  });
+
+  it('posts no gain/loss in the base currency', () => {
+    const entries = entriesOf(
+      buildRefund({
+        currencyCode: 'USD',
+        exchangeRate: 1,
+        creditNote: { ...buildRefund().creditNote, exchangeRate: 1 },
+      }),
+    );
+    expect(entries).toHaveLength(2);
+  });
+
+  it('leaves the cash basis set without A/R or gain/loss: income goes at the refund rate, as a payment', () => {
+    const entries = cashEntries(buildRefund({ amount: 100 }));
+    expect(netOf(entries, BANK)).toBe(-123);
+    expect(netOf(entries, 500)).toBe(123);
+    expect(entries.some((e) => [AR, GAIN_LOSS].includes(e.accountId))).toBe(
+      false,
+    );
+  });
+});

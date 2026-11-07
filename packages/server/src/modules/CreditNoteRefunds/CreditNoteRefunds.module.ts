@@ -13,6 +13,7 @@ import { RefundCreditNoteGLEntriesSubscriber } from '../CreditNotes/subscribers/
 import { LedgerModule } from '../Ledger/Ledger.module';
 import { AccountsModule } from '../Accounts/Accounts.module';
 import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLocking.module';
+import { TenancyModule } from '../Tenancy/Tenancy.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TransactionsLockingModule } from '../TransactionsLocking/TransactionsLo
     LedgerModule,
     AccountsModule,
     TransactionsLockingModule,
+    TenancyModule,
   ],
   providers: [
     CreateRefundCreditNoteService,
