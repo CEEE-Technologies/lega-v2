@@ -1025,5 +1025,34 @@ describe('Warehouses and smaller fixes (e2e)', () => {
         ),
       ).toEqual([]);
     });
+
+    it('a correct journal with a rounding remainder is not listed', async () => {
+      // Two 0.01 lines at 1.3 round to 0.01 each, while A/R rounds to 0.03:
+      // the ledger storage puts the remaining cent on an income line.
+      const eurCustomerId = await createCustomer(api, { currencyCode: 'EUR' });
+      const serviceId = await createItem(api, accounts, 'service');
+      const roundedId = ok(
+        await api()
+          .post('/credit-notes')
+          .send({
+            customerId: eurCustomerId,
+            creditNoteDate: '2026-06-02',
+            creditNoteNumber: `P4-CN-${faker.string.alphanumeric(8)}`,
+            exchangeRate: 1.3,
+            open: true,
+            entries: [
+              { index: 1, itemId: serviceId, quantity: 1, rate: 0.01 },
+              { index: 2, itemId: serviceId, quantity: 1, rate: 0.01 },
+            ],
+          }),
+      ).body.id;
+
+      const found = await scan();
+      expect(
+        found.filter(
+          (f) => f.referenceType === 'CreditNote' && f.referenceId === roundedId,
+        ),
+      ).toEqual([]);
+    });
   });
 });

@@ -11,7 +11,7 @@ import { AccountRepository } from '@/modules/Accounts/repositories/Account.repos
 import { AccountTransaction } from '@/modules/Accounts/models/AccountTransaction.model';
 import { LedgerStorageService } from '@/modules/Ledger/LedgerStorage.service';
 import { Ledger } from '@/modules/Ledger/Ledger';
-import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
+import { ILedger, ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { CreditNote } from '@/modules/CreditNotes/models/CreditNote';
 import { CreditNoteAccrualGL } from '@/modules/CreditNotes/commands/CreditNoteAccrualGL';
@@ -237,7 +237,12 @@ export class StaleJournalsRepairService {
     const found: Omit<IStaleJournal, 'locked'>[] = [];
 
     for (const creditNote of creditNotes) {
-      const ledger = await this.getCreditNoteLedger(creditNote, trx);
+      // Rounded and balanced as the ledger storage saves it, so a journal
+      // with a rounding remainder doesn't look stale forever.
+      const ledger = await this.ledgerStorage.normalize(
+        await this.getCreditNoteLedger(creditNote, trx),
+        trx,
+      );
       const stored = await this.creditNoteRows(creditNote.id, trx);
       const differences = this.compare(stored, ledger.getEntries());
 
@@ -303,7 +308,7 @@ export class StaleJournalsRepairService {
   }
 
   /** The accrual entries of a ledger (a payment ledger has both bases). */
-  private accrualEntries(ledger: Ledger): ILedgerEntry[] {
+  private accrualEntries(ledger: ILedger): ILedgerEntry[] {
     return ledger
       .getEntries()
       .filter(
@@ -327,12 +332,14 @@ export class StaleJournalsRepairService {
     const found: Omit<IStaleJournal, 'locked'>[] = [];
 
     for (const payment of payments) {
-      const ledger =
+      const ledger = await this.ledgerStorage.normalize(
         await this.paymentReceivedGLEntries.getPaymentReceiveGLedger(
           payment,
           baseCurrency,
           trx,
-        );
+        ),
+        trx,
+      );
       const stored = await this.accrualRows('PaymentReceive', payment.id, trx);
       const differences = this.compare(stored, this.accrualEntries(ledger));
 
@@ -365,9 +372,12 @@ export class StaleJournalsRepairService {
     const found: Omit<IStaleJournal, 'locked'>[] = [];
 
     for (const payment of payments) {
-      const ledger = await this.billPaymentGLEntries.getBillPaymentGLedger(
-        payment,
-        baseCurrency,
+      const ledger = await this.ledgerStorage.normalize(
+        await this.billPaymentGLEntries.getBillPaymentGLedger(
+          payment,
+          baseCurrency,
+          trx,
+        ),
         trx,
       );
       const stored = await this.accrualRows('BillPayment', payment.id, trx);
