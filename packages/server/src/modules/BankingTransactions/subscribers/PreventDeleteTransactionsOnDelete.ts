@@ -25,21 +25,24 @@ export class PreventDeleteTransactionOnDeleteSubscriber {
     oldCashflowTransaction,
     trx,
   }: ICommandCashflowDeletingPayload) {
-    if (oldCashflowTransaction.uncategorizedTransactionId) {
-      const foundTransactions = await this.uncategorizedBankTransactionModel()
-        .query(trx)
-        .where({
-          categorized: true,
-          categorizeRefId: oldCashflowTransaction.id,
-          categorizeRefType: 'CashflowTransaction',
-        });
-      // Throw the error if the cashflow transaction still linked to uncategorized transaction.
-      if (foundTransactions.length > 0) {
-        throw new ServiceError(
-          ERRORS.CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED,
-          'Cannot delete cashflow transaction converted from uncategorized transaction.',
-        );
-      }
+    // Categorizing links the bank line to the deposit by the deposit's own
+    // id (`categorizeRefType`/`categorizeRefId`); the deposit's
+    // `uncategorizedTransactionId` is never set, so it isn't checked here.
+    // Uncategorizing frees the line first, so its own delete passes.
+    const foundTransactions = await this.uncategorizedBankTransactionModel()
+      .query(trx)
+      .where({
+        categorized: true,
+        categorizeRefId: oldCashflowTransaction.id,
+        categorizeRefType: 'CashflowTransaction',
+      });
+    // Throw the error if the cashflow transaction still linked to uncategorized transaction.
+    if (foundTransactions.length > 0) {
+      throw new ServiceError(
+        ERRORS.CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED,
+        'This transaction was made from a bank line. Uncategorize the bank line instead.',
+        { uncategorizedTransactionIds: foundTransactions.map((t) => t.id) },
+      );
     }
   }
 }

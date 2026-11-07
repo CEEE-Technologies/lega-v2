@@ -42,11 +42,21 @@ describe('PreventDeleteTransactionOnDeleteSubscriber', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('skips the lookup for a transaction not made from a bank line', async () => {
-    const { subscriber, modelProxy } = setup([{ id: 1 }]);
-    await subscriber.preventDeleteCashflowTransactionHasUncategorizedTransaction(
-      payload(null),
-    );
-    expect(modelProxy).not.toHaveBeenCalled();
+  // B3: categorizing never sets the deposit's `uncategorizedTransactionId`,
+  // so the line is looked up by the deposit's own id.
+  it('looks the bank line up by the deposit id when uncategorizedTransactionId is empty', async () => {
+    const { subscriber, where } = setup([{ id: 1 }]);
+    await expect(
+      subscriber.preventDeleteCashflowTransactionHasUncategorizedTransaction(
+        payload(null),
+      ),
+    ).rejects.toMatchObject({
+      errorType: 'CANNOT_DELETE_TRANSACTION_CONVERTED_FROM_UNCATEGORIZED',
+    });
+    expect(where).toHaveBeenCalledWith({
+      categorized: true,
+      categorizeRefId: 9,
+      categorizeRefType: 'CashflowTransaction',
+    });
   });
 });
