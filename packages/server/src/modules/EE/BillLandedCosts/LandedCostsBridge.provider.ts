@@ -57,8 +57,14 @@ export class LandedCostsBridgeProvider
   }
 
   /**
-   * Validates the bill entries that have landed cost flag should be
-   * inventory items.
+   * Validates that the bill lines flagged as landed cost are service or
+   * non-inventory lines (decision D7, the rule the screens use).
+   *
+   * The landed cost line is posted to its cost account (freight, customs)
+   * by the bill; allocating it then moves it from that account into the
+   * stock of the target items, so it is counted in stock once. An
+   * inventory line would already be stock of its own item, so allocating
+   * it too would count the freight in stock twice.
    * @param {IBillLandedCostEntryDTO[]} entries - Bill entries.
    */
   public async validateBillEntries(
@@ -71,14 +77,15 @@ export class LandedCostsBridgeProvider
 
     const entriesItemsById = transformToMap(entriesItems, 'id');
 
-    const nonInventoryHasCost = entries.filter((entry) => {
+    const inventoryHasCost = entries.filter((entry) => {
       const item = entriesItemsById.get(entry.itemId);
 
-      return entry.landedCost && item.type !== 'inventory';
+      return entry.landedCost && item?.type === 'inventory';
     });
-    if (nonInventoryHasCost.length > 0) {
+    if (inventoryHasCost.length > 0) {
       throw new ServiceError(
-        ERRORS.LANDED_COST_ENTRIES_SHOULD_BE_INVENTORY_ITEMS,
+        ERRORS.LANDED_COST_ENTRIES_SHOULD_NOT_BE_INVENTORY_ITEMS,
+        'Landed cost can only be on service or non-inventory lines. An inventory line already adds its cost to stock.',
       );
     }
   }

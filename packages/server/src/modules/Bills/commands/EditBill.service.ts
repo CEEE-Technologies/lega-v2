@@ -121,6 +121,10 @@ export class EditBillService {
     await this.itemsEntriesService.validateNonPurchasableEntriesItems(
       billDTO.entries,
     );
+    // Landed cost only on service or non-inventory lines, as on create.
+    await this.validators.validateCostEntriesShouldBeInventoryItems(
+      billDTO.entries,
+    );
 
     // Transforms the bill DTO to model object.
     const billObj = await this.transformerDTO.billDTOToModel(

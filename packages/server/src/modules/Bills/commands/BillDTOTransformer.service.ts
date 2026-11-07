@@ -1,4 +1,4 @@
-import { sumMoneyBy } from '@bigcapital/utils';
+import { calcLineMoney, sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { omit } from 'lodash';
 import * as moment from 'moment';
@@ -38,6 +38,37 @@ export class BillDTOTransformer {
    */
   private getBillEntriesTotal(entries: ItemEntry[]): number {
     return sumMoneyBy(entries, (e) => this.itemEntryModel().calcAmount(e));
+  }
+
+  /**
+   * Retrieves the landed cost the bill can allocate: its landed cost lines
+   * after discount and without tax, which is what the bill posts to their
+   * cost accounts (and what allocating moves into stock).
+   * @param {ItemEntry[]} entries - With the tax rate associated.
+   * @param {boolean} isInclusiveTax
+   * @returns {number}
+   */
+  private getLandedCostAmount(
+    entries: Partial<ItemEntry>[],
+    isInclusiveTax?: boolean,
+  ): number {
+    return entries
+      .filter((entry) => entry.landedCost)
+      .reduce(
+        (total, entry) =>
+          sumMoney(
+            total,
+            calcLineMoney({
+              quantity: entry.quantity,
+              rate: entry.rate,
+              discount: entry.discount,
+              discountType: entry.discountType,
+              taxRate: entry.taxRate,
+              isInclusiveTax,
+            }).totalExcludingTax,
+          ),
+        0,
+      );
   }
 
   /**
@@ -88,7 +119,10 @@ export class BillDTOTransformer {
         'dueDate',
       ]),
       amount,
-      landedCostAmount: 0,
+      landedCostAmount: this.getLandedCostAmount(
+        entries,
+        billDTO.isInclusiveTax,
+      ),
       currencyCode: vendor.currencyCode,
       exchangeRate: billDTO.exchangeRate || 1,
       billNumber,
