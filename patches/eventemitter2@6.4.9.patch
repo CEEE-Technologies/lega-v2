@@ -1,0 +1,23 @@
+diff --git a/lib/eventemitter2.js b/lib/eventemitter2.js
+index 7c2e550d04c8eb5c08c5e46b3e437068fb184917..ff45ac992d356796fcdd9f582c7d3dc5aeb93ed5 100644
+--- a/lib/eventemitter2.js
++++ b/lib/eventemitter2.js
+@@ -1171,7 +1171,17 @@
+       }
+     }
+ 
+-    return Promise.all(promises);
++    // Lega patch: wait for every listener before passing on the first
++    // error. With Promise.all a failing listener rejected at once while
++    // the others kept writing to a transaction the caller was undoing.
++    return Promise.allSettled(promises).then(function (results) {
++      var values = new Array(results.length);
++      for (var k = 0; k < results.length; k++) {
++        if (results[k].status === 'rejected') throw results[k].reason;
++        values[k] = results[k].value;
++      }
++      return values;
++    });
+   };
+ 
+   EventEmitter.prototype.on = function(type, listener, options) {
