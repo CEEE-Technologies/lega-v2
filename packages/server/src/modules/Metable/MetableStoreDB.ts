@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { IMetadata, IMetableStoreStorage } from './types';
 import { MetableStore } from './MetableStore';
 import { MetableConfig } from './MetableConfig';
@@ -72,14 +73,16 @@ export class MetableDBStore
 
   /**
    * Saves the modified, deleted and insert metadata.
+   * @param {Knex.Transaction} trx - Saves inside this transaction when given,
+   *   so the settings are kept or undone together with the rest of a save.
    */
-  async save() {
+  async save(trx?: Knex.Transaction) {
     this.validateStoreIsLoaded();
 
     await Promise.all([
-      this.saveUpdated(this.metadata),
-      this.saveDeleted(this.metadata),
-      this.saveInserted(this.metadata),
+      this.saveUpdated(this.metadata, trx),
+      this.saveDeleted(this.metadata, trx),
+      this.saveInserted(this.metadata, trx),
     ]);
   }
 
@@ -88,7 +91,7 @@ export class MetableDBStore
    * @param {IMetadata[]} metadata -
    * @returns {Promise}
    */
-  saveUpdated(metadata: IMetadata[]) {
+  saveUpdated(metadata: IMetadata[], trx?: Knex.Transaction) {
     const updated = metadata.filter((m) => m._markAsUpdated === true);
     const opers = [];
 
@@ -97,6 +100,7 @@ export class MetableDBStore
         .update(
           { [this.VALUE_COLUMN]: meta.value },
           { ...this.extraQuery(meta) },
+          trx,
         )
         .then(() => {
           meta._markAsUpdated = false;
@@ -111,7 +115,7 @@ export class MetableDBStore
    * @param {IMetadata[]} metadata -
    * @returns {Promise}
    */
-  saveDeleted(metadata: IMetadata[]) {
+  saveDeleted(metadata: IMetadata[], trx?: Knex.Transaction) {
     const deleted = metadata.filter(
       (m: IMetadata) => m._markAsDeleted === true,
     );
@@ -120,9 +124,12 @@ export class MetableDBStore
     if (deleted.length > 0) {
       deleted.forEach((meta) => {
         const deleteOper = this.repository
-          .deleteBy({
-            ...this.extraQuery(meta),
-          })
+          .deleteBy(
+            {
+              ...this.extraQuery(meta),
+            },
+            trx,
+          )
           .then(() => {
             meta._markAsDeleted = false;
           });
@@ -137,7 +144,7 @@ export class MetableDBStore
    * @param {IMetadata[]} metadata -
    * @returns {Promise}
    */
-  saveInserted(metadata: IMetadata[]) {
+  saveInserted(metadata: IMetadata[], trx?: Knex.Transaction) {
     const inserted = metadata.filter(
       (m: IMetadata) => m._markAsInserted === true,
     );
@@ -149,7 +156,7 @@ export class MetableDBStore
         [this.VALUE_COLUMN]: meta.value,
         ...this.transfromMetaExtraColumns(meta),
       };
-      const insertOper = this.repository.create(insertData).then(() => {
+      const insertOper = this.repository.create(insertData, trx).then(() => {
         meta._markAsInserted = false;
       });
       opers.push(insertOper);

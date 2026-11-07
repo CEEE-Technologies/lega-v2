@@ -10,6 +10,7 @@ import {
   MatchedTransactionsPOJO,
 } from '../types';
 import { GetMatchedTransactionsByType } from './GetMatchedTransactionsByType';
+import { getMatchPaymentExchangeRate } from '../_utils';
 import { CreatePaymentReceivedService } from '@/modules/PaymentReceived/commands/CreatePaymentReceived.serivce';
 import { SaleInvoice } from '@/modules/SaleInvoices/models/SaleInvoice';
 import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectable.service';
@@ -98,6 +99,17 @@ export class GetMatchedTransactionsByInvoices extends GetMatchedTransactionsByTy
     matchTransactionDTO: IMatchTransactionDTO,
     trx?: Knex.Transaction,
   ) {
+    const invoice = await this.saleInvoiceModel()
+      .query(trx)
+      .findById(matchTransactionDTO.referenceId)
+      .throwIfNotFound();
+
+    // A foreign-currency invoice is paid at the rate given with the match.
+    const exchangeRate = getMatchPaymentExchangeRate(
+      invoice.currencyCode,
+      await this.getBaseCurrency(),
+      matchTransactionDTO.exchangeRate,
+    );
     await super.createMatchedTransaction(
       uncategorizedTransactionIds,
       matchTransactionDTO,
@@ -110,15 +122,12 @@ export class GetMatchedTransactionsByInvoices extends GetMatchedTransactionsByTy
         .findById(uncategorizedTransactionId)
         .throwIfNotFound();
 
-    const invoice = await SaleInvoice.query(trx)
-      .findById(matchTransactionDTO.referenceId)
-      .throwIfNotFound();
-
     const createPaymentReceivedDTO: IPaymentReceivedCreateDTO = {
       customerId: invoice.customerId,
       paymentDate: uncategorizedTransaction.date,
       amount: invoice.dueAmount,
       depositAccountId: uncategorizedTransaction.accountId,
+      exchangeRate,
       entries: [
         {
           index: 1,

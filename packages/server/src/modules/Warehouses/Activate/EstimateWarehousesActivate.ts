@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { SaleEstimate } from '@/modules/SaleEstimates/models/SaleEstimate';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
@@ -17,19 +18,21 @@ export class EstimatesActivateWarehouses {
   /**
    * Updates all inventory transactions with the primary warehouse.
    * @param {Warehouse} primaryWarehouse
+   * @param   {Knex.Transaction} trx - The activation transaction.
    * @returns {Promise<void>}
    */
   public updateEstimatesWithWarehouse = async (
     primaryWarehouse: Warehouse,
+    trx?: Knex.Transaction,
   ): Promise<void> => {
     // Updates the sale estimates with primary warehouse.
     await this.saleEstimateModel()
-      .query()
+      .query(trx)
       .update({ warehouseId: primaryWarehouse.id });
 
     // Update the sale estimates entries with primary warehouse.
     await this.itemEntryModel()
-      .query()
+      .query(trx)
       .where('referenceType', 'SaleEstimate')
       .update({
         warehouseId: primaryWarehouse.id,

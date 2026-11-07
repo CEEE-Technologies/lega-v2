@@ -32,4 +32,10 @@ export const handleDeleteErrors = (errors: RoleError[]) => {
       intent: Intent.DANGER,
     });
   }
+  if (errors.find((error) => error.type === 'ADMIN_ONLY')) {
+    AppToaster.show({
+      message: intl.get('roles.error.admin_only'),
+      intent: Intent.DANGER,
+    });
+  }
 };

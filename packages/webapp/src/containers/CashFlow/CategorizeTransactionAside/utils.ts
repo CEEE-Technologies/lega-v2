@@ -17,8 +17,16 @@ export const transformToReq = (
     .filter(([key, value]) => value)
     .map(([key]) => {
       const [referenceType, referenceId] = key.split('-');
+      const exchangeRate = parseFloat(
+        String(values.exchangeRates?.[key] ?? ''),
+      );
 
-      return { referenceType, referenceId: parseInt(referenceId, 10) };
+      return {
+        referenceType,
+        referenceId: parseInt(referenceId, 10),
+        // Only foreign invoices and bills have a rate field.
+        ...(exchangeRate > 0 ? { exchangeRate } : {}),
+      };
     });
   return { matchedTransactions, uncategorizedTransactions };
 };

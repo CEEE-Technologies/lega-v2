@@ -2,7 +2,8 @@ import request = require('supertest');
 import * as fs from 'fs';
 import * as path from 'path';
 import { faker } from '@faker-js/faker';
-import { Knex } from 'knex';
+import { knex as knexFactory, Knex } from 'knex';
+import { knexSnakeCaseMappers } from 'objection';
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SystemKnexConnection } from '../../src/modules/System/SystemDB/SystemDB.constants';
@@ -20,6 +21,8 @@ export interface Company {
   owner: Session;
   organizationId: string;
   tenantId: number;
+  /** The id of the job that built the organization. */
+  buildJobId?: string;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -134,7 +137,7 @@ export const createCompany = async (
       .where({ organizationId })
       .first();
     if (job.body.is_completed && tenant?.initializedAt && tenant?.seededAt) {
-      return { owner, organizationId, tenantId: tenant.id };
+      return { owner, organizationId, tenantId: tenant.id, buildJobId: jobId };
     }
     await sleep(500);
   }
@@ -229,3 +232,24 @@ export const ADMIN_ROLE_ID = 1;
 
 /** The error type of a ServiceError response. */
 export const errorType = (res: request.Response) => res.body?.errors?.[0]?.type;
+
+/**
+ * Opens a small connection to the company's own database. Close it with
+ * `destroy()` when the test file is done.
+ */
+export const tenantKnex = (app: INestApplication, company: Company): Knex => {
+  const config = app.get(ConfigService).get('tenantDatabase');
+  return knexFactory({
+    client: config.client,
+    connection: {
+      host: config.host,
+      port: Number(config.port),
+      user: config.user,
+      password: config.password,
+      database: `${config.dbNamePrefix}${company.organizationId}`,
+      charset: 'utf8',
+    },
+    pool: { min: 0, max: 1 },
+    ...knexSnakeCaseMappers({ upperCase: true }),
+  });
+};

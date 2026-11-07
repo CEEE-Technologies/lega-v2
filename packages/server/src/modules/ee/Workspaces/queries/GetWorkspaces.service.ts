@@ -10,6 +10,14 @@ import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectab
 import { S3_CLIENT } from '@/modules/S3/S3.module';
 import { WorkspacesFinancialsService } from './WorkspacesFinancials.service';
 import { OrgFinancialTotalsMap } from '@/modules/Analytics/Analytics.constants';
+import { ClsService } from 'nestjs-cls';
+import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { TenantUser } from '@/modules/Tenancy/TenancyModels/models/TenantUser.model';
+import { TenantModel } from '@/modules/System/models/TenantModel';
+import { getAbilityForRole } from '@/modules/Roles/TenantAbilities';
+import { ReportsAction } from '@/modules/FinancialStatements/types/Report.types';
+import { AbilitySubject } from '@/modules/Roles/Roles.types';
+import { WorkspaceUserStatusService } from './WorkspaceUserStatus.service';
 
 @Injectable()
 export class GetWorkspacesService {
@@ -28,6 +36,12 @@ export class GetWorkspacesService {
     private readonly configService: ConfigService,
 
     private readonly workspacesFinancials: WorkspacesFinancialsService,
+
+    @Inject(TenantUser.name)
+    private readonly tenantUserModel: TenantModelProxy<typeof TenantUser>,
+
+    private readonly cls: ClsService,
+    private readonly workspaceUserStatus: WorkspaceUserStatusService,
   ) {}
 
   /**
@@ -84,10 +98,19 @@ export class GetWorkspacesService {
 
     await Promise.all(logoPromises);
 
-    // Compute the financial totals (assets/liabilities) of the ready organizations.
-    const financialTotals = await this.getFinancialTotals(memberships);
+    // Compute the financial totals (assets/liabilities) of the ready
+    // organizations where the user may see them.
+    const financialTotals = await this.getFinancialTotals(userId, memberships);
+
+    // The organizations where the user is deactivated (shown greyed out).
+    const inactiveOrganizationIds =
+      await this.workspaceUserStatus.getInactiveOrganizationIds(
+        userId,
+        memberships,
+      );
 
     return this.transformer.transform(memberships, new WorkspaceTransformer(), {
+      inactiveOrganizationIds,
       defaultTenantId,
       includeInactive,
       currentOrganizationId,
@@ -102,23 +125,66 @@ export class GetWorkspacesService {
    * @returns {Promise<OrgFinancialTotalsMap>}
    */
   private async getFinancialTotals(
+    userId: number,
     memberships: UserTenant[],
   ): Promise<OrgFinancialTotalsMap> {
-    const organizationIds = memberships
-      .map((membership) => membership.tenant)
-      .filter(
-        (tenant) =>
-          tenant &&
-          tenant.isReady &&
-          !tenant.isBuildRunning &&
-          !tenant.isDeleting &&
-          tenant.isActive,
-      )
-      .map((tenant) => tenant.organizationId);
+    const organizationIds: string[] = [];
+
+    for (const membership of memberships) {
+      const tenant = membership.tenant;
+      const isReady =
+        tenant &&
+        tenant.isReady &&
+        !tenant.isBuildRunning &&
+        !tenant.isDeleting &&
+        tenant.isActive;
+
+      if (isReady && (await this.canSeeTotals(userId, membership))) {
+        organizationIds.push(tenant.organizationId);
+      }
+    }
 
     if (organizationIds.length === 0) {
       return new Map();
     }
     return this.workspacesFinancials.getTotals(organizationIds);
+  }
+
+  /**
+   * Whether the user may see the organization's totals: the owner, or a user
+   * who is active there and may read the balance sheet. The totals are the
+   * balance sheet's, so nobody else sees them.
+   * @param {number} userId - System user id.
+   * @param {UserTenant} membership
+   * @returns {Promise<boolean>}
+   */
+  private async canSeeTotals(
+    userId: number,
+    membership: UserTenant,
+  ): Promise<boolean> {
+    if (membership.role === 'owner') return true;
+
+    const tenant = membership.tenant as TenantModel;
+    const previousOrganizationId = this.cls.get('organizationId');
+    this.cls.set('organizationId', tenant.organizationId);
+    try {
+      const tenantUser = await this.tenantUserModel()
+        .query()
+        .findOne({ systemUserId: userId })
+        .withGraphFetched('role.permissions');
+
+      if (!tenantUser?.role) return false;
+      if (tenantUser.active != null && !tenantUser.active) return false;
+
+      return getAbilityForRole(tenantUser.role).can(
+        ReportsAction.READ_BALANCE_SHEET,
+        AbilitySubject.Report,
+      );
+    } catch {
+      return false;
+    } finally {
+      // The rest of the request reads the current organization from here.
+      this.cls.set('organizationId', previousOrganizationId);
+    }
   }
 }

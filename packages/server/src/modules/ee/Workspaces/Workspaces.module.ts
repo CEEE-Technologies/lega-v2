@@ -25,6 +25,7 @@ import { SocketModule } from '@/modules/Socket/Socket.module';
 import { S3Module } from '@/modules/S3/S3.module';
 import { WorkspaceDeletedSubscriber } from './subscribers/WorkspaceDeleted.subscriber';
 import { WorkspacesFinancialsService } from './queries/WorkspacesFinancials.service';
+import { WorkspaceUserStatusService } from './queries/WorkspaceUserStatus.service';
 import { AnalyticsCoreModule } from '@/modules/Analytics/AnalyticsCore.module';
 
 @Module({
@@ -53,6 +54,7 @@ import { AnalyticsCoreModule } from '@/modules/Analytics/AnalyticsCore.module';
     GetWorkspacesService,
     GetWorkspaceBuildJobService,
     WorkspacesFinancialsService,
+    WorkspaceUserStatusService,
     CreateUserTenantOnSignupSubscriber,
     WorkspaceCreatedSubscriber,
     WorkspaceDeletedSubscriber,

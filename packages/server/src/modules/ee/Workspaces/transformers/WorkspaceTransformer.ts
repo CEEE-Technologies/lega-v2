@@ -21,6 +21,7 @@ export class WorkspaceTransformer extends Transformer<UserTenant> {
       'buildJobId',
       'metadata',
       'isDefault',
+      'isUserInactive',
       'totalIncome',
       'totalExpenses',
       'totalAssets',
@@ -120,6 +121,18 @@ export class WorkspaceTransformer extends Transformer<UserTenant> {
   };
 
   /**
+   * Whether the user is deactivated in this organization: opening it is
+   * refused, so the switcher shows it greyed out.
+   */
+  protected isUserInactive = (membership: UserTenant): boolean => {
+    const organizationId = membership.tenant?.organizationId;
+    const inactive = this.options?.inactiveOrganizationIds as
+      | Set<string>
+      | undefined;
+    return !!organizationId && !!inactive?.has(organizationId);
+  };
+
+  /**
    * Get total income from financial data.
    */
   protected totalIncome = (): undefined => {
@@ -182,6 +195,7 @@ export class WorkspaceTransformer extends Transformer<UserTenant> {
       buildJobId: this.buildJobId(membership),
       role: membership.role,
       isDefault: this.isDefault(membership),
+      isUserInactive: this.isUserInactive(membership),
       metadata: this.metadata(membership),
       totalIncome: this.totalIncome(),
       totalExpenses: this.totalExpenses(),

@@ -8723,6 +8723,8 @@ export interface components {
              * @example ac_xxx
              */
             code: string;
+            /** @description The state of the Stripe connect link, returned by Stripe unchanged */
+            state?: string;
         };
         CreateStripeAccountResponseDto: {
             /**
@@ -16976,6 +16978,8 @@ export interface components {
             buildJobId?: string;
             role: string;
             isDefault?: boolean;
+            /** @description Whether the user is deactivated in this organization (it cannot be opened). */
+            isUserInactive?: boolean;
             metadata?: components["schemas"]["WorkspaceMetadataDto"];
             totalIncome?: number;
             totalExpenses?: number;

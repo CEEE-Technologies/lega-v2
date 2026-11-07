@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ItemEntry } from '@/modules/TransactionItemEntry/models/ItemEntry';
 import { CreditNote } from '@/modules/CreditNotes/models/CreditNote';
@@ -17,18 +18,20 @@ export class CreditNotesActivateWarehouses {
   /**
    * Updates all credit note transactions with the primary warehouse.
    * @param   {Warehouse} primaryWarehouse
+   * @param   {Knex.Transaction} trx - The activation transaction.
    * @returns {Promise<void>}
    */
   public updateCreditsWithWarehouse = async (
     primaryWarehouse: Warehouse,
+    trx?: Knex.Transaction,
   ): Promise<void> => {
     // Updates the sale estimates with primary warehouse.
-    await this.creditNoteModel().query().update({
+    await this.creditNoteModel().query(trx).update({
       warehouseId: primaryWarehouse.id,
     });
     // Update the sale estimates entries with primary warehouse.
     await this.itemEntryModel()
-      .query()
+      .query(trx)
       .where('referenceType', 'CreditNote')
       .update({
         warehouseId: primaryWarehouse.id,

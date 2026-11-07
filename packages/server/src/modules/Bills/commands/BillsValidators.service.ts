@@ -117,6 +117,18 @@ export class BillsValidators {
   }
 
   /**
+   * Validates no landed cost was allocated from the given bill.
+   * @param {number} billId - Bill id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  public async validateBillNotLandedCostSource(
+    billId: number,
+    trx?: Knex.Transaction,
+  ) {
+    await this.landedCostsBridge.validateBillNotLandedCostSource(billId, trx);
+  }
+
+  /**
    * Validate transaction entries that have landed cost type should not be
    * inventory items.
    * @param {IItemEntryDTO[]} newEntriesDTO -

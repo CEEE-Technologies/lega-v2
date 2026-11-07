@@ -13,6 +13,8 @@ import { RolePermissionsSchema } from './queries/RolePermissionsSchema';
 import { AuthorizationGuard } from './Authorization.guard';
 import { PermissionGuard } from './Permission.guard';
 import { PurgeTenantAbilitiesSubscriber } from './subscribers/PurgeTenantAbilities.subscriber';
+import { AdminAccessService } from './AdminAccess.service';
+import { TenancyModule } from '../Tenancy/Tenancy.module';
 
 const models = [
   RegisterTenancyModel(Role),
@@ -20,7 +22,7 @@ const models = [
 ];
 
 @Module({
-  imports: [...models],
+  imports: [TenancyModule, ...models],
   providers: [
     CreateRoleService,
     EditRoleService,
@@ -32,8 +34,9 @@ const models = [
     AuthorizationGuard,
     PermissionGuard,
     PurgeTenantAbilitiesSubscriber,
+    AdminAccessService,
   ],
   controllers: [RolesController],
-  exports: [...models, AuthorizationGuard, PermissionGuard],
+  exports: [...models, AuthorizationGuard, PermissionGuard, AdminAccessService],
 })
 export class RolesModule {}
