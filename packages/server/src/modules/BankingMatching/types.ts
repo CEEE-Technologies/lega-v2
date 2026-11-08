@@ -43,6 +43,8 @@ export interface GetMatchedTransactionsFilter {
   minAmount: number;
   maxAmount: number;
   transactionType: string;
+  /** The bank account of the bank lines being matched. */
+  accountId?: number;
 }
 
 export interface MatchedTransactionPOJO {

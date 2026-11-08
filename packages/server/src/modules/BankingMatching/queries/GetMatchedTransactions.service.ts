@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import * as moment from 'moment';
 import { first, sumBy } from 'lodash';
 import { PromisePool } from '@supercharge/promise-pool';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   GetMatchedTransactionsFilter,
   MatchedTransactionsPOJO,
@@ -18,6 +18,8 @@ import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 
 @Injectable()
 export class GetMatchedTransactions {
+  private readonly logger = new Logger(GetMatchedTransactions.name);
+
   constructor(
     private readonly getMatchedInvoicesService: GetMatchedTransactionsByInvoices,
     private readonly getMatchedBillsService: GetMatchedTransactionsByBills,
@@ -69,8 +71,21 @@ export class GetMatchedTransactions {
     const matchedTransactions = await PromisePool.withConcurrency(2)
       .for(filtered)
       .process(async ({ type: _type, service }) => {
-        return service.getMatchedTransactions(filter);
+        // The matchers that read lines of the bank account (manual
+        // journals) need to know which account it is.
+        return service.getMatchedTransactions({
+          ...filter,
+          accountId: first(uncategorizedTransactions)?.accountId,
+        });
       });
+    // A matcher that fails is left out of the list; log it, so a broken
+    // matcher doesn't just quietly offer nothing.
+    matchedTransactions.errors?.forEach((error) =>
+      this.logger.error(
+        `A ${error.item?.type} matcher failed: ${error.raw?.message ?? error.message}`,
+        error.raw?.stack,
+      ),
+    );
     const { perfectMatches, possibleMatches } = this.groupMatchedResults(
       uncategorizedTransactions,
       matchedTransactions,

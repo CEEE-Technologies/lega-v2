@@ -86,6 +86,8 @@ export class MatchBankTransactions {
       const foundMatchedTransaction =
         await getMatchedTransactionsService.getMatchedTransaction(
           matchedTransaction.referenceId,
+          // A manual journal is matched by its lines on this bank account.
+          { accountId: uncategorizedTransactions[0]?.accountId },
         );
       if (!foundMatchedTransaction) {
         throw new ServiceError(ERRORS.RESOURCE_ID_MATCHING_TRANSACTION_INVALID);

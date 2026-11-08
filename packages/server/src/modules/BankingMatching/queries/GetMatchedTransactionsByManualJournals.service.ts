@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { sumMoneyBy, toMoneyNumber } from '@bigcapital/utils';
 import { GetMatchedTransactionManualJournalsTransformer } from './GetMatchedTransactionManualJournalsTransformer';
 import { GetMatchedTransactionsByType } from './GetMatchedTransactionsByType';
 import { GetMatchedTransactionsFilter } from '../types';
@@ -18,61 +19,89 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
   }
 
   /**
-   * Retrieve the matched transactions of manual journals.
+   * Retrieves the published, unmatched manual journals with a line on the
+   * bank account. A journal's amount is what it moves on that account
+   * (debit - credit of those lines: a debit is money in), so the min/max
+   * filters apply to that amount, not to the journal total.
    * @param {GetMatchedTransactionsFilter} filter
-   * @returns
    */
   async getMatchedTransactions(
     filter: Omit<GetMatchedTransactionsFilter, 'transactionType'>,
   ) {
-    // @todo: get the account id from the filter
-    const accountId = 1000;
+    const accountId = filter.accountId;
+    if (!accountId) return [];
 
-    const manualJournals = await this.manualJournalModel()
+    // Not a joined graph: `withGraphJoined` inside `onBuild` failed every
+    // time ("table metadata has not been fetched"), and the error was
+    // dropped with the other matchers' results, so no journal was offered.
+    const query = this.manualJournalModel()
       .query()
-      .onBuild((query) => {
-        query.withGraphJoined('matchedBankTransaction');
-        query.whereNull('matchedBankTransaction.id');
-
-        query.withGraphJoined('entries');
-        query.where('entries.accountId', accountId);
-        query.modify('filterByPublished');
-
-        if (filter.fromDate) {
-          query.where('date', '>=', filter.fromDate);
-        }
-        if (filter.toDate) {
-          query.where('date', '<=', filter.toDate);
-        }
-        if (filter.minAmount) {
-          query.where('amount', '>=', filter.minAmount);
-        }
-        if (filter.maxAmount) {
-          query.where('amount', '<=', filter.maxAmount);
-        }
+      .modify('filterByPublished')
+      .whereNotExists(ManualJournal.relatedQuery('matchedBankTransaction'))
+      .whereExists(
+        ManualJournal.relatedQuery('entries').where('accountId', accountId),
+      )
+      // Only the lines on the bank account: they make the amount.
+      .withGraphFetched('entries')
+      .modifyGraph('entries', (builder) => {
+        builder.where('accountId', accountId);
       });
+    if (filter.fromDate) {
+      query.where('date', '>=', filter.fromDate);
+    }
+    if (filter.toDate) {
+      query.where('date', '<=', filter.toDate);
+    }
+    const manualJournals = await query;
+    const inRange = manualJournals.filter((manualJournal) => {
+      const amount = Math.abs(bankAccountNet(manualJournal));
+      if (amount === 0) return false;
+      if (filter.minAmount && amount < filter.minAmount) return false;
+      if (filter.maxAmount && amount > filter.maxAmount) return false;
+      return true;
+    });
     return this.transformer.transform(
-      manualJournals,
+      inRange,
       new GetMatchedTransactionManualJournalsTransformer(),
     );
   }
 
   /**
-   * Retrieves the matched transaction of manual journals.
-   * @param {number} tenantId
+   * Retrieves the manual journal to match, with its lines on the bank
+   * account (its amount). Not found when it has no line on that account.
    * @param {number} transactionId
-   * @returns
+   * @param {{ accountId?: number }} context - The bank line's account.
    */
-  public async getMatchedTransaction(transactionId: number) {
+  public async getMatchedTransaction(
+    transactionId: number,
+    context?: { accountId?: number },
+  ) {
+    const accountId = context?.accountId;
     const manualJournal = await this.manualJournalModel()
       .query()
       .findById(transactionId)
+      .modify('filterByPublished')
       .whereNotExists(ManualJournal.relatedQuery('matchedBankTransaction'))
+      .withGraphFetched('entries')
+      .modifyGraph('entries', (builder) => {
+        builder.where('accountId', accountId ?? null);
+      })
       .throwIfNotFound();
 
+    if (!accountId || bankAccountNet(manualJournal) === 0) {
+      return null;
+    }
     return this.transformer.transform(
       manualJournal,
       new GetMatchedTransactionManualJournalsTransformer(),
     );
   }
 }
+
+/** Debit - credit of the journal's loaded lines, rounded to the cent. */
+const bankAccountNet = (manualJournal: ManualJournal): number =>
+  sumMoneyBy(
+    (manualJournal as any).entries ?? [],
+    (entry: any) =>
+      toMoneyNumber(entry.debit || 0) - toMoneyNumber(entry.credit || 0),
+  );
