@@ -45,11 +45,6 @@
   "engines": {
     "node": "16.x || 17.x || 18.x"
   },
-  "husky": {
-    "hooks": {
-      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
-    }
-  },
   "dependencies": {
     "tsup": "^8.3.0"
   },
