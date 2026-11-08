@@ -4,7 +4,7 @@ import { AuditLog } from '../models/AuditLog.model';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { GetAuditLogsQueryDto } from '../dtos/GetAuditLogsQuery.dto';
 import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectable.service';
-import { GetAuditLogListTransformer } from '@/modules/AuditLogs/queries/GetAuditLogList.transformer';
+import { GetAuditLogListTransformer } from './GetAuditLogList.transformer';
 
 export interface AuditLogListItem {
   id: number;

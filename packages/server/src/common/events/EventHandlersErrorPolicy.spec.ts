@@ -20,9 +20,7 @@ import * as ts from 'typescript';
 /** Files whose handlers receive `trx` but may still ignore errors. */
 const REVIEWED_SIDE_EFFECTS_WITH_TRX: Record<string, string> = {
   'modules/EE/AuditLogs/subscribers/FinancialAuditLog.subscriber.ts':
-    'audit log row; a failed audit write must not undo the save',
-  'modules/AuditLogs/subscribers/FinancialAuditLog.subscriber.ts':
-    'old copy of the audit log subscriber (module not loaded)',
+    'audit row written after commit; trx is only used to wait for the commit',
   'modules/PaymentReceived/subscribers/PaymentReceivedSmsNotificationSubscriber.ts':
     'SMS sent after commit; trx is only used to wait for the commit',
   'modules/SaleEstimates/subscribers/SaleEstimateSmsNotificationSubscriber.ts':
@@ -136,8 +134,8 @@ describe('event handler error policy', () => {
   const handlers = collectHandlers();
 
   it('finds the handlers (scanner sanity check)', () => {
-    // There are about 640 handlers; a much lower number means the scan broke.
-    expect(handlers.length).toBeGreaterThan(600);
+    // There are about 560 handlers; a much lower number means the scan broke.
+    expect(handlers.length).toBeGreaterThan(500);
   });
 
   it('never mixes error options on one handler', () => {
