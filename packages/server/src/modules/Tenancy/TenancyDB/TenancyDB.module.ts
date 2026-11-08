@@ -1,5 +1,4 @@
 import knex from 'knex';
-import * as LRUCache from 'lru-cache';
 import { Global, Module } from '@nestjs/common';
 import { knexSnakeCaseMappers } from 'objection';
 import { ClsModule, ClsService } from 'nestjs-cls';
@@ -7,8 +6,9 @@ import { ConfigService } from '@nestjs/config';
 import { DATE_ONLY_COLUMNS_OPTIONS } from '@/common/constants/database.constants';
 import { TENANCY_DB_CONNECTION } from './TenancyDB.constants';
 import { UnitOfWork } from './UnitOfWork.service';
+import { KnexPoolCache } from './KnexPoolCache';
 
-const lruCache = new LRUCache();
+const tenantPools = new KnexPoolCache();
 
 export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
   provide: TENANCY_DB_CONNECTION,
@@ -18,7 +18,7 @@ export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
   useFactory: async (configService: ConfigService, cls: ClsService) => () => {
     const organizationId = cls.get('organizationId');
     const database = `bigcapital_tenant_${organizationId}`;
-    const cachedInstance = lruCache.get(database);
+    const cachedInstance = tenantPools.get(database);
 
     if (cachedInstance) {
       return cachedInstance;
@@ -44,7 +44,7 @@ export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
       pool: { min: 0, max: 7 },
       ...knexSnakeCaseMappers({ upperCase: true }),
     });
-    lruCache.set(database, knexInstance);
+    tenantPools.set(database, knexInstance);
 
     return knexInstance;
   },

@@ -3,7 +3,8 @@ import * as moment from 'moment';
 import { faker } from '@faker-js/faker';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { app, orgainzationId } from './init-app-test';
+import { app, orgainzationId, useCompany } from './init-app-test';
+import { createCompany } from './_utils/security';
 import {
   authHeaders,
   createCustomer,
@@ -170,6 +171,7 @@ let customerId: number;
 // Multi-warehouses are on for the whole suite (the transfers need them).
 let mainId: number;
 let branchId: number;
+let bankAccountId: number;
 
 const billBody = (entries: any[], extra: any = {}) => ({
   vendorId,
@@ -205,6 +207,17 @@ const createInvoice = async (entries: any[], extra: any = {}) => {
   return { id: res.body.id as number, body };
 };
 
+// Its own company: it turns multi-warehouse on, which would break the files
+// that run after it in the shared test company (WAREHOUSE_ID_NOT_FOUND).
+beforeAll(async () => {
+  const company = await createCompany(app, 'invcos');
+  useCompany(
+    company.organizationId,
+    company.owner.token,
+    company.owner.systemUserId,
+  );
+}, 300000);
+
 describe('Inventory quantities and cost of sales (e2e)', () => {
   beforeAll(async () => {
     vendorId = await createVendor('USD');
@@ -226,6 +239,12 @@ describe('Inventory quantities and cost of sales (e2e)', () => {
         }).expect(201)
       ).body;
     branchId = other.id;
+    bankAccountId = (
+      await getTenantKnex()('accounts')
+        .where('accountType', 'bank')
+        .orderBy('id')
+        .first('id')
+    ).id;
   });
 
   afterAll(async () => {
@@ -729,7 +748,7 @@ describe('Inventory quantities and cost of sales (e2e)', () => {
       const pay = (amount: number, date: string) =>
         post('/bill-payments', {
           vendorId,
-          paymentAccountId: 1000,
+          paymentAccountId: bankAccountId,
           paymentDate: date,
           paymentNumber: `P-${faker.string.alphanumeric(10)}`,
           entries: [{ billId: freight.id, paymentAmount: amount }],

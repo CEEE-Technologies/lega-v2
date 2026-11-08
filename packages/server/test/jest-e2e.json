@@ -14,5 +14,6 @@
     "^@bigcapital/utils$": "<rootDir>/../../../shared/bigcapital-utils/src/index.ts"
   },
   "maxWorkers": 1,
-  "maxConcurrency": 1
+  "maxConcurrency": 1,
+  "workerIdleMemoryLimit": "2GB"
 }

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import knex, { Knex } from 'knex';
-import * as LRUCache from 'lru-cache';
 import { knexSnakeCaseMappers } from 'objection';
 import { DATE_ONLY_COLUMNS_OPTIONS } from '@/common/constants/database.constants';
+import { KnexPoolCache } from '@/modules/Tenancy/TenancyDB/KnexPoolCache';
 
 /**
  * Resolves raw knex connections to the tenant databases by organization id.
@@ -12,7 +12,7 @@ import { DATE_ONLY_COLUMNS_OPTIONS } from '@/common/constants/database.constants
  */
 @Injectable()
 export class TenantConnectionFactory {
-  private readonly lruCache = new LRUCache<string, Knex>();
+  private readonly lruCache = new KnexPoolCache();
 
   constructor(private readonly configService: ConfigService) {}
 

@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
+import { DatabasePoolsShutdown } from '../Tenancy/TenancyDB/DatabasePoolsShutdown';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE, APP_FILTER } from '@nestjs/core';
@@ -314,6 +315,8 @@ import { AppThrottleModule } from './AppThrottle.module';
       useClass: DuplicateDocumentNumberFilter,
     },
     AppService,
+    // Last on shutdown (the root module's hooks run last): see the class.
+    DatabasePoolsShutdown,
   ],
 })
 export class AppModule {
