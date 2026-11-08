@@ -67,6 +67,9 @@ export function closeStepHooks(trx, keep: boolean) {
   hooks.forEach((callback) => runAfterTransaction(trx, callback));
 }
 
+/** The after-commit work that has not finished yet. */
+const pendingAfterCommitWork = new Set<Promise<unknown>>();
+
 /**
  * Run a callback when the transaction is done.
  * @param {import('objection').TransactionOrKnex | undefined} trx
@@ -79,7 +82,7 @@ export function runAfterTransaction(trx, callback) {
     steps[steps.length - 1].push(callback);
     return;
   }
-  waitForTransaction(trx).then(
+  const work = waitForTransaction(trx).then(
     () => {
       // If transaction success, then run action
       // Log instead of re-throwing: an error thrown from a timer is an
@@ -97,4 +100,32 @@ export function runAfterTransaction(trx, callback) {
       // The transaction was rolled back: skip the hook.
     },
   );
+  pendingAfterCommitWork.add(work);
+  work.finally(() => pendingAfterCommitWork.delete(work));
+}
+
+/**
+ * Waits until the after-commit work queued so far (and any it queues in
+ * turn) has finished. A process that exits right after a save, such as a
+ * CLI repair command, calls this before closing the app: otherwise the
+ * work (adding the cost recompute job, the analytics delta, the audit row)
+ * is cut off, although the save itself committed. Gives up after
+ * `timeoutMs`, so a transaction left open can't hang a shutdown.
+ */
+export async function settleAfterCommitWork(
+  timeoutMs: number = 30_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (pendingAfterCommitWork.size > 0 && Date.now() < deadline) {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, deadline - Date.now());
+    });
+    // A transaction still open at the deadline doesn't hold up shutdown.
+    await Promise.race([
+      Promise.allSettled([...pendingAfterCommitWork]),
+      timeout,
+    ]);
+    clearTimeout(timer);
+  }
 }

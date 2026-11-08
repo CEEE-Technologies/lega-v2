@@ -1,7 +1,13 @@
-import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
+import {
+  BeforeApplicationShutdown,
+  Inject,
+  Injectable,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { Knex } from 'knex';
 import { SystemKnexConnection } from '@/modules/System/SystemDB/SystemDB.constants';
 import { KnexPoolCache } from './KnexPoolCache';
+import { settleAfterCommitWork } from './TransactionsHooks';
 
 /**
  * Closes the database pools when the app shuts down: the system database
@@ -14,11 +20,21 @@ import { KnexPoolCache } from './KnexPoolCache';
  * their running jobs (which still need the database) before this runs.
  */
 @Injectable()
-export class DatabasePoolsShutdown implements OnApplicationShutdown {
+export class DatabasePoolsShutdown
+  implements BeforeApplicationShutdown, OnApplicationShutdown
+{
   constructor(
     @Inject(SystemKnexConnection)
     private readonly systemKnex: Knex,
   ) {}
+
+  /**
+   * Lets the after-commit work of the last saves finish while the queues
+   * and the database are still open (they close in the next phase).
+   */
+  async beforeApplicationShutdown(): Promise<void> {
+    await settleAfterCommitWork();
+  }
 
   async onApplicationShutdown(): Promise<void> {
     await KnexPoolCache.closeAllCaches();
