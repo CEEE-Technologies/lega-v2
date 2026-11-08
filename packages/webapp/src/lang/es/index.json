@@ -1541,6 +1541,7 @@
   "roles.error.role_is_predefined": "El rol está predefinido, no puedes eliminar roles predefinidos.",
   "roles.error.you_cannot_change_your_own_role": "No puedes cambiar tu propio rol.",
   "roles.error.admin_only": "Solo un administrador puede hacer esto.",
+  "roles.error.permissions_not_held": "Solo puedes otorgar permisos que tú mismo tienes.",
   "roles.permission_schema.success_message": "El rol se ha creado con éxito.",
   "roles.permission_schema.upload_message": "El rol dado se ha actualizado con éxito.",
   "roles.permission_schema.delete.alert_message": "El rol dado se ha eliminado con éxito.",

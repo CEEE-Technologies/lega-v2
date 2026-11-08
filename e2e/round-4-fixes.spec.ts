@@ -347,6 +347,7 @@ test.describe('F12: right-click row menus', () => {
 test.describe('F6: the users list explains an admin-only refusal', () => {
   let owner: OnboardedSession;
   let manny: AuthSession;
+  const wideRoleName = `F7 Wide ${faker.string.alphanumeric(5)}`;
   const anaEmail = `f6-ana-${faker.string.alphanumeric(8).toLowerCase()}@example.com`;
 
   /** Reads the newest invite token (the invite email isn't sent locally). */
@@ -401,7 +402,11 @@ test.describe('F6: the users list explains an admin-only refusal', () => {
     const managerRole = await api(owner, 'POST', '/roles', {
       roleName: `F6 Manager ${faker.string.alphanumeric(5)}`,
       roleDescription: 'Can manage users',
-      permissions: [{ subject: 'User', ability: 'Manage', value: true }],
+      // Viewing roles too: the invite dialog lists the roles with it.
+      permissions: [
+        { subject: 'User', ability: 'Manage', value: true },
+        { subject: 'Role', ability: 'View', value: true },
+      ],
     });
     await inviteAndAccept(anaEmail, 'Secur1ty-Test-Pass', adminRole.id);
     const mannyCredentials = {
@@ -416,6 +421,50 @@ test.describe('F6: the users list explains an admin-only refusal', () => {
       (managerRole.data ?? managerRole).id,
     );
     manny = await signInUser(API_BASE, mannyCredentials);
+    await api(owner, 'POST', '/roles', {
+      roleName: wideRoleName,
+      roleDescription: 'More than a user manager has',
+      permissions: [
+        { subject: 'User', ability: 'Manage', value: true },
+        { subject: 'Bill', ability: 'Delete', value: true },
+      ],
+    });
+  });
+
+  test('F7: inviting with a role wider than your own shows "You can only give permissions you have yourself."', async ({
+    page,
+  }) => {
+    await signInPage(page, manny, '/preferences/users');
+    await page.getByRole('button', { name: 'Invite User' }).click();
+    const dialog = page.locator('.bp4-dialog');
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await dialog
+      .locator('input[name="email"]')
+      .fill(`f7-${faker.string.alphanumeric(8).toLowerCase()}@example.com`);
+    // The role select opens on Enter (as the other list tests do it).
+    const select = dialog
+      .locator('.bp4-form-group')
+      .filter({ hasText: 'Role name' })
+      .locator('button, [tabindex="0"]')
+      .first();
+    let picked = false;
+    for (let attempt = 0; attempt < 8 && !picked; attempt++) {
+      await select.focus();
+      await page.keyboard.press('Enter');
+      picked = await page.evaluate((roleName) => {
+        const item = Array.from(
+          document.querySelectorAll('[role="menuitem"]'),
+        ).find((el) => (el as HTMLElement).innerText.trim() === roleName);
+        (item as HTMLElement | undefined)?.click();
+        return !!item;
+      }, wideRoleName);
+    }
+    expect(picked).toBe(true);
+    await expect(dialog).toContainText(wideRoleName);
+    await dialog.getByRole('button', { name: 'Invite' }).click();
+    await expect(
+      dialog.getByText('You can only give permissions you have yourself.'),
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('deactivating an admin shows "Only an admin can do this."', async ({

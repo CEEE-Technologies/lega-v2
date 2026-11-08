@@ -1612,6 +1612,7 @@
   "roles.error.role_is_predefined": "Role is predefined, you cannot delete predefined roles.",
   "roles.error.you_cannot_change_your_own_role": "You cannot change your own role.",
   "roles.error.admin_only": "Only an admin can do this.",
+  "roles.error.permissions_not_held": "You can only give permissions you have yourself.",
   "roles.permission_schema.success_message": "The role has been created successfully.",
   "roles.permission_schema.upload_message": "The given role has been updated successfully.",
   "roles.permission_schema.delete.alert_message": "The given role has been deleted successfully.",
