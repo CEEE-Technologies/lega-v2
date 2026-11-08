@@ -47,6 +47,18 @@ export class EditRoleService {
     ) {
       await this.adminAccess.throwUnlessAdmin();
     }
+    // A non-admin may only add permissions they hold themselves. The ones
+    // the role already has can stay, so the role can still be edited.
+    const current = new Set(
+      (await this.adminAccess.getRolePermissions(roleId)).map(
+        (p) => `${p.subject}:${p.ability}`,
+      ),
+    );
+    await this.adminAccess.throwUnlessHoldsPermissions(
+      editRoleDTO.permissions.filter(
+        (p) => !current.has(`${p.subject}:${p.ability}`),
+      ),
+    );
     // Transform permissions: map permissionId to id for Objection.js upsertGraph
     const permissions = editRoleDTO.permissions.map((perm) => ({
       id: perm.permissionId,

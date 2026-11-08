@@ -8,6 +8,7 @@ import { events } from '@/common/events/events';
 import { CreateRoleDto } from '../dtos/Role.dto';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { validateInvalidPermissions } from '../utils';
+import { AdminAccessService } from '../AdminAccess.service';
 
 @Injectable()
 export class CreateRoleService {
@@ -17,6 +18,8 @@ export class CreateRoleService {
 
     @Inject(Role.name)
     private readonly roleModel: TenantModelProxy<typeof Role>,
+
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -27,6 +30,11 @@ export class CreateRoleService {
   public async createRole(createRoleDTO: CreateRoleDto) {
     // Validates the invalid permissions.
     validateInvalidPermissions(createRoleDTO.permissions);
+
+    // A non-admin may only give the permissions they hold themselves.
+    await this.adminAccess.throwUnlessHoldsPermissions(
+      createRoleDTO.permissions,
+    );
 
     // Transformes the permissions DTO.
     const permissions = createRoleDTO.permissions;

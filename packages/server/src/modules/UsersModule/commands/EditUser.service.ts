@@ -128,20 +128,20 @@ export class EditUserService {
   }
 
   /**
-   * Throws unless the signed-in user is an admin, when the role change gives
-   * or takes away the Admin role.
+   * Throws unless the signed-in user may make the role change: taking away
+   * or giving the Admin role needs an admin; giving another role needs its
+   * permissions (a non-admin can't give more than they hold).
    * @param {number} oldRoleId - The user's role now.
    * @param {number} newRoleId - The role asked for.
    */
   async validateAdminRoleChange(oldRoleId: number, newRoleId: number) {
     if (oldRoleId === newRoleId) return;
 
-    if (
-      (await this.adminAccess.isAdminRole(newRoleId)) ||
-      (await this.adminAccess.isAdminRole(oldRoleId))
-    ) {
+    if (await this.adminAccess.isAdminRole(oldRoleId)) {
       await this.adminAccess.throwUnlessAdmin();
     }
+    // The Admin role needs an admin; any other role needs its permissions.
+    await this.adminAccess.throwUnlessMayGiveRole(newRoleId);
   }
 
   /**

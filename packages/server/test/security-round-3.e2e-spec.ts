@@ -578,9 +578,11 @@ describe('Security round 3 (e2e)', () => {
     });
 
     it('a user manager can still invite someone with another role', async () => {
+      // Within what Manny holds himself (round 4, F7: a non-admin can't
+      // give a role with permissions they don't have).
       const res = await inA(manny)
         .patch('/invite')
-        .send({ email: uniqueEmail('viewer'), roleId: balanceSheetRoleId });
+        .send({ email: uniqueEmail('viewer'), roleId: managerRoleId });
       expect(res.status).toBe(200);
     });
 
