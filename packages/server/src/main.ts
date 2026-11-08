@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ClsMiddleware } from 'nestjs-cls';
@@ -33,6 +34,13 @@ async function bootstrap() {
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('swagger', app, documentFactory);
+
+  // Every PDF (and the PDF attached to emails) is made by Gotenberg.
+  if (!process.env.GOTENBERG_URL) {
+    new Logger('Gotenberg').warn(
+      'GOTENBERG_URL is not set: PDF downloads and PDF email attachments will fail.',
+    );
+  }
 
   // SERVER_PORT is shared with the webapp dev server and the browser tests;
   // PORT still works on its own.
