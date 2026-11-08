@@ -18,7 +18,7 @@ interface TenantsRepairStockQuantitiesOptions {
     'Lists the items (and, with multi-warehouse on, item and warehouse pairs) whose stored stock on hand ' +
     'differs from what their stock movements add up to (health check H3 (b)). Dry run by default: nothing ' +
     'is changed. --apply (with --organization, after a database backup) sets each stored quantity from the ' +
-    'movements, in one transaction.',
+    'movements, in one transaction. Run it when nobody is saving stock documents.',
 })
 export class TenantsRepairStockQuantitiesCommand extends BaseCommand {
   constructor(configService: ConfigService) {

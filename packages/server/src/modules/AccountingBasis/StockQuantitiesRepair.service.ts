@@ -44,7 +44,10 @@ export class StockQuantitiesRepairService {
    * The stored quantities are locked first and the movements summed after
    * that (READ COMMITTED): a document saved meanwhile either committed
    * before the lock (its movements are counted) or waits for the lock and
-   * then adds its own change on top of the repaired figure.
+   * then adds its own change on top of the repaired figure. A save that
+   * already holds one item's row and then needs another the repair holds
+   * is a deadlock: the database undoes one of the two (no wrong figure is
+   * written), so run this when nobody is saving stock documents.
    */
   public repair(): Promise<IStockQuantitiesScan> {
     return this.uow.withTransaction(async (trx) => {
