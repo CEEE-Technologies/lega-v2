@@ -28,6 +28,9 @@ const PACKAGES = [
   },
 ];
 
+/** Files per prettier / git call. */
+const BATCH = 100;
+
 const gitList = (args) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8' })
     .split('\0')
@@ -49,13 +52,27 @@ for (const { dir, matches } of PACKAGES) {
   skipped.push(...files.filter((file) => unstaged.has(file)));
   if (whole.length === 0) continue;
 
-  const prettier = path.join(root, dir, 'node_modules', '.bin', 'prettier');
-  execFileSync(
-    prettier,
-    ['--write', ...whole.map((file) => path.relative(dir, file))],
-    { cwd: path.join(root, dir), stdio: 'inherit' },
+  // Runs the package's own prettier through node (no shell, no .bin shim,
+  // so it works on Windows too), in batches so a large commit stays under
+  // the command-line length limit.
+  const pkgDir = path.join(root, dir);
+  const prettierPkg = require.resolve('prettier/package.json', {
+    paths: [pkgDir],
+  });
+  const { bin } = require(prettierPkg);
+  const prettierBin = path.join(
+    path.dirname(prettierPkg),
+    typeof bin === 'string' ? bin : bin.prettier,
   );
-  execFileSync('git', ['add', '--', ...whole], { cwd: root });
+  for (let i = 0; i < whole.length; i += BATCH) {
+    const batch = whole.slice(i, i + BATCH);
+    execFileSync(
+      process.execPath,
+      [prettierBin, '--write', ...batch.map((file) => path.relative(dir, file))],
+      { cwd: pkgDir, stdio: 'inherit' },
+    );
+    execFileSync('git', ['add', '--', ...batch], { cwd: root });
+  }
 }
 
 if (skipped.length > 0) {
