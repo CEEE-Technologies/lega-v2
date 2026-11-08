@@ -3,45 +3,36 @@ import { KnexPoolCache } from './KnexPoolCache';
 describe('KnexPoolCache', () => {
   const pool = () => ({ destroy: jest.fn(() => Promise.resolve()) }) as any;
 
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  it('keeps every pool until closed (no limit: a long job may hold one)', () => {
+    const cache = new KnexPoolCache();
+    const pools = Array.from({ length: 150 }, () => pool());
+    pools.forEach((p, i) => cache.set(`db_${i}`, p));
 
-  it('closes a pool pushed out by the size limit, after the delay', () => {
-    const cache = new KnexPoolCache(2, 1000);
-    const a = pool();
-    cache.set('db_a', a);
-    cache.set('db_b', pool());
-    cache.set('db_c', pool());
-
-    expect(cache.get('db_a')).toBeUndefined();
-    expect(cache.size).toBe(2);
-    expect(a.destroy).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(1000);
-    expect(a.destroy).toHaveBeenCalledTimes(1);
+    expect(cache.size).toBe(150);
+    expect(cache.get('db_0')).toBe(pools[0]);
+    pools.forEach((p) => expect(p.destroy).not.toHaveBeenCalled());
   });
 
-  it('keeps the recently used pools', () => {
-    const cache = new KnexPoolCache(2, 1000);
-    const a = pool();
-    const b = pool();
-    cache.set('db_a', a);
-    cache.set('db_b', b);
-    cache.get('db_a');
-    cache.set('db_c', pool());
-
-    expect(cache.get('db_a')).toBe(a);
-    expect(cache.get('db_b')).toBeUndefined();
-  });
-
-  it('closeAll closes every pool at once and empties the cache', async () => {
-    const cache = new KnexPoolCache(10, 1000);
+  it('closeAll closes every pool and empties the cache', async () => {
+    const cache = new KnexPoolCache();
     const pools = [pool(), pool(), pool()];
     pools.forEach((p, i) => cache.set(`db_${i}`, p));
 
     await cache.closeAll();
     pools.forEach((p) => expect(p.destroy).toHaveBeenCalledTimes(1));
     expect(cache.size).toBe(0);
-    jest.advanceTimersByTime(10_000);
-    pools.forEach((p) => expect(p.destroy).toHaveBeenCalledTimes(1));
+  });
+
+  it('closeAllCaches closes the pools of every cache', async () => {
+    const a = new KnexPoolCache();
+    const b = new KnexPoolCache();
+    const pa = pool();
+    const pb = pool();
+    a.set('db_a', pa);
+    b.set('db_b', pb);
+
+    await KnexPoolCache.closeAllCaches();
+    expect(pa.destroy).toHaveBeenCalledTimes(1);
+    expect(pb.destroy).toHaveBeenCalledTimes(1);
   });
 });

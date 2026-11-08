@@ -37,6 +37,10 @@ export class DatabasePoolsShutdown
   }
 
   async onApplicationShutdown(): Promise<void> {
+    // The queue workers closed just before (their modules' hooks run before
+    // the root's) and waited for their running jobs: let the after-commit
+    // work of those jobs' last saves finish too.
+    await settleAfterCommitWork();
     await KnexPoolCache.closeAllCaches();
     await this.systemKnex.destroy().catch(() => undefined);
   }

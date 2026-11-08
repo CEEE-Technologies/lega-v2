@@ -1,22 +1,15 @@
 import { Knex } from 'knex';
-import * as LRUCache from 'lru-cache';
-
-/** How many company databases keep an open pool (TENANT_DB_POOLS_MAX). */
-export const DEFAULT_MAX_POOLS = 100;
 
 /**
- * A pool pushed out of the cache is closed this long after, not at once: a
- * request that already holds it (an open transaction) can still finish.
- */
-export const CLOSE_EVICTED_POOL_AFTER_MS = 5 * 60 * 1000;
-
-/**
- * The connection pools of the company databases, one per database. The
- * cache has a size limit, so pools of companies not used for a while are
- * closed instead of piling up, and every pool is closed when the app shuts
- * down (DatabasePoolsShutdown). Without it, every company used since the
- * start kept its pool, and closing the app (the e2e tests, the CLI) left
- * them all open.
+ * The connection pools of the company databases, one per database, kept
+ * for the life of the app and closed when it shuts down
+ * (DatabasePoolsShutdown). Closing the app (the e2e tests, the CLI) used to
+ * leave every pool open.
+ *
+ * There is no size limit on purpose: the pools keep no idle connections
+ * (min 0), so an unused pool costs no database connection, while closing a
+ * pool that a long job still holds (a cash basis rebuild keeps one for its
+ * whole run) would fail that job.
  */
 export class KnexPoolCache {
   /** Every cache, so shutdown can close them all (see DatabasePoolsShutdown). */
@@ -27,48 +20,28 @@ export class KnexPoolCache {
     await Promise.all([...KnexPoolCache.caches].map((c) => c.closeAll()));
   }
 
-  private readonly cache: LRUCache<string, Knex>;
-  private closing = false;
+  private readonly pools = new Map<string, Knex>();
 
-  constructor(
-    max: number = Number(process.env.TENANT_DB_POOLS_MAX) || DEFAULT_MAX_POOLS,
-    private readonly closeEvictedAfterMs: number = CLOSE_EVICTED_POOL_AFTER_MS,
-  ) {
-    this.cache = new LRUCache<string, Knex>({
-      max,
-      dispose: (_database, instance) => {
-        if (this.closing) return;
-        const timer = setTimeout(() => {
-          instance.destroy().catch(() => undefined);
-        }, this.closeEvictedAfterMs);
-        // A pending close doesn't keep the process alive.
-        timer.unref?.();
-      },
-    });
+  constructor() {
     KnexPoolCache.caches.add(this);
   }
 
   get(database: string): Knex | undefined {
-    return this.cache.get(database);
+    return this.pools.get(database);
   }
 
   set(database: string, instance: Knex): void {
-    this.cache.set(database, instance);
+    this.pools.set(database, instance);
   }
 
   get size(): number {
-    return this.cache.length;
+    return this.pools.size;
   }
 
-  /** Closes every pool now (on shutdown). */
+  /** Closes every pool now (on shutdown) and empties the cache. */
   async closeAll(): Promise<void> {
-    const instances = this.cache.values();
-    this.closing = true;
-    try {
-      this.cache.reset();
-    } finally {
-      this.closing = false;
-    }
+    const instances = [...this.pools.values()];
+    this.pools.clear();
     await Promise.all(
       instances.map((instance) => instance.destroy().catch(() => undefined)),
     );
