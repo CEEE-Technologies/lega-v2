@@ -25,6 +25,9 @@ export class GetRecognizedTransactionService {
       await this.uncategorizedBankTransactionModel()
         .query()
         .findById(uncategorizedTransactionId)
+        // Only a bank line a rule recognized has a recognized transaction;
+        // any other line is not found (it used to crash the transformer).
+        .whereNotNull('recognizedTransactionId')
         .withGraphFetched('matchedBankTransactions')
         .withGraphFetched('recognizedTransaction.assignAccount')
         .withGraphFetched('recognizedTransaction.bankRule')
