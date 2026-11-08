@@ -63,6 +63,13 @@ module.exports = [
           message:
             'Math.round(x * 1000) is ad-hoc money rounding. Use roundMoney / toCents / moneyEq from @bigcapital/utils.',
         },
+        {
+          // The build rewrites `@/` only in static imports: in dist,
+          // `import('@/...')` stays `require('@/...')` and fails to load.
+          selector: 'ImportExpression[source.value=/^@\\u002F/]',
+          message:
+            "Dynamic import('@/...') isn't rewritten by the build and fails in dist. Use a relative path.",
+        },
       ],
       '@typescript-eslint/no-unused-vars': [
         'error',
