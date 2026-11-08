@@ -176,7 +176,16 @@ export async function filterInvoicesByNumber(
   invoiceNumber: string,
 ): Promise<Locator> {
   await page.getByRole('button', { name: /filter|filters applied/i }).click();
+  // Wait for the filtered list itself: a new filter swaps the table for its
+  // loading view and back, so a row clicked before then (for example its
+  // right-click menu, already open) is replaced.
+  const filtered = waitForListResponse(
+    page,
+    '/api/sale-invoices',
+    invoiceNumber,
+  );
   await page.getByPlaceholder('Value').first().fill(invoiceNumber);
+  await filtered;
 
   const row = page
     .getByTestId('invoice-row')
@@ -208,4 +217,24 @@ export async function deleteInvoiceViaRow(page: Page, row: Locator) {
   await expect(
     page.getByText('The invoice has been deleted successfully.'),
   ).toBeVisible({ timeout: 15_000 });
+}
+
+/**
+ * Waits for the list request carrying the filter value (the filter sends it
+ * as a URL-encoded JSON query parameter).
+ */
+export function waitForListResponse(
+  page: Page,
+  path: string,
+  filterValue: string,
+) {
+  return page.waitForResponse(
+    (response) =>
+      response.url().includes(path) &&
+      decodeURIComponent(response.url().replace(/\+/g, ' ')).includes(
+        filterValue,
+      ) &&
+      response.ok(),
+    { timeout: 30_000 },
+  );
 }

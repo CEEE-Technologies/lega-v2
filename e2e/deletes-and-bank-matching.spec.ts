@@ -1,4 +1,5 @@
 import path from 'path';
+import { waitForListResponse } from './_invoices';
 import { test, expect, type Page } from '@playwright/test';
 import { faker } from '@faker-js/faker';
 import { readApiAuth, type ApiAuth } from './_api';
@@ -365,7 +366,10 @@ test.describe('Delete refusals show a clear message', () => {
     await page.goto('/expenses');
     await waitForExpensesPage(page);
     await page.getByRole('button', { name: /filter|filters applied/i }).click();
+    // Wait for the filtered list (a new filter replaces the rows).
+    const filtered = waitForListResponse(page, '/api/expenses', referenceNo);
     await page.getByPlaceholder('Value').first().fill(referenceNo);
+    await filtered;
     const row = page.getByTestId('expense-row').first();
     await expect(row).toBeVisible({ timeout: 30_000 });
     await page.keyboard.press('Escape');
