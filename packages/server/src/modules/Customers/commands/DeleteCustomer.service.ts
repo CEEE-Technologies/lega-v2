@@ -10,6 +10,8 @@ import { Customer } from '../models/Customer';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ERRORS } from '../constants';
+import { getContactTransactionKinds } from '@/modules/Contacts/ContactTransactions';
+import { ServiceError } from '@/modules/Items/ServiceError';
 
 @Injectable()
 export class DeleteCustomer {
@@ -38,6 +40,21 @@ export class DeleteCustomer {
     // Retrieve the customer or throw not found service error.
     const query = this.customerModel().query(trx);
     const oldCustomer = await query.findById(customerId).throwIfNotFound();
+
+    // A customer with any transaction can't be deleted: say so, instead of
+    // the database refusing the delete (a raw 500).
+    const transactions = await getContactTransactionKinds(
+      trx ?? this.customerModel().knex(),
+      'customer',
+      customerId,
+    );
+    if (transactions.length > 0) {
+      throw new ServiceError(
+        ERRORS.CUSTOMER_HAS_TRANSACTIONS,
+        'Customer has associated transactions',
+        { transactions },
+      );
+    }
 
     // Triggers `onCustomerDeleting` event.
     await this.eventPublisher.emitAsync(events.customers.onDeleting, {
