@@ -589,7 +589,7 @@ const movementTotals = (knex: Knex, groupBy: string[]) =>
  * on (the per-warehouse figures are only kept then). The old code undid a
  * re-saved document's movements once per line, so its stock grew.
  */
-const getStockTotalDifferences = async (knex: Knex) => {
+export const getStockTotalDifferences = async (knex: Knex) => {
   const differences: IDataHealthStockTotal[] = [];
 
   const items: any[] = await knex
