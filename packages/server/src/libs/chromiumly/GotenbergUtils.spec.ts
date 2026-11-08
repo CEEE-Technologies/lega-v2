@@ -8,6 +8,10 @@ import { GotenbergUtils, PDF_RENDER_FAILED } from './GotenbergUtils';
  * "nothing" (which crashed the caller) and never an error page passed on
  * as the PDF.
  */
+// Real HTTP round trips to a local server: allow for a busy machine (the
+// default 5 s timed out once with the whole suite running in parallel).
+jest.setTimeout(30_000);
+
 describe('GotenbergUtils.fetch', () => {
   let server: http.Server;
   let base: string;
