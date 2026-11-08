@@ -90,4 +90,19 @@ export class AdminAccessService {
       throw new ServiceError(ERRORS.ADMIN_ONLY, ADMIN_ONLY_MESSAGE);
     }
   }
+
+  /**
+   * Throws unless the signed-in user is the owner or an admin, when the
+   * target user has the Admin role: only they may deactivate, reactivate or
+   * remove an admin (the same rule as giving the role).
+   * @param {{ roleId?: number | null }} targetUser
+   * @throws {ServiceError}
+   */
+  async throwUnlessAdminForAdminUser(targetUser: {
+    roleId?: number | null;
+  }): Promise<void> {
+    if (await this.isAdminRole(targetUser.roleId)) {
+      await this.throwUnlessAdmin();
+    }
+  }
 }

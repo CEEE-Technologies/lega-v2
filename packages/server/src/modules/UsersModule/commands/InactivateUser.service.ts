@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { AdminAccessService } from '@/modules/Roles/AdminAccess.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModelObject } from 'objection';
 import { ServiceError } from '@/modules/Items/ServiceError';
@@ -19,6 +20,7 @@ export class InactivateUserService {
     private readonly eventEmitter: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
     private readonly tenantUserOwner: TenantUserOwnerService,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -45,6 +47,9 @@ export class InactivateUserService {
 
     // Nobody can deactivate the owner.
     await this.tenantUserOwner.throwIfOwner(tenantUser);
+
+    // Only the owner and admins can deactivate an admin.
+    await this.adminAccess.throwUnlessAdminForAdminUser(tenantUser);
 
     // Throw serivce error if the user is already inactivated.
     this.throwErrorIfUserInactive(tenantUser);
