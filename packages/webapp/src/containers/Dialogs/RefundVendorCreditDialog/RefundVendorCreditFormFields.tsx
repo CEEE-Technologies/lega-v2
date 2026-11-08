@@ -128,8 +128,8 @@ function RefundVendorCreditFormFieldsInner(): React.ReactElement {
         {/*------------ exchange rate ----------- */}
         <ExchangeRateMutedField
           name={'exchangeRate'}
-          fromCurrency={baseCurrency}
-          toCurrency={values.currencyCode}
+          fromCurrency={values.currencyCode}
+          toCurrency={baseCurrency}
           formGroupProps={{ label: '', inline: false }}
           date={values.date}
           exchangeRate={values.exchangeRate}
