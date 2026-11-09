@@ -536,3 +536,77 @@ test.describe('F21: the opening-balance dialog keeps its date', () => {
     expect(String(saved)).toContain('2026-01-15');
   });
 });
+
+/**
+ * Sweep S1: a manual journal line's contact is a real form field. The cell
+ * wrote `contact_id` (not a form field), so a picked contact was dropped on
+ * save and a saved one showed blank when editing.
+ */
+test.describe('S1: manual journal line contacts', () => {
+  let owner: OnboardedSession;
+  const name = `S1 customer ${faker.string.alphanumeric(6)}`;
+  let journalId: number;
+
+  test.beforeAll(async () => {
+    test.setTimeout(120_000);
+    owner = await createOnboardedUser(API_BASE);
+    const customer = await api(owner, 'POST', '/customers', {
+      displayName: name,
+      customerType: 'business',
+      currencyCode: 'AED',
+    });
+    const accountsRes = await api(owner, 'GET', '/accounts');
+    const accounts: any[] = Array.isArray(accountsRes)
+      ? accountsRes
+      : (accountsRes.accounts ?? accountsRes.data);
+    const byType = (type: string) =>
+      accounts.find((a) => (a.accountType ?? a.account_type) === type).id;
+    journalId = (
+      await api(owner, 'POST', '/manual-journals', {
+        date: '2026-06-01',
+        journalNumber: `S1-${faker.string.alphanumeric(6)}`,
+        journalType: 'Journal',
+        publish: true,
+        entries: [
+          {
+            index: 1,
+            accountId: byType('accounts-receivable'),
+            contactId: customer.id,
+            debit: 40,
+            credit: 0,
+          },
+          { index: 2, accountId: byType('income'), debit: 0, credit: 40 },
+        ],
+      })
+    ).id;
+  });
+
+  test('editing a journal shows the line contact, and saving keeps it', async ({
+    page,
+  }) => {
+    await signInPage(page, owner, `/manual-journals/${journalId}/edit`);
+    // The contact suggest field shows the contact's name in its input.
+    await page.waitForFunction(
+      (contactName) =>
+        Array.from(document.querySelectorAll('input')).some(
+          (input) => (input as HTMLInputElement).value === contactName,
+        ),
+      name,
+      { timeout: 30_000 },
+    );
+    const saved = page.waitForResponse(
+      (res) =>
+        res.url().includes(`/api/manual-journals/${journalId}`) &&
+        res.request().method() === 'PUT',
+      { timeout: 30_000 },
+    );
+    await page.getByRole('button', { name: /^Save/ }).first().click();
+    const res = await saved;
+    expect(res.status(), await res.text()).toBe(200);
+
+    const journal = await api(owner, 'GET', `/manual-journals/${journalId}`);
+    const entries = (journal.data ?? journal).entries;
+    const receivable = entries.find((e: any) => Number(e.debit) === 40);
+    expect(receivable.contactId ?? receivable.contact_id).toBeTruthy();
+  });
+});

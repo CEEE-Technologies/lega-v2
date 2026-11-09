@@ -16,9 +16,10 @@ export default function BranchesListFieldCell({
 }) {
   const handleBranchSelected = React.useCallback(
     (branch) => {
-      updateData(index, 'branch_id', branch.id);
+      // The column's own field (`branchId`), as for contacts.
+      updateData(index, id, branch.id);
     },
-    [updateData, index],
+    [updateData, index, id],
   );
 
   const error = errors?.[index]?.[id];
@@ -35,7 +36,7 @@ export default function BranchesListFieldCell({
       <BranchSuggestField
         branches={branches}
         onBranchSelected={handleBranchSelected}
-        selectedBranchId={original?.branch_id}
+        selectedBranchId={original?.[id]}
       />
     </FormGroup>
   );
