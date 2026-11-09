@@ -63,3 +63,12 @@ export const getContactTransactionKinds = async (
   }
   return kinds;
 };
+
+/**
+ * The message for a contact that has transactions, naming their kinds
+ * (e.g. "Vendor has transactions: bills, vendor credits.").
+ * @param {string} label - "Customer" or "Vendor".
+ * @param {string[]} kinds - From `getContactTransactionKinds`.
+ */
+export const contactHasTransactionsMessage = (label: string, kinds: string[]) =>
+  `${label} has transactions: ${kinds.map((kind) => kind.replace(/_/g, ' ')).join(', ')}.`;

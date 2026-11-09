@@ -7,7 +7,10 @@ import type { WithWarehouseTransfersActionsProps } from '@/containers/WarehouseT
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withWarehouseTransfersActions } from '@/containers/WarehouseTransfers/WarehouseTransfersLanding/withWarehouseTransfersActions';
 import { useBulkDeleteWarehouseTransfers } from '@/hooks/query';
 
@@ -95,6 +98,10 @@ function WarehouseTransferBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_warehouse_transfer_singular')}
         resourcePluralLabel={intl.get('resource_warehouse_transfer_plural')}
       />

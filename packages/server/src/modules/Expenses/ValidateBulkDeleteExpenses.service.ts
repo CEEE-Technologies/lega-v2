@@ -7,6 +7,10 @@ import {
   TransactionAbortedError,
   withSavepoint,
 } from '@/modules/Tenancy/TenancyDB/DryRun';
+import {
+  NonDeletableReason,
+  toNonDeletableReason,
+} from '@/common/utils/non-deletable-reason';
 
 @Injectable()
 export class ValidateBulkDeleteExpensesService {
@@ -21,12 +25,14 @@ export class ValidateBulkDeleteExpensesService {
     nonDeletableCount: number;
     deletableIds: number[];
     nonDeletableIds: number[];
+    nonDeletableReasons?: NonDeletableReason[];
   }> {
     // Every delete runs in a transaction that is always rolled back, so
     // nothing is kept and no after-save work runs.
     return runDryRun(this.tenantKnex(), async (trx) => {
       const deletableIds: number[] = [];
       const nonDeletableIds: number[] = [];
+      const nonDeletableReasons: NonDeletableReason[] = [];
 
       for (const expenseId of expenseIds) {
         try {
@@ -38,6 +44,7 @@ export class ValidateBulkDeleteExpensesService {
         } catch (error) {
           if (error instanceof TransactionAbortedError) throw error;
           nonDeletableIds.push(expenseId);
+          nonDeletableReasons.push(toNonDeletableReason(expenseId, error));
         }
       }
 
@@ -46,6 +53,7 @@ export class ValidateBulkDeleteExpensesService {
         nonDeletableCount: nonDeletableIds.length,
         deletableIds,
         nonDeletableIds,
+        nonDeletableReasons,
       };
     });
   }

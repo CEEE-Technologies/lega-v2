@@ -9,7 +9,10 @@ import withDialogRedux from '@/components/DialogReduxConnect';
 import { handleDeleteErrors } from '@/containers/Accounts/utils';
 import { withAccountsTableActions } from '@/containers/Accounts/withAccountsTableActions';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { useBulkDeleteAccounts } from '@/hooks/query/accounts';
 
 interface AccountBulkDeleteDialogPayload {
@@ -88,6 +91,10 @@ function AccountBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_account_singular')}
         resourcePluralLabel={intl.get('resource_account_plural')}
       />

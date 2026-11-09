@@ -175,6 +175,12 @@ describe('F8: deleting a contact with transactions (e2e)', () => {
       ).body;
       expect(check.nonDeletableIds ?? check.non_deletable_ids).toEqual([busy]);
       expect(check.deletableIds ?? check.deletable_ids).toEqual([free]);
+      // F29: and says why.
+      const reasons = check.nonDeletableReasons ?? check.non_deletable_reasons;
+      expect(reasons).toEqual([
+        expect.objectContaining({ id: busy, type: 'VENDOR_HAS_TRANSACTIONS' }),
+      ]);
+      expect(reasons[0].message).toMatch(/vendor credit/i);
       expect(await exists(busy)).toBe(true);
       expect(await exists(free)).toBe(true);
     });

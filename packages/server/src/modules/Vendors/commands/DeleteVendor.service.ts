@@ -10,7 +10,10 @@ import {
 } from '../types/Vendors.types';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ERRORS } from '../constants';
-import { getContactTransactionKinds } from '@/modules/Contacts/ContactTransactions';
+import {
+  getContactTransactionKinds,
+  contactHasTransactionsMessage,
+} from '@/modules/Contacts/ContactTransactions';
 import { ServiceError } from '@/modules/Items/ServiceError';
 
 @Injectable()
@@ -46,7 +49,7 @@ export class DeleteVendorService {
     if (transactions.length > 0) {
       throw new ServiceError(
         ERRORS.VENDOR_HAS_TRANSACTIONS,
-        'Vendor has associated transactions',
+        contactHasTransactionsMessage('Vendor', transactions),
         { transactions },
       );
     }

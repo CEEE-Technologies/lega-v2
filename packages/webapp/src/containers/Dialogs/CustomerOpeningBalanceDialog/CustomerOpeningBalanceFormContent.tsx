@@ -1,8 +1,8 @@
 import { Form } from 'formik';
-import { useCustomerOpeningBalanceContext } from './CustomerOpeningBalanceFormProvider';
-import { DocumentExchangeRateSync, hasOpeningBalance } from '@/components';
 import { CustomerOpeningBalanceFields } from './CustomerOpeningBalanceFields';
 import { CustomerOpeningBalanceFormFloatingActions } from './CustomerOpeningBalanceFormFloatingActions';
+import { useCustomerOpeningBalanceContext } from './CustomerOpeningBalanceFormProvider';
+import { DocumentExchangeRateSync, hasOpeningBalance } from '@/components';
 
 /**
  * Customer Opening balance form content.

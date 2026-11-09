@@ -10,7 +10,10 @@ import { Customer } from '../models/Customer';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ERRORS } from '../constants';
-import { getContactTransactionKinds } from '@/modules/Contacts/ContactTransactions';
+import {
+  getContactTransactionKinds,
+  contactHasTransactionsMessage,
+} from '@/modules/Contacts/ContactTransactions';
 import { ServiceError } from '@/modules/Items/ServiceError';
 
 @Injectable()
@@ -51,7 +54,7 @@ export class DeleteCustomer {
     if (transactions.length > 0) {
       throw new ServiceError(
         ERRORS.CUSTOMER_HAS_TRANSACTIONS,
-        'Customer has associated transactions',
+        contactHasTransactionsMessage('Customer', transactions),
         { transactions },
       );
     }

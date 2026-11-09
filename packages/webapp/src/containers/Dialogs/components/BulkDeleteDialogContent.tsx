@@ -4,7 +4,18 @@ import { x } from '@xstyled/emotion';
 import React from 'react';
 import { FormattedMessage as T } from '@/components';
 
+export interface NonDeletableReason {
+  id: number;
+  type: string;
+  message: string;
+}
+
+/** The reasons shown: the distinct messages, at most this many. */
+const MAX_REASONS = 3;
+
 interface BulkDeleteDialogContentProps {
+  /** Why the ones that can't be deleted are refused (from the server). */
+  nonDeletableReasons?: NonDeletableReason[];
   totalSelected: number;
   deletableCount: number;
   undeletableCount: number;
@@ -18,7 +29,15 @@ export function BulkDeleteDialogContent({
   undeletableCount,
   resourceSingularLabel,
   resourcePluralLabel,
+  nonDeletableReasons = [],
 }: BulkDeleteDialogContentProps) {
+  // One line per distinct reason, with how many it applies to.
+  const reasons = Object.entries(
+    nonDeletableReasons.reduce<Record<string, number>>((acc, reason) => {
+      acc[reason.message] = (acc[reason.message] ?? 0) + 1;
+      return acc;
+    }, {}),
+  );
   return (
     <div className={Classes.DIALOG_BODY}>
       <x.p fontWeight="semibold">
@@ -53,6 +72,18 @@ export function BulkDeleteDialogContent({
           />{' '}
         </x.div>
       </x.div>
+
+      {reasons.length > 0 && (
+        <x.ul mt={'8px'} pl={'20px'} data-testid="bulk-delete-reasons">
+          {reasons.slice(0, MAX_REASONS).map(([message, count]) => (
+            <li key={message}>
+              {count > 1 ? `${count} × ` : ''}
+              {message}
+            </li>
+          ))}
+          {reasons.length > MAX_REASONS && <li>…</li>}
+        </x.ul>
+      )}
 
       <x.p mt={'12px'}>
         <T

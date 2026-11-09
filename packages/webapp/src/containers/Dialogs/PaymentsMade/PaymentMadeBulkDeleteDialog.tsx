@@ -7,7 +7,10 @@ import type { WithPaymentMadeActionsProps } from '@/containers/Purchases/Payment
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withPaymentMadeActions } from '@/containers/Purchases/PaymentsMade/PaymentsLanding/withPaymentMadeActions';
 import { useBulkDeletePaymentMades } from '@/hooks/query/payment-mades';
 
@@ -90,6 +93,10 @@ function PaymentMadeBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_payment_made_singular')}
         resourcePluralLabel={intl.get('resource_payment_made_plural')}
       />
