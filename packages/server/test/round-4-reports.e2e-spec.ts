@@ -16,6 +16,8 @@ import { findNode } from './_utils/balance-sheet';
  *   beginning of the first column.
  * - R9: report repositories (balance sheet, P&L...) were one instance
  *   shared by every request, so concurrent reports could mix their data.
+ * - R4: Inventory Item Details valued the opening stock with sales at
+ *   their selling price, not their cost.
  * - R2: Transactions by Customer/Vendor did the same with the opening
  *   balance (start-date entries in the opening and again in the period).
  */
@@ -37,6 +39,7 @@ describe('Round 4 sweep: reports (e2e)', () => {
 
   let customerId: number;
   let itemId: number;
+  let stockItemId: number;
 
   const invoice = async (date: string, rate: number, extra = {}) =>
     ok(
@@ -149,7 +152,7 @@ describe('Round 4 sweep: reports (e2e)', () => {
   });
 
   it('R5: sales and purchases by items count only sales and purchases', async () => {
-    const stockItemId = ok(
+    stockItemId = ok(
       await api()
         .post('/items')
         .send({
@@ -340,4 +343,35 @@ describe('Round 4 sweep: reports (e2e)', () => {
       expect(value).toBe(who === 'own' ? ownExpected : otherExpected);
     }
   }, 300000);
+
+  it('R4: inventory item details open at cost (after R5 made the stock moves)', async () => {
+    // Bought 10 @ 5, sold 2 (at 20), adjusted -3 and +4 at cost 5: 9 left,
+    // worth 45 at cost. Cost lots are computed by a background job.
+    for (let i = 0; i < 30; i++) {
+      const lots = await db('inventory_cost_lot_tracker').where({
+        itemId: stockItemId,
+        direction: 'OUT',
+      });
+      if (lots.length >= 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    const res = ok(
+      await api()
+        .get('/reports/inventory-item-details')
+        .query({
+          fromDate: '2026-07-10',
+          toDate: '2026-07-31',
+          itemsIds: [stockItemId, stockItemId],
+        }),
+    );
+    const items = res.body.data ?? res.body;
+    const item = items.find((node: any) => node.id === stockItemId);
+    const opening = (item.children ?? []).find(
+      (child: any) => (child.node_type ?? child.nodeType) === 'OPENING_ENTRY',
+    );
+    expect({
+      quantity: opening.quantity.number,
+      value: opening.value.number,
+    }).toEqual({ quantity: 9, value: 45 });
+  });
 });
