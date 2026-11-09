@@ -43,11 +43,24 @@ export const CashFlowStatementDatePeriods = <
      * Initialize date range set.
      */
     public initDateRangeCollection() {
-      this.dateRangeSet = dateRangeFromToCollection(
+      const ranges = dateRangeFromToCollection(
         this.query.fromDate,
         this.query.toDate,
         this.comparatorDateType as moment.unitOfTime.StartOf,
       );
+      // The first period starts at the start of its month (or week...),
+      // which can be before the report's from date; the cash at beginning
+      // is one row per account dated at its last entry before the from
+      // date, so opening the first period earlier dropped it. Clamp the
+      // first and last periods to the report's dates.
+      const dateFormat = 'YYYY-MM-DD';
+      const from = moment(this.query.fromDate).format(dateFormat);
+      const to = moment(this.query.toDate).format(dateFormat);
+      this.dateRangeSet = ranges.map((range, index) => ({
+        fromDate: index === 0 && range.fromDate < from ? from : range.fromDate,
+        toDate:
+          index === ranges.length - 1 && range.toDate > to ? to : range.toDate,
+      }));
     }
 
     /**

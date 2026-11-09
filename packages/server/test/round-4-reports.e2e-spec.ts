@@ -12,6 +12,8 @@ import { findNode } from './_utils/balance-sheet';
  *   started on it).
  * - R5: Sales / Purchases by Items counted inventory adjustments (and
  *   transfers) as sales and purchases.
+ * - R8: cash flow monthly columns from mid-month dropped the cash at
+ *   beginning of the first column.
  * - R2: Transactions by Customer/Vendor did the same with the opening
  *   balance (start-date entries in the opening and again in the period).
  */
@@ -228,5 +230,50 @@ describe('Round 4 sweep: reports (e2e)', () => {
       sold: 2,
       bought: 10,
     });
+  });
+
+  it('R8: cash flow monthly columns from mid-month keep the opening cash', async () => {
+    const bankId = await byType('bank');
+    ok(
+      await api()
+        .post('/manual-journals')
+        .send({
+          date: '2026-08-10',
+          journalNumber: `R8-${Date.now()}`,
+          publish: true,
+          entries: [
+            { index: 1, accountId: bankId, debit: 200, credit: 0 },
+            {
+              index: 2,
+              accountId: await byType('equity'),
+              debit: 0,
+              credit: 200,
+            },
+          ],
+        }),
+    );
+    const query = { fromDate: '2026-08-15', toDate: '2026-09-30' };
+    const total = ok(
+      await api().get('/reports/cashflow-statement').query(query),
+    ).body;
+    const periods = ok(
+      await api()
+        .get('/reports/cashflow-statement')
+        .query({
+          ...query,
+          displayColumnsType: 'date_periods',
+          displayColumnsBy: 'month',
+        }),
+    ).body;
+    const beginning = (body: any) =>
+      (body.data ?? body).find(
+        (node: any) => node.id === 'CASH_BEGINNING_PERIOD',
+      );
+    const totalBeginning = beginning(total)?.total?.amount;
+    expect(totalBeginning).toBeGreaterThan(0);
+    // The first month's opening cash is the report's opening cash.
+    expect(beginning(periods)?.periods?.[0]?.total?.amount).toBe(
+      totalBeginning,
+    );
   });
 });
