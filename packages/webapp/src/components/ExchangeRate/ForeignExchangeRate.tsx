@@ -134,8 +134,21 @@ export function ForeignExchangeRateSync({
     // Wait until both currencies are known.
     if (!baseCurrency || currencyCode === undefined) return;
     if (filledFor.current === currencyCode) return;
+    const isFirstFill = filledFor.current === undefined;
     filledFor.current = currencyCode;
 
+    // Remounted over a rate the user already typed (money in/out remount
+    // their fields when the type changes): keep it. 1 is the forms' default
+    // for a foreign currency, so it is still replaced.
+    if (
+      isFirstFill &&
+      isForeignCurrency(currencyCode, baseCurrency) &&
+      isValidExchangeRate(currentRate) &&
+      Number(currentRate) !== 1 &&
+      !isValidExchangeRate(sourceRate)
+    ) {
+      return;
+    }
     if (!isForeignCurrency(currencyCode, baseCurrency)) {
       setFetchCurrency(null);
       fill(1);
@@ -157,7 +170,9 @@ export function ForeignExchangeRateSync({
     if (!fetchCurrency || isFetching) return;
     if (fetchCurrency !== currencyCode) return;
     const rate = latest?.exchangeRate;
-    if (!isError && isValidExchangeRate(rate)) {
+    // Only into the still-empty field: a rate typed while the request was
+    // in flight wins.
+    if (!isError && isValidExchangeRate(rate) && currentRate === '') {
       fill(Number(rate));
     }
     setFetchCurrency(null);
