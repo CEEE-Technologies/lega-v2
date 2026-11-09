@@ -17,8 +17,10 @@ export function MoneyInExchangeRateField() {
   return (
     <ExchangeRateMutedField
       name={'exchangeRate'}
-      fromCurrency={values.currencyCode}
-      toCurrency={(account as Account | undefined)?.currencyCode}
+      // The amount is in the account's currency and the server books
+      // amount × rate in the base currency: 1 {account} = rate {base}.
+      fromCurrency={(account as Account | undefined)?.currencyCode}
+      toCurrency={values.currencyCode}
       formGroupProps={{ label: '', inline: false }}
       date={values.date}
       exchangeRate={values.exchangeRate}
