@@ -30,6 +30,7 @@ import {
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { safeSumBy } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type BillSubmitError = {
   data?: { errors?: { type: string }[] };
@@ -96,7 +97,7 @@ function BillFormInner() {
         history.push('/bills');
       }
       if (submitPayload.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.

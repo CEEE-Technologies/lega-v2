@@ -31,6 +31,7 @@ import { AppToaster, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { orderingLinesIndexes, transactionNumber, safeSumBy } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type CreditNoteFormInnerProps = Record<string, never>;
 
@@ -125,7 +126,7 @@ function CreditNoteFormInner({}: CreditNoteFormInnerProps) {
         history.push('/credit-notes');
       }
       if (submitPayload?.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.

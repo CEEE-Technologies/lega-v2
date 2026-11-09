@@ -81,4 +81,53 @@ describe('F26: turning branches on (e2e)', () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.branchId === branch.id)).toBe(true);
   });
+
+  // Sweep S6: with branches on, an invoice and a money in/out need a branch
+  // (their validators weren't registered, so they were saved without one).
+  it('an invoice or a money-in without a branch is refused', async () => {
+    const byType = async (type: string) =>
+      (await db('accounts').where('accountType', type).first('id')).id;
+    const customer = await api()
+      .post('/customers')
+      .send({
+        displayName: `S6 customer ${Date.now()}`,
+        customerType: 'business',
+        currencyCode: 'USD',
+      });
+    const item = await api()
+      .post('/items')
+      .send({
+        name: `S6 service ${Date.now()}`,
+        type: 'service',
+        sellable: true,
+        sellAccountId: await byType('income'),
+        sellPrice: 10,
+      });
+    const invoice = await api()
+      .post('/sale-invoices')
+      .send({
+        customerId: customer.body.id,
+        invoiceDate: '2026-06-01',
+        dueDate: '2026-06-30',
+        invoiceNo: `S6-${Date.now()}`,
+        delivered: true,
+        entries: [{ index: 1, itemId: item.body.id, quantity: 1, rate: 10 }],
+      });
+    expect(invoice.status).toBe(400);
+    expect(invoice.body.errors?.[0]?.type).toBe('BRANCH_ID_REQUIRED');
+
+    const moneyIn = await api()
+      .post('/banking/transactions')
+      .send({
+        date: '2026-06-01',
+        transactionType: 'owner_contribution',
+        amount: 10,
+        cashflowAccountId: await byType('bank'),
+        creditAccountId: await byType('equity'),
+        description: 'S6',
+        publish: true,
+      });
+    expect(moneyIn.status).toBe(400);
+    expect(moneyIn.body.errors?.[0]?.type).toBe('BRANCH_ID_REQUIRED');
+  });
 });

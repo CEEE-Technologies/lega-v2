@@ -32,6 +32,7 @@ import {
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { safeSumBy, transactionNumber } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 interface VendorCreditNoteFormInnerProps {}
 
@@ -121,7 +122,7 @@ function VendorCreditNoteFormInner({}: VendorCreditNoteFormInnerProps) {
         history.push('/vendor-credits');
       }
       if (submitPayload?.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.

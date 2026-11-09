@@ -37,6 +37,7 @@ import { PageForm } from '@/components/PageForm';
 import { CLASSES } from '@/constants/classes';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { transactionNumber } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 /**
  * Journal entries form.
@@ -155,7 +156,7 @@ function MakeJournalEntriesFormInner() {
         history.push('/manual-journals');
       }
       if (submitPayload.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     if (isNewMode || !manualJournal) {

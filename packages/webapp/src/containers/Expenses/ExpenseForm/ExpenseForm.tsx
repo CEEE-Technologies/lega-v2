@@ -34,6 +34,7 @@ import {
 import { PageForm } from '@/components/PageForm';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 /**
  * Expense form.
@@ -113,7 +114,7 @@ function ExpenseFormInner() {
         history.push('/expenses');
       }
       if (currentSubmitPayload.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
 

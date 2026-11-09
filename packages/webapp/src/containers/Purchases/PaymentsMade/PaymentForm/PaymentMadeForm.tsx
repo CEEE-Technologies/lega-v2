@@ -44,6 +44,7 @@ import { PageForm } from '@/components/PageForm';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { orderingLinesIndexes, safeSumBy, formattedAmount } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type WithDialogActionsProps = {
   openDialog: (name: string, payload?: Record<string, unknown>) => void;
@@ -159,7 +160,8 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
       setSubmitting(false);
 
       submitPayload.redirect && history.push('/payments-made');
-      submitPayload.resetForm && resetForm();
+      submitPayload.resetForm &&
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       return true;
     };
 

@@ -26,6 +26,9 @@ import { PaymentMadeBranchValidateSubscriber } from './subscribers/Validators/Pa
 import { PaymentReceiveBranchValidateSubscriber } from './subscribers/Validators/PaymentReceiveBranchSubscriber';
 import { SaleReceiptBranchValidateSubscriber } from './subscribers/Validators/SaleReceiptBranchesSubscriber';
 import { VendorCreditBranchValidateSubscriber } from './subscribers/Validators/VendorCreditBranchSubscriber';
+import { InvoiceBranchValidateSubscriber } from './subscribers/Validators/InvoiceBranchValidatorSubscriber';
+import { CashflowBranchDTOValidatorSubscriber } from './subscribers/Validators/CashflowBranchDTOValidatorSubscriber';
+import { VendorCreditRefundBranchValidateSubscriber } from './subscribers/Validators/VendorCreditRefundBranchSubscriber';
 import { ValidateBranchExistance } from './integrations/ValidateBranchExistance';
 import { ManualJournalBranchesValidator } from './integrations/ManualJournals/ManualJournalsBranchesValidator';
 import { CashflowTransactionsActivateBranches } from './integrations/Cashflow/CashflowActivateBranches';
@@ -78,6 +81,11 @@ import { FeaturesModule } from '../Features/Features.module';
     SaleEstimateBranchValidateSubscriber,
     SaleReceiptBranchValidateSubscriber,
     VendorCreditBranchValidateSubscriber,
+    // These three existed but weren't registered, so nothing required a
+    // branch on invoices, money in/out and vendor credit refunds.
+    InvoiceBranchValidateSubscriber,
+    CashflowBranchDTOValidatorSubscriber,
+    VendorCreditRefundBranchValidateSubscriber,
     ValidateBranchExistance,
     ManualJournalBranchesValidator,
     CashflowTransactionsActivateBranches,
