@@ -54,6 +54,12 @@ function UserInactivateAlertInner({
             intent: Intent.DANGER,
           });
         }
+        if (errors.find((e) => e.type === 'ADMIN_ONLY')) {
+          AppToaster.show({
+            message: intl.get('roles.error.admin_only'),
+            intent: Intent.DANGER,
+          });
+        }
       })
       .finally(() => {
         closeAlert(name);

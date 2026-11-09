@@ -4,6 +4,7 @@ import { tableClassNames } from '../utils';
 import { Injectable } from '@nestjs/common';
 import { ChromiumlyTenancy } from '../../ChromiumlyTenancy/ChromiumlyTenancy.service';
 import { renderFinancialSheetTemplateHtml } from '@bigcapital/pdf-templates';
+import { escapePdfCell } from '@/utils/escape-pdf-cell';
 
 @Injectable()
 export class TableSheetPdf {
@@ -77,6 +78,19 @@ export class TableSheetPdf {
       FinancialTableStructure.flatNestedTree(rows, {
         nestedPrefix: '<span style="padding-left: 15px;"></span>',
       });
-    return tableClassNames(flatNestedTreeRows(rows));
+    // Escape the cells first: the template renders them as HTML, and only
+    // the indent prefix added above is meant to be HTML.
+    return tableClassNames(flatNestedTreeRows(escapeTableRows(rows)));
   };
 }
+
+/** The rows (and their nested rows) with every cell value escaped. */
+export const escapeTableRows = (rows: ITableRow[]): ITableRow[] =>
+  rows.map((row) => ({
+    ...row,
+    cells: row.cells.map((cell) => ({
+      ...cell,
+      value: escapePdfCell(cell.value),
+    })),
+    ...(row.children ? { children: escapeTableRows(row.children) } : {}),
+  }));

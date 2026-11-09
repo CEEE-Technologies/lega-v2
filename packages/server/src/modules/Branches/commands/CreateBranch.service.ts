@@ -26,32 +26,36 @@ export class CreateBranchService {
   /**
    * Creates a new branch.
    * @param {CreateBranchDto} createBranchDTO
+   * @param {Knex.Transaction} trx - Inside this transaction when given (e.g.
+   *   the first branch, made when branches are turned on).
    * @returns {Promise<Branch>}
    */
   public createBranch = async (
     createBranchDTO: CreateBranchDto,
+    trx?: Knex.Transaction,
   ): Promise<Branch> => {
     // Creates a new branch under unit-of-work.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
-      // Triggers `onBranchCreate` event.
-      await this.eventPublisher.emitAsync(events.warehouse.onEdit, {
+      // Triggers `onBranchCreate` event (it sent the warehouse events).
+      await this.eventPublisher.emitAsync(events.branch.onCreate, {
         createBranchDTO,
         trx,
       } as IBranchCreatePayload);
 
+      // Inside the transaction (it was saved outside it).
       const branch = await this.branchModel()
-        .query()
+        .query(trx)
         .insertAndFetch({
           ...createBranchDTO,
         });
       // Triggers `onBranchCreated` event.
-      await this.eventPublisher.emitAsync(events.warehouse.onEdited, {
+      await this.eventPublisher.emitAsync(events.branch.onCreated, {
         createBranchDTO,
         branch,
         trx,
       } as IBranchCreatedPayload);
 
       return branch;
-    });
+    }, trx);
   };
 }

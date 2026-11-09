@@ -707,6 +707,46 @@ describe('Deletes, undo and bank matching (e2e)', () => {
       expect(Number(bill.paymentAmount)).toBe(0);
     });
 
+    // F23 (round 4): unmatching deletes the payment the match created, so
+    // in a closed period it is refused and the payment stays.
+    it('an invoice match in a closed period: unmatch is refused, the payment stays', async () => {
+      const invoiceId = await createInvoice(275);
+      const lineId = await createBankLine(accounts.bank, 275);
+      ok(await match(lineId, 'SaleInvoice', invoiceId));
+      const paymentId = (await matchesOf(lineId)).find(
+        (m) => m.referenceType === 'PaymentReceive',
+      ).referenceId;
+
+      ok(
+        await api()
+          .put('/transactions-locking/lock')
+          .send({ module: 'all', lockToDate: DATE, reason: 'F23 e2e' }),
+      );
+      try {
+        const refused = await api().patch(
+          `/banking/matching/unmatch/${lineId}`,
+        );
+        expect(refused.status).toBe(400);
+        expect(errorType(refused)).toBe('TRANSACTIONS_DATE_LOCKED');
+        expect(await matchesOf(lineId)).not.toEqual([]);
+        expect(
+          await db('payment_receives').where({ id: paymentId }),
+        ).toHaveLength(1);
+        expect(
+          await bankNet(accounts.bank, 'PaymentReceive', [paymentId]),
+        ).toBe(275);
+      } finally {
+        ok(
+          await api()
+            .put('/transactions-locking/cancel-lock')
+            .send({ module: 'all', reason: 'F23 e2e done' }),
+        );
+      }
+      // Open again: it unmatches.
+      ok(await api().patch(`/banking/matching/unmatch/${lineId}`));
+      expect(await matchesOf(lineId)).toEqual([]);
+    });
+
     it('an expense match: the expense stays', async () => {
       const expenseId = ok(
         await api()
@@ -915,6 +955,43 @@ describe('Deletes, undo and bank matching (e2e)', () => {
             .first()
         )?.recognizedTransactionId,
       );
+
+    // F27 (round 4): an account a rule assigns lines to can't be deleted
+    // (its foreign key gave a raw 500); the error names the rule.
+    it('F27: an account a bank rule assigns to is refused, with the rule named', async () => {
+      const bank = await createAccount({ accountType: 'bank' });
+      const target = await createAccount({ accountType: 'equity' });
+      const name = `F27 rule ${uid()}`;
+      const ruleId = ok(
+        await api()
+          .post('/banking/rules')
+          .send({
+            name,
+            order: 1,
+            applyIfAccountId: bank,
+            applyIfTransactionType: 'deposit',
+            conditions: [
+              {
+                field: 'description',
+                comparator: 'contains',
+                value: `nomatch-${uid()}`,
+              },
+            ],
+            assignCategory: 'Deposit',
+            assignAccountId: target,
+          }),
+      ).body.id as number;
+
+      const refused = await api().delete(`/accounts/${target}`);
+      expect(refused.status).toBe(400);
+      expect(errorType(refused)).toBe('ACCOUNT_USED_BY_BANK_RULES');
+      expect(JSON.stringify(refused.body)).toContain(name);
+      expect(await db('accounts').where({ id: target })).toHaveLength(1);
+
+      ok(await api().delete(`/banking/rules/${ruleId}`));
+      ok(await api().delete(`/accounts/${target}`));
+      expect(await db('accounts').where({ id: target })).toEqual([]);
+    });
 
     it('B6: deleting an account with no rules keeps every suggestion; one with rules only undoes its own', async () => {
       const bankA = await createAccount({ accountType: 'bank' });

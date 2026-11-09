@@ -1,51 +1,63 @@
 import request = require('supertest');
 import { app, AuthorizationHeader, orgainzationId } from './init-app-test';
+import { createTestBankAccount, insertBankLine } from './_utils/banking';
+import { getTenantKnex } from './_utils/money-matrix';
 
 describe('Banking Exclude (e2e)', () => {
+  let bankId: number;
+
+  const call = (method: 'get' | 'put' | 'delete', url: string) =>
+    request(app.getHttpServer())
+      [method](url)
+      .set('organization-id', orgainzationId)
+      .set('Authorization', AuthorizationHeader);
+
+  const isExcluded = async (lineId: number) =>
+    Boolean(
+      (
+        await getTenantKnex()('uncategorized_cashflow_transactions')
+          .where({ id: lineId })
+          .first()
+      ).excludedAt,
+    );
+
+  beforeAll(async () => {
+    bankId = await createTestBankAccount();
+  });
+
   it('/banking/exclude (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/banking/exclude')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader)
-      .expect(200);
+    return call('get', '/banking/exclude').expect(200);
   });
 
-  it('/banking/exclude/:id (PUT)', async () => {
-    const response = await request(app.getHttpServer())
-      .put('/banking/exclude/1')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader);
+  it('/banking/exclude/:id (PUT) and (DELETE)', async () => {
+    const lineId = await insertBankLine(bankId, 33);
+    expect((await call('put', `/banking/exclude/${lineId}`)).status).toBe(200);
+    expect(await isExcluded(lineId)).toBe(true);
 
-    // A transaction only exists when bank data was synced into the organization.
-    expect([200, 404]).toContain(response.status);
+    expect((await call('delete', `/banking/exclude/${lineId}`)).status).toBe(
+      200,
+    );
+    expect(await isExcluded(lineId)).toBe(false);
   });
 
-  it('/banking/exclude/bulk (PUT)', async () => {
-    const response = await request(app.getHttpServer())
-      .put('/banking/exclude/bulk')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader)
-      .send({ ids: [1, 2] });
+  it('/banking/exclude/bulk (PUT) and (DELETE)', async () => {
+    const a = await insertBankLine(bankId, 11);
+    const b = await insertBankLine(bankId, 22);
+    expect(
+      (await call('put', '/banking/exclude/bulk').send({ ids: [a, b] })).status,
+    ).toBe(200);
+    expect(await isExcluded(a)).toBe(true);
+    expect(await isExcluded(b)).toBe(true);
 
-    expect([200, 404]).toContain(response.status);
+    expect(
+      (await call('delete', '/banking/exclude/bulk').send({ ids: [a, b] }))
+        .status,
+    ).toBe(200);
+    expect(await isExcluded(a)).toBe(false);
+    expect(await isExcluded(b)).toBe(false);
   });
 
-  it('/banking/exclude/:id (DELETE)', async () => {
-    const response = await request(app.getHttpServer())
-      .delete('/banking/exclude/1')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader);
-
-    expect([200, 404]).toContain(response.status);
-  });
-
-  it('/banking/exclude/bulk (DELETE)', async () => {
-    const response = await request(app.getHttpServer())
-      .delete('/banking/exclude/bulk')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader)
-      .send({ ids: [1, 2] });
-
-    expect([200, 404]).toContain(response.status);
+  it('an unknown line is not found', async () => {
+    expect((await call('put', '/banking/exclude/999999999')).status).toBe(404);
   });
 });

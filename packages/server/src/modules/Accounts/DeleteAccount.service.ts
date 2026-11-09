@@ -8,6 +8,7 @@ import { events } from '@/common/events/events';
 import { IAccountEventDeletedPayload } from './Accounts.types';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
 import { ERRORS } from './constants';
+import { ServiceError } from '../Items/ServiceError';
 
 @Injectable()
 export class DeleteAccount {
@@ -48,6 +49,38 @@ export class DeleteAccount {
   }
 
   /**
+   * Refuses an account that a bank rule assigns bank lines to, or that a
+   * recognized bank line is assigned to (their foreign keys made the delete
+   * fail with a raw 500).
+   * @param {number} accountId
+   * @param {Knex.Transaction} trx
+   */
+  private async throwIfUsedByBankRules(
+    accountId: number,
+    trx: Knex.Transaction,
+  ) {
+    const rules = await trx('bank_rules')
+      .where({ assignAccountId: accountId })
+      .select('name');
+    const recognized = await trx('recognized_bank_transactions')
+      .where({ assignedAccountId: accountId })
+      .count({ count: '*' })
+      .first();
+    const recognizedCount = Number(recognized?.count ?? 0);
+
+    if (rules.length > 0 || recognizedCount > 0) {
+      const names = rules.map((rule) => rule.name).join(', ');
+      throw new ServiceError(
+        ERRORS.ACCOUNT_USED_BY_BANK_RULES,
+        rules.length > 0
+          ? `This account is used by bank rules: ${names}. Change or delete those rules first.`
+          : 'This account is used by recognized bank transactions. Change or delete their bank rules first.',
+        { bankRules: rules.map((rule) => rule.name), recognizedCount },
+      );
+    }
+  }
+
+  /**
    * Deletes the account from the storage.
    * @param {number} accountId
    * @param {Knex.Transaction} trx - Database transaction instance.
@@ -72,6 +105,9 @@ export class DeleteAccount {
         trx,
         oldAccount,
       } as IAccountEventDeletedPayload);
+
+      // A bank rule or a recognized bank line still assigns to it.
+      await this.throwIfUsedByBankRules(accountId, trx);
 
       // Unlink the parent account from children accounts.
       await this.unassociateChildrenAccountsFromParent(accountId, trx);

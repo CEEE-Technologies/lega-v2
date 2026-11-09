@@ -38,4 +38,10 @@ export const handleDeleteErrors = (errors: RoleError[]) => {
       intent: Intent.DANGER,
     });
   }
+  if (errors.find((error) => error.type === 'PERMISSIONS_NOT_HELD')) {
+    AppToaster.show({
+      message: intl.get('roles.error.permissions_not_held'),
+      intent: Intent.DANGER,
+    });
+  }
 };

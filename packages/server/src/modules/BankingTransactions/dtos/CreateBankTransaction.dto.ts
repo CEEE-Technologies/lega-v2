@@ -65,15 +65,16 @@ export class CreateBankTransactionDto {
   @IsMoney()
   amount: number;
 
-  @ApiProperty({
-    description: 'Exchange rate for currency conversion',
+  @ApiPropertyOptional({
+    description:
+      'Exchange rate for currency conversion: 1 account currency = rate base currency. Required for a foreign-currency account; ignored (1) for a base-currency one.',
     type: Number,
-    default: 1,
     example: 1.15,
   })
   @ToNumber()
   @IsNumber()
-  exchangeRate: number = 1;
+  @IsOptional()
+  exchangeRate?: number;
 
   @ApiPropertyOptional({
     description: 'Currency code for the transaction',

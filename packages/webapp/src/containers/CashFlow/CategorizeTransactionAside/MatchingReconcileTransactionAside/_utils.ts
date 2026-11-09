@@ -15,7 +15,10 @@ export const transformToReq = (
       values.type === 'deposit' ? 'other_income' : 'other_expense',
     description: values.memo,
     amount: toNumber(values.amount),
-    exchangeRate: 1,
+    // Required (and checked) for a foreign-currency bank account; the
+    // server uses 1 for a base-currency one. It used to always send 1.
+    // (The SDK body type still marks it required, from the old default 1.)
+    exchangeRate: (Number(values.exchangeRate) || undefined) as number,
     creditAccountId: toNumber(values.category),
     cashflowAccountId: bankAccountId,
     publish: true,
@@ -31,4 +34,5 @@ export const initialValues: MatchingReconcileTransactionValues = {
   referenceNo: '',
   category: '',
   branchId: '',
+  exchangeRate: 1,
 };

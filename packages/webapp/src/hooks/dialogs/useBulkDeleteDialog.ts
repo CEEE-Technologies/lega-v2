@@ -6,6 +6,7 @@ interface BulkDeleteValidationMutation {
   mutateAsync: (ids: number[]) => Promise<{
     deletableCount?: number;
     nonDeletableCount?: number;
+    nonDeletableReasons?: Array<{ id: number; type: string; message: string }>;
   }>;
   isPending: boolean;
 }
@@ -24,8 +25,11 @@ export const useBulkDeleteDialog = (
         return;
       }
 
-      const { deletableCount = 0, nonDeletableCount = 0 } =
-        await validateBulkDelete(ids);
+      const {
+        deletableCount = 0,
+        nonDeletableCount = 0,
+        nonDeletableReasons = [],
+      } = await validateBulkDelete(ids);
 
       const totalSelected = deletableCount + nonDeletableCount || ids.length;
 
@@ -33,6 +37,8 @@ export const useBulkDeleteDialog = (
         ids,
         deletableCount,
         undeletableCount: nonDeletableCount,
+        // Why each one can't be deleted (shown in the dialog).
+        nonDeletableReasons,
         totalSelected,
       });
     },

@@ -60,4 +60,17 @@ export class ValidateBulkDeleteResponseDto {
     example: [3],
   })
   nonDeletableIds: number[];
+
+  @ApiPropertyOptional({
+    description:
+      'Why each item that cannot be deleted is refused: its id, the error type and message',
+    example: [
+      {
+        id: 3,
+        type: 'CUSTOMER_HAS_TRANSACTIONS',
+        message: 'The customer has transactions: invoices.',
+      },
+    ],
+  })
+  nonDeletableReasons?: Array<{ id: number; type: string; message: string }>;
 }

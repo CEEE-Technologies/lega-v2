@@ -27,10 +27,11 @@ import {
   type CreditNoteFormValues,
   type CreditNoteEntry,
 } from './utils';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { orderingLinesIndexes, transactionNumber, safeSumBy } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type CreditNoteFormInnerProps = Record<string, never>;
 
@@ -125,7 +126,7 @@ function CreditNoteFormInner({}: CreditNoteFormInnerProps) {
         history.push('/credit-notes');
       }
       if (submitPayload?.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.
@@ -141,12 +142,16 @@ function CreditNoteFormInner({}: CreditNoteFormInnerProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<CreditNoteFormValues>
       validationSchema={
         isNewMode ? CreateCreditNoteFormSchema : EditCreditNoteFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form

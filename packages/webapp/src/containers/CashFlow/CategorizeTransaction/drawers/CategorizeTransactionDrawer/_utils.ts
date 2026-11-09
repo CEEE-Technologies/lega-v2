@@ -47,11 +47,27 @@ export const tranformToRequest = (
     creditAccountId: toNumber(formValues.creditAccountId) ?? 0,
     referenceNo: formValues.referenceNo,
     transactionType: formValues.transactionType,
-    exchangeRate: toNumber(formValues.exchangeRate) ?? 1,
+    // Required (and checked) for a foreign-currency bank account; the
+    // server uses 1 for a base-currency one.
+    // (The SDK body type still marks it required, from the old default 1.)
+    exchangeRate: (Number(formValues.exchangeRate) || undefined) as number,
     description: formValues.description,
     branchId: toNumber(formValues.branchId),
     uncategorizedTransactionIds,
   };
+};
+
+/**
+ * The currency of the bank account being categorized: the line's amount is
+ * in it, and the books get amount × rate in the base currency.
+ */
+export const useCategorizeBankAccountCurrency = () => {
+  const { accounts } = useCategorizeTransactionBoot();
+
+  return (bankAccountId: string | number | null | undefined) =>
+    (
+      accounts as Array<{ id: number; currencyCode?: string }> | undefined
+    )?.find((account) => account.id === Number(bankAccountId))?.currencyCode;
 };
 
 /**

@@ -202,18 +202,20 @@ export class TenantsMoneyRepairCommand extends BaseCommand {
 
   /**
    * Boots the application (this code, not a running server) and rebuilds
-   * the organization's cash basis set inside the tenant context.
+   * the organization's cash basis set inside the tenant context. The
+   * dynamic imports use relative paths: the build doesn't rewrite the `@/`
+   * alias inside them, so `node dist/cli.js` couldn't load an aliased one.
    */
   private async rebuildCashBasis(organizationId: string) {
     const { ClsService } = await import('nestjs-cls');
     const { CashBasisRebuildService } = await import(
-      '@/modules/AccountingBasis/CashBasisRebuild.service'
+      '../../AccountingBasis/CashBasisRebuild.service'
     );
     const { CreditApplicationsGLService } = await import(
-      '@/modules/AccountingBasis/CreditApplicationsGL.service'
+      '../../AccountingBasis/CreditApplicationsGL.service'
     );
     const { SaleInvoiceWriteoffGLStorage } = await import(
-      '@/modules/SaleInvoices/commands/writeoff/SaleInvoiceWriteoffGLStorage'
+      '../../SaleInvoices/commands/writeoff/SaleInvoiceWriteoffGLStorage'
     );
     const { createMaintenanceApp } = await import('../MaintenanceApp');
     const app = await createMaintenanceApp();

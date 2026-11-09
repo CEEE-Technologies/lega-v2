@@ -4,6 +4,7 @@ import * as FF from 'fp-ts/function';
 import { round } from 'lodash';
 import moment from 'moment';
 import React from 'react';
+import intl from 'react-intl-universal';
 import { useAccountTransactionsContext } from '../../AccountTransactions/AccountTransactionsProvider';
 import { withBanking } from '../../withBanking';
 import { withBankingActions } from '../../withBankingActions';
@@ -29,11 +30,16 @@ import {
   FMoneyInputGroup,
   Group,
   Icon,
+  ExchangeRateInputGroup,
+  ForeignExchangeRateSync,
+  isForeignCurrency,
+  useExchangeRateValidate,
 } from '@/components';
 import { Aside } from '@/components/Aside/Aside';
 import { ContentTabs } from '@/components/ContentTabs';
 import { Features } from '@/constants';
 import { useDateInputFormatter } from '@/hooks';
+import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { useCreateCashflowTransaction } from '@/hooks/query';
 
 interface ReconcileSubmitSuccessPayload {
@@ -58,7 +64,13 @@ function MatchingReconcileTransactionFormRoot({
   const { mutateAsync: createCashflowTransactionMutate } =
     useCreateCashflowTransaction();
 
-  const { accountId } = useAccountTransactionsContext();
+  const { accountId, currentAccount } = useAccountTransactionsContext();
+
+  // The rate is required when the bank account's currency is foreign.
+  const validateExchangeRate = useExchangeRateValidate(
+    () =>
+      (currentAccount as { currencyCode?: string } | undefined)?.currencyCode,
+  );
 
   // Handles the aside close.
   const handleAsideClose = () => {
@@ -99,8 +111,15 @@ function MatchingReconcileTransactionFormRoot({
             )
           ) {
             setErrors({
-              ...({} as MatchingReconcileTransactionValues),
               branchId: 'The branch is required.',
+            });
+          } else if (
+            error.response?.data?.errors?.find(
+              (e) => e.type === 'EXCHANGE_RATE_REQUIRED',
+            )
+          ) {
+            setErrors({
+              exchangeRate: intl.get('exchange_rate.error.required'),
             });
           } else {
             AppToaster.show({
@@ -133,6 +152,7 @@ function MatchingReconcileTransactionFormRoot({
           onSubmit={handleSubmit}
           initialValues={_initialValues}
           validationSchema={MatchingReconcileFormSchema}
+          validate={validateExchangeRate}
         >
           <Form className={styles.form}>
             <Aside.Body className={styles.asideContent}>
@@ -211,6 +231,8 @@ function CreateReconcileTransactionContent() {
       >
         <FMoneyInputGroup name={'amount'} fastField />
       </FFormGroup>
+
+      <MatchingReconcileExchangeRate />
 
       <MatchingReconcileCategoryField />
 
@@ -304,5 +326,34 @@ function MatchingReconcileTransactionFooter() {
         </Button>
       </Group>
     </Box>
+  );
+}
+
+/**
+ * The rate of a transaction on a foreign-currency bank account: today's
+ * rate, else empty and required (it used to be sent as 1, with no field).
+ */
+function MatchingReconcileExchangeRate() {
+  const { currentAccount } = useAccountTransactionsContext();
+  const baseCurrency = useCurrentOrganizationBaseCurrency();
+  const accountCurrency = (
+    currentAccount as { currencyCode?: string } | undefined
+  )?.currencyCode;
+
+  return (
+    <>
+      <ForeignExchangeRateSync
+        currencyCode={accountCurrency}
+        isNewMode={true}
+      />
+      {isForeignCurrency(accountCurrency, baseCurrency) && (
+        <ExchangeRateInputGroup
+          name={'exchangeRate'}
+          fromCurrency={accountCurrency ?? ''}
+          toCurrency={baseCurrency ?? ''}
+          formGroupProps={{ label: 'Exchange rate', inline: false }}
+        />
+      )}
+    </>
   );
 }

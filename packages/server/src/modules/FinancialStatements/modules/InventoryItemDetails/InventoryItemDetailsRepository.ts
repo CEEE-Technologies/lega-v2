@@ -4,6 +4,7 @@ import * as moment from 'moment';
 import { IInventoryDetailsQuery } from './InventoryItemDetails.types';
 import { Item } from '@/modules/Items/models/Item';
 import { InventoryTransaction } from '@/modules/InventoryCost/models/InventoryTransaction';
+import { InventoryCostLotTracker } from '@/modules/InventoryCost/models/InventoryCostLotTracker';
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { transformToMapKeyValue } from '@/utils/transform-to-map-key-value';
@@ -18,6 +19,11 @@ export class InventoryItemDetailsRepository {
   @Inject(InventoryTransaction.name)
   readonly inventoryTransactionModel: TenantModelProxy<
     typeof InventoryTransaction
+  >;
+
+  @Inject(InventoryCostLotTracker.name)
+  readonly inventoryCostLotTrackerModel: TenantModelProxy<
+    typeof InventoryCostLotTracker
   >;
 
   @Inject(TenancyContext)
@@ -207,7 +213,33 @@ export class InventoryItemDetailsRepository {
       .sum('valueOut as valueOut')
       .withGraphFetched('itemCostAggregated');
 
-    return openingBalanceTransactions;
+    // The opening value is what the stock cost, from the cost lots: an OUT
+    // row's rate is the selling price on a sale, so IN value - OUT value
+    // took sales away at their price (buy 10 @ 5, sell 4 @ 20: -30, not 30).
+    const costLots = this.inventoryCostLotTrackerModel()
+      .query()
+      .select('itemId')
+      .select(
+        raw(
+          "SUM(IF(`DIRECTION` = 'IN', `COST`, 0)) - SUM(IF(`DIRECTION` = 'OUT', `COST`, 0)) AS `VALUE`",
+        ),
+      )
+      .modify('filterDateRange', null, openingBalanceDate)
+      .groupBy('itemId');
+
+    if (!isEmpty(filter.warehousesIds)) {
+      costLots.modify('filterByWarehouses', filter.warehousesIds);
+    }
+    if (!isEmpty(filter.branchesIds)) {
+      costLots.modify('filterByBranches', filter.branchesIds);
+    }
+    const costValueByItemId = new Map(
+      (await costLots).map((lot: any) => [lot.itemId, Number(lot.value) || 0]),
+    );
+    return openingBalanceTransactions.map((transaction: any) => ({
+      ...transaction,
+      value: costValueByItemId.get(transaction.itemId) ?? transaction.value,
+    }));
   }
 
   /**

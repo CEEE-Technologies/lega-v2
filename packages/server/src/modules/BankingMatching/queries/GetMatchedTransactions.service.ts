@@ -2,7 +2,7 @@ import * as R from 'ramda';
 import * as moment from 'moment';
 import { first, sumBy } from 'lodash';
 import { PromisePool } from '@supercharge/promise-pool';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   GetMatchedTransactionsFilter,
   MatchedTransactionsPOJO,
@@ -13,11 +13,17 @@ import { GetMatchedTransactionsByManualJournals } from './GetMatchedTransactions
 import { GetMatchedTransactionsByCashflow } from './GetMatchedTransactionsByCashflow';
 import { GetMatchedTransactionsByInvoices } from './GetMatchedTransactionsByInvoices.service';
 import { UncategorizedBankTransaction } from '@/modules/BankingTransactions/models/UncategorizedBankTransaction';
-import { sortClosestMatchTransactions } from '../_utils';
+import {
+  sortClosestMatchTransactions,
+  validateUncategorizedTransactionsSameAccount,
+} from '../_utils';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { Account } from '@/modules/Accounts/models/Account.model';
 
 @Injectable()
 export class GetMatchedTransactions {
+  private readonly logger = new Logger(GetMatchedTransactions.name);
+
   constructor(
     private readonly getMatchedInvoicesService: GetMatchedTransactionsByInvoices,
     private readonly getMatchedBillsService: GetMatchedTransactionsByBills,
@@ -29,6 +35,9 @@ export class GetMatchedTransactions {
     private readonly uncategorizedBankTransactionModel: TenantModelProxy<
       typeof UncategorizedBankTransaction
     >,
+
+    @Inject(Account.name)
+    private readonly accountModel: TenantModelProxy<typeof Account>,
   ) {}
 
   /**
@@ -60,7 +69,10 @@ export class GetMatchedTransactions {
         .whereIn('id', uncategorizedTransactionIds)
         .throwIfNotFound();
 
-    const totalPending = sumBy(uncategorizedTransactions, 'amount');
+    // Every matcher lists the transactions of one bank account.
+    validateUncategorizedTransactionsSameAccount(uncategorizedTransactions);
+    const accountId = first(uncategorizedTransactions)?.accountId;
+    const account = await this.accountModel().query().findById(accountId);
 
     const filtered = filter.transactionType
       ? this.registered.filter((item) => item.type === filter.transactionType)
@@ -69,8 +81,22 @@ export class GetMatchedTransactions {
     const matchedTransactions = await PromisePool.withConcurrency(2)
       .for(filtered)
       .process(async ({ type: _type, service }) => {
-        return service.getMatchedTransactions(filter);
+        // Matchers list the bank account's own transactions, with their
+        // amounts in the account's currency.
+        return service.getMatchedTransactions({
+          ...filter,
+          accountId,
+          accountCurrencyCode: account?.currencyCode,
+        });
       });
+    // A matcher that fails is left out of the list; log it, so a broken
+    // matcher doesn't just quietly offer nothing.
+    matchedTransactions.errors?.forEach((error) =>
+      this.logger.error(
+        `A ${error.item?.type} matcher failed: ${error.raw?.message ?? error.message}`,
+        error.raw?.stack,
+      ),
+    );
     const { perfectMatches, possibleMatches } = this.groupMatchedResults(
       uncategorizedTransactions,
       matchedTransactions,
@@ -78,7 +104,7 @@ export class GetMatchedTransactions {
     return {
       perfectMatches,
       possibleMatches,
-      totalPending,
+      totalPending: sumBy(uncategorizedTransactions, 'amount'),
     };
   }
 

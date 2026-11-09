@@ -46,6 +46,9 @@ export const transformInvoiceToPdfTemplate = (
       amount: tax.taxRateAmountFormatted,
     })),
     discount: invoice.discountAmountFormatted,
+    // The total includes it, so the PDF shows it (it was left out, and the
+    // lines didn't add up to the total).
+    adjustment: invoice.adjustmentFormatted,
     discountLabel: invoice.discountPercentageFormatted
       ? `Discount [${invoice.discountPercentageFormatted}]`
       : 'Discount',

@@ -18,16 +18,16 @@ export class ContactBalanceSummaryReport extends FinancialSheet {
   readonly filter: IContactBalanceSummaryQuery;
 
   /**
-   * Calculates the contact percentage of column.
-   * @param {number} customerBalance - Contact balance.
+   * Calculates the contact's share of the total (contact / total).
    * @param {number} totalBalance - Total contacts balance.
-   * @returns {number}
+   * @param {number} contactBalance - Contact balance.
+   * @returns {number} 0 when the total is 0 (it was Infinity or NaN).
    */
   protected getContactPercentageOfColumn = (
-    customerBalance: number,
     totalBalance: number,
+    contactBalance: number,
   ): number => {
-    return totalBalance / customerBalance;
+    return totalBalance === 0 ? 0 : contactBalance / totalBalance;
   };
 
   /**

@@ -23,10 +23,16 @@ import { VendorCreditNoteFormHeader } from './VendorCreditNoteFormHeader';
 import { useVendorCreditNoteFormContext } from './VendorCreditNoteFormProvider';
 import { VendorCreditNoteFormTopBar } from './VendorCreditNoteFormTopBar';
 import { VendorCreditNoteItemsEntriesEditor } from './VendorCreditNoteItemsEntriesEditor';
-import { AppToaster, Box } from '@/components';
+import {
+  AppToaster,
+  Box,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { safeSumBy, transactionNumber } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 interface VendorCreditNoteFormInnerProps {}
 
@@ -116,7 +122,7 @@ function VendorCreditNoteFormInner({}: VendorCreditNoteFormInnerProps) {
         history.push('/vendor-credits');
       }
       if (submitPayload?.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.
@@ -132,12 +138,16 @@ function VendorCreditNoteFormInner({}: VendorCreditNoteFormInnerProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<VendorCreditFormValues>
       validationSchema={
         isNewMode ? CreateCreditNoteFormSchema : EditCreditNoteFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form
@@ -148,6 +158,8 @@ function VendorCreditNoteFormInner({}: VendorCreditNoteFormInnerProps) {
           flex: 1,
         })}
       >
+        {/* Fills the rate: never a silent 1 for a foreign currency. */}
+        <DocumentExchangeRateSync isNewMode={isNewMode} />
         <PageForm flex={1}>
           <PageForm.Body>
             <VendorCreditNoteFormTopBar />

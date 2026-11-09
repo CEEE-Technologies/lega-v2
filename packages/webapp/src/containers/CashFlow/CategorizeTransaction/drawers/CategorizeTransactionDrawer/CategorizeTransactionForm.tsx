@@ -4,9 +4,11 @@ import { useMutation } from '@tanstack/react-query';
 import { Formik, Form, FormikHelpers } from 'formik';
 import * as FF from 'fp-ts/function';
 import React from 'react';
+import intl from 'react-intl-universal';
 import styled from 'styled-components';
 import {
   tranformToRequest,
+  useCategorizeBankAccountCurrency,
   useCategorizeTransactionFormInitialValues,
 } from './_utils';
 import { CreateCategorizeTransactionSchema } from './CategorizeTransactionForm.schema';
@@ -15,7 +17,7 @@ import { CategorizeTransactionFormFooter } from './CategorizeTransactionFormFoot
 import type { CategorizeTransactionFormValues } from './_utils';
 import type { WithBankingActionsProps } from '@/containers/CashFlow/withBankingActions';
 import type { CategorizeTransactionBody } from '@bigcapital/sdk-ts';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { useCategorizeTransactionTabsBoot } from '@/containers/CashFlow/CategorizeTransactionAside/CategorizeTransactionTabsBoot';
 import { withBankingActions } from '@/containers/CashFlow/withBankingActions';
 import { useApiFetcher } from '@/hooks/useRequest';
@@ -42,6 +44,13 @@ function CategorizeTransactionFormRoot({
 
   // Form initial values in create and edit mode.
   const initialValues = useCategorizeTransactionFormInitialValues();
+
+  // The rate is required when the bank account's currency is foreign.
+  const getAccountCurrency = useCategorizeBankAccountCurrency();
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: CategorizeTransactionFormValues) =>
+      getAccountCurrency(values.debitAccountId),
+  );
 
   // Callbacks handles form submit.
   const handleFormSubmit = (
@@ -78,6 +87,14 @@ function CategorizeTransactionFormRoot({
               ...({} as CategorizeTransactionFormValues),
               branchId: 'The branch is required.',
             });
+          } else if (
+            err.response?.data?.errors?.some(
+              (e) => e.type === 'EXCHANGE_RATE_REQUIRED',
+            )
+          ) {
+            setErrors({
+              exchangeRate: intl.get('exchange_rate.error.required'),
+            });
           } else {
             AppToaster.show({
               message: 'Something went wrong!',
@@ -92,6 +109,7 @@ function CategorizeTransactionFormRoot({
     <Formik
       validationSchema={CreateCategorizeTransactionSchema}
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <FormRoot>

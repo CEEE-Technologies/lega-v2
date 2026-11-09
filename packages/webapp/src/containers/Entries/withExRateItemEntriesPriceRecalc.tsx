@@ -136,10 +136,15 @@ export const useSyncExRateToForm = ({ onSynced }: UseSyncExRateToFormProps) => {
   // Sync the fetched real-time exchanage rate to the form.
   useEffect(() => {
     if (!isAutoExchangeRateLoading && autoExRateCurrency) {
-      // Sets a default ex. rate to 1 in case the exchange rate service wasn't configured.
-      // or returned an error from the server-side.
-      const exchangeRate = autoExchangeRate?.exchangeRate || 1;
+      const exchangeRate = autoExchangeRate?.exchangeRate;
 
+      // No rate (the rate service isn't configured or failed): leave it
+      // empty for the user to type, never a silent 1 (the form requires it).
+      if (!exchangeRate || !(exchangeRate > 0)) {
+        // (No "prices re-calculated" notice: the entries are unchanged.)
+        setFieldValue('exchangeRate', '');
+        return;
+      }
       setFieldValue('exchangeRate', exchangeRate + '');
       setFieldValue(
         'entries',

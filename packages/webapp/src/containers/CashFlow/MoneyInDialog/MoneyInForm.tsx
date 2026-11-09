@@ -11,7 +11,7 @@ import { MoneyInFormContent } from './MoneyInFormContent';
 import type { MoneyInFormValues } from './types';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
 import type { CreateCashflowTransactionBody } from '@bigcapital/sdk-ts';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { transactionNumber } from '@/utils';
@@ -68,6 +68,7 @@ function MoneyInFormInner({
     accountType,
     createCashflowTransactionMutate,
     cashflowSettings: cashflowSetting,
+    accounts,
   } = useMoneyInDailogContext();
 
   const transactionNextNumber = cashflowSetting?.nextNumber as
@@ -118,10 +119,21 @@ function MoneyInFormInner({
       });
   };
 
+  // The rate is required when the account's currency is foreign (the
+  // amount is in the account's currency).
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: MoneyInFormValues) =>
+      (
+        accounts as Array<{ id: number; currencyCode?: string }> | undefined
+      )?.find((account) => account.id === Number(values.cashflowAccountId))
+        ?.currencyCode,
+  );
+
   return (
     <Formik
       validationSchema={CreateMoneyInFormSchema}
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <MoneyInFormContent />

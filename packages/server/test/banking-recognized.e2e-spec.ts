@@ -2,21 +2,19 @@ import request = require('supertest');
 import { app, AuthorizationHeader, orgainzationId } from './init-app-test';
 
 describe('Banking Recognized Transactions (e2e)', () => {
-  it('/banking/recognized (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/banking/recognized')
-      .set('organization-id', orgainzationId)
-      .set('Authorization', AuthorizationHeader)
-      .expect(200);
-  });
-
-  it('/banking/recognized/:recognizedTransactionId (GET)', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/banking/recognized/1')
+  const get = (url: string) =>
+    request(app.getHttpServer())
+      .get(url)
       .set('organization-id', orgainzationId)
       .set('Authorization', AuthorizationHeader);
 
-    // A transaction only exists when bank data was synced into the organization.
-    expect([200, 404]).toContain(response.status);
+  it('/banking/recognized (GET)', () => {
+    return get('/banking/recognized').expect(200);
+  });
+
+  // A recognized line is covered end to end in
+  // round-4-recognized-bank-line.e2e-spec.ts.
+  it('/banking/recognized/:recognizedTransactionId (GET) unknown is not found', async () => {
+    expect((await get('/banking/recognized/999999999')).status).toBe(404);
   });
 });

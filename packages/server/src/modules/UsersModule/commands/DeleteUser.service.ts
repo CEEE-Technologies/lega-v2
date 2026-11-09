@@ -1,5 +1,6 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Inject, Injectable } from '@nestjs/common';
+import { AdminAccessService } from '@/modules/Roles/AdminAccess.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { TenantUser } from '@/modules/Tenancy/TenancyModels/models/TenantUser.model';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
@@ -17,6 +18,7 @@ export class DeleteUserService {
     private readonly eventEmitter: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
     private readonly tenantUserOwner: TenantUserOwnerService,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -39,6 +41,9 @@ export class DeleteUserService {
     }
     // Nobody can remove the owner.
     await this.tenantUserOwner.throwIfOwner(tenantUser);
+
+    // Only the owner and admins can remove an admin.
+    await this.adminAccess.throwUnlessAdminForAdminUser(tenantUser);
 
     // Validate the delete user should not be the last active user.
     if (tenantUser.isInviteAccepted) {

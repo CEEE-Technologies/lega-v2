@@ -10,6 +10,7 @@ import {
 import * as FF from 'fp-ts/function';
 import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
+import { useAccountTransactionsContext } from '../AccountTransactions/AccountTransactionsProvider';
 import { withBanking } from '../withBanking';
 import { withBankingActions } from '../withBankingActions';
 import styles from './CategorizeTransactionAside.module.scss';
@@ -34,6 +35,7 @@ import type { MatchingTransactionFormValues } from './types';
 import type { WithBankingProps } from '../withBanking';
 import type { WithBankingActionsProps } from '../withBankingActions';
 import { AppToaster, Box, FormatNumber, Group, Stack } from '@/components';
+import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { useMatchUncategorizedTransaction } from '@/hooks/query/banking';
 import { useIsDarkMode } from '@/hooks/useDarkMode';
 
@@ -357,6 +359,12 @@ const MatchTransactionFooter = FF.pipe(
     const { submitForm, isSubmitting, values } =
       useFormikContext<MatchingTransactionFormValues>();
     const totalPending = useGetPendingAmountMatched();
+    // The bank lines are in the bank account's currency (it was always USD).
+    const { currentAccount } = useAccountTransactionsContext();
+    const baseCurrency = useCurrentOrganizationBaseCurrency();
+    const pendingCurrency =
+      (currentAccount as { currencyCode?: string } | undefined)?.currencyCode ||
+      baseCurrency;
     const showReconcileLink = useIsShowReconcileTransactionLink();
     // Every selected invoice or bill in another currency needs a rate.
     const foreignMatches = useSelectedForeignMatches();
@@ -410,7 +418,7 @@ const MatchTransactionFooter = FF.pipe(
               Pending{' '}
               <FormatNumber
                 value={totalPending}
-                currency={'USD'}
+                currency={pendingCurrency}
                 noZero={false}
               />
             </Text>

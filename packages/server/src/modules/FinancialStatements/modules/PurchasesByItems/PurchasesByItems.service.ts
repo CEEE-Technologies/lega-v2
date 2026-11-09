@@ -66,6 +66,9 @@ export class PurchasesByItemsService {
       .onBuild((builder: any) => {
         builder.modify('itemsTotals');
         builder.modify('INDirection');
+        // Purchases only: warehouse transfers, adjustments and credit notes
+        // also move stock in and were counted as purchased.
+        builder.whereIn('transactionType', ['Bill']);
 
         // Filter the inventory items only.
         builder.whereIn('itemId', inventoryItemsIds);

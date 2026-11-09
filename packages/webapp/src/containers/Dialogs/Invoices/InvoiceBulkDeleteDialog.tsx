@@ -7,7 +7,10 @@ import type { WithInvoiceActionsProps } from '@/containers/Sales/Invoices/Invoic
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withInvoiceActions } from '@/containers/Sales/Invoices/InvoicesLanding/withInvoiceActions';
 import { useBulkDeleteInvoices } from '@/hooks/query/invoices';
 
@@ -91,6 +94,10 @@ function InvoiceBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_invoice_singular')}
         resourcePluralLabel={intl.get('resource_invoice_plural')}
       />

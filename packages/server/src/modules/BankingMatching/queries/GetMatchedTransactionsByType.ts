@@ -2,6 +2,7 @@ import { Knex } from 'knex';
 import {
   GetMatchedTransactionsFilter,
   IMatchTransactionDTO,
+  MatchedTransactionContext,
   MatchedTransactionPOJO,
   MatchedTransactionsPOJO,
 } from '../types';
@@ -49,6 +50,7 @@ export abstract class GetMatchedTransactionsByType {
    */
   public async getMatchedTransaction(
     _transactionId: number,
+    _context?: MatchedTransactionContext,
   ): Promise<MatchedTransactionPOJO> {
     throw new Error(
       'The `getMatchedTransaction` method is not defined for the transaction type.',

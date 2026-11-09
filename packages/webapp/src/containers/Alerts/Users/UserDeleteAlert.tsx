@@ -46,16 +46,21 @@ function UserDeleteAlertInner({
           intent: Intent.SUCCESS,
         });
       })
-      .catch(
-        ({ data: { errors } }: { data: { errors: UserDeleteError[] } }) => {
-          if (errors.find((e) => e.type === 'CANNOT_DELETE_LAST_USER')) {
-            AppToaster.show({
-              message: 'Cannot delete the last user in the system.',
-              intent: Intent.DANGER,
-            });
-          }
-        },
-      )
+      .catch((error: { data?: { errors?: UserDeleteError[] } }) => {
+        const errors = error?.data?.errors ?? [];
+        if (errors.find((e) => e.type === 'CANNOT_DELETE_LAST_USER')) {
+          AppToaster.show({
+            message: 'Cannot delete the last user in the system.',
+            intent: Intent.DANGER,
+          });
+        }
+        if (errors.find((e) => e.type === 'ADMIN_ONLY')) {
+          AppToaster.show({
+            message: intl.get('roles.error.admin_only'),
+            intent: Intent.DANGER,
+          });
+        }
+      })
       .finally(() => {
         closeAlert(name);
       });

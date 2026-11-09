@@ -19,6 +19,9 @@ import {
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { CreateBankTransactionDto } from '../dtos/CreateBankTransaction.dto';
 import { formatDateFields } from '@/utils/format-date-fields';
+import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import { ServiceError } from '@/modules/Items/ServiceError';
+import { ERRORS } from '../constants';
 
 @Injectable()
 export class CreateBankTransactionService {
@@ -34,7 +37,36 @@ export class CreateBankTransactionService {
 
     @Inject(Account.name)
     private accountModel: TenantModelProxy<typeof Account>,
+
+    private tenancyContext: TenancyContext,
   ) {}
+
+  /**
+   * The rate of a transaction on the account: 1 on a base-currency
+   * account; on a foreign-currency one the given rate, which is required
+   * (the amount is in the account's currency and the books get amount ×
+   * rate, so a missing rate used to post at 1).
+   * @param {number | undefined} exchangeRate
+   * @param {Account} cashflowAccount
+   */
+  private getExchangeRate = async (
+    exchangeRate: number | undefined,
+    cashflowAccount: Account,
+  ): Promise<number> => {
+    const metadata = await this.tenancyContext.getTenantMetadata();
+    const baseCurrency = metadata?.baseCurrency;
+
+    if (!baseCurrency || cashflowAccount.currencyCode === baseCurrency) {
+      return 1;
+    }
+    if (!(Number(exchangeRate) > 0)) {
+      throw new ServiceError(
+        ERRORS.EXCHANGE_RATE_REQUIRED,
+        `The exchange rate is required for a ${cashflowAccount.currencyCode} account.`,
+      );
+    }
+    return Number(exchangeRate);
+  };
 
   /**
    * Authorize the cashflow creating transaction.
@@ -93,7 +125,10 @@ export class CreateBankTransactionService {
       ...formatDateFields(fromDTO, ['date']),
       transactionNumber,
       currencyCode: cashflowAccount.currencyCode,
-      exchangeRate: fromDTO?.exchangeRate || 1,
+      exchangeRate: await this.getExchangeRate(
+        fromDTO?.exchangeRate,
+        cashflowAccount,
+      ),
       transactionType: transformCashflowTransactionType(
         fromDTO.transactionType,
       ),

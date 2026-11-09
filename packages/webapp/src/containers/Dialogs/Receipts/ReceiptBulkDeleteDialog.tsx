@@ -7,7 +7,10 @@ import type { WithReceiptsActionsProps } from '@/containers/Sales/Receipts/Recei
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withReceiptsActions } from '@/containers/Sales/Receipts/ReceiptsLanding/withReceiptsActions';
 import { useBulkDeleteReceipts } from '@/hooks/query/receipts';
 
@@ -88,6 +91,10 @@ function ReceiptBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_receipt_singular')}
         resourcePluralLabel={intl.get('resource_receipt_plural')}
       />

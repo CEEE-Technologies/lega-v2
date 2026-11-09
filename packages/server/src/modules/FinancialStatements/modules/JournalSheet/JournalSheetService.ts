@@ -27,7 +27,9 @@ export class JournalSheetService {
       ...getJournalSheetDefaultQuery(),
       ...query,
     };
-    this.journalRepository.setFilter(query);
+    // The filter with its defaults (the bare query ignored the default
+    // dates, so an API call with none returned all history).
+    this.journalRepository.setFilter(filter);
     await this.journalRepository.load();
 
     // Reflect the resolved accounting basis in the report query, including

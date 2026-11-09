@@ -7,7 +7,10 @@ import type { WithEstimatesActionsProps } from '@/containers/Sales/Estimates/Est
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withEstimatesActions } from '@/containers/Sales/Estimates/EstimatesLanding/withEstimatesActions';
 import { useBulkDeleteEstimates } from '@/hooks/query/estimates';
 
@@ -88,6 +91,10 @@ function EstimateBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_estimate_singular')}
         resourcePluralLabel={intl.get('resource_estimate_plural')}
       />

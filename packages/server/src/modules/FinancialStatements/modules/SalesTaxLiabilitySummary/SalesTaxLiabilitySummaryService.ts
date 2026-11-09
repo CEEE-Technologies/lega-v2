@@ -5,11 +5,12 @@ import { Injectable } from '@nestjs/common';
 import { SalesTaxLiabilitySummaryQuery } from './SalesTaxLiability.types';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { mergeSalesTaxLiabilityQueryWithDefaults } from './utils';
+import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class SalesTaxLiabilitySummaryService {
   constructor(
-    private readonly repository: SalesTaxLiabilitySummaryRepository,
+    private readonly moduleRef: ModuleRef,
     private readonly salesTaxLiabilityMeta: SalesTaxLiabilitySummaryMeta,
     private readonly tenancyContext: TenancyContext,
   ) {}
@@ -22,7 +23,17 @@ export class SalesTaxLiabilitySummaryService {
   public async salesTaxLiability(query: SalesTaxLiabilitySummaryQuery) {
     const filter = mergeSalesTaxLiabilityQueryWithDefaults(query);
 
-    await this.repository.load(filter);
+    // A new repository per report: it holds this report's query and
+    // data, and one instance shared by every request (the service is
+    // a singleton) let concurrent reports overwrite each other's.
+    const repository = await this.moduleRef.resolve(
+      SalesTaxLiabilitySummaryRepository,
+      undefined,
+      {
+        strict: false,
+      },
+    );
+    await repository.load(filter);
 
     // Retrieve the meta first to get date format.
     const meta = await this.salesTaxLiabilityMeta.meta(filter);
@@ -32,7 +43,7 @@ export class SalesTaxLiabilitySummaryService {
 
     const taxLiabilitySummary = new SalesTaxLiabilitySummary(
       filter,
-      this.repository,
+      repository,
       {
         baseCurrency: tenantMetadata.baseCurrency,
         dateFormat: meta.dateFormat,

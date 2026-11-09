@@ -10,6 +10,7 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { I18nService } from 'nestjs-i18n';
 import { allPassedConditionsPass } from '@/utils/all-conditions-passed';
 import { TransactionsByContactRepository } from './TransactionsByContactRepository';
+import * as moment from 'moment';
 
 export class TransactionsByContact extends FinancialSheet {
   public readonly filter: ITransactionsByContactsFilter;
@@ -105,9 +106,14 @@ export class TransactionsByContact extends FinancialSheet {
    * @returns {number}
    */
   protected getContactOpeningBalance(customerId: number): number {
+    // Up to the day before the period: the ledger also holds the period's
+    // entries, and closing on the start date counted that day's entries in
+    // the opening and again in the period.
     const openingBalanceLedger = this.repository.ledger
       .whereContactId(customerId)
-      .whereToDate(this.filter.fromDate);
+      .whereToDate(
+        moment(this.filter.fromDate).subtract(1, 'day').format('YYYY-MM-DD'),
+      );
 
     // Retrieve the closing balance of the ledger.
     const openingBalance = openingBalanceLedger.getClosingBalance();

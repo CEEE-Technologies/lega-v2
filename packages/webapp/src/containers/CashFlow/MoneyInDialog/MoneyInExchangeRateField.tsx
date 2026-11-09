@@ -4,7 +4,7 @@ import { useMoneyInFieldsContext } from './MoneyInFieldsProvider';
 import { useForeignAccount } from './utils';
 import type { MoneyInFormValues } from './types';
 import type { Account } from '@bigcapital/sdk-ts';
-import { ExchangeRateMutedField } from '@/components';
+import { ExchangeRateMutedField, ForeignExchangeRateSync } from '@/components';
 
 export function MoneyInExchangeRateField() {
   const { account } = useMoneyInFieldsContext();
@@ -17,11 +17,28 @@ export function MoneyInExchangeRateField() {
   return (
     <ExchangeRateMutedField
       name={'exchangeRate'}
-      fromCurrency={values.currencyCode}
-      toCurrency={(account as Account | undefined)?.currencyCode}
+      // The amount is in the account's currency and the server books
+      // amount × rate in the base currency: 1 {account} = rate {base}.
+      fromCurrency={(account as Account | undefined)?.currencyCode}
+      toCurrency={values.currencyCode}
       formGroupProps={{ label: '', inline: false }}
       date={values.date}
       exchangeRate={values.exchangeRate}
+    />
+  );
+}
+
+/**
+ * Fills the rate for the account's currency: today's rate, else empty (the
+ * user must type it), never a silent 1; 1 for a base-currency account.
+ */
+export function MoneyInExchangeRateSync() {
+  const { account } = useMoneyInFieldsContext();
+
+  return (
+    <ForeignExchangeRateSync
+      currencyCode={(account as Account | undefined)?.currencyCode}
+      isNewMode={true}
     />
   );
 }

@@ -430,6 +430,8 @@ export const resetFormState = ({
       // Reset the all values except the warehouse id.
       ...initialValues,
       warehouseId: values.warehouseId,
+      // The branch too (it was dropped, so the next one had none).
+      branchId: values.branchId,
     },
   });
 };

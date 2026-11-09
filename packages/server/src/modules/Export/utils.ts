@@ -1,4 +1,5 @@
 import { flatMap, get } from 'lodash';
+import { escapePdfCell } from '@/utils/escape-pdf-cell';
 /**
  * Flattens the data based on a specified attribute.
  * @param data - The data to be flattened.
@@ -37,7 +38,8 @@ export const mapPdfRows = (columns: any, data: Record<string, any>) => {
     const cells = columns.map((column) => {
       return {
         key: column.accessor,
-        value: get(item, getDataAccessor(column)),
+        // Escaped: the template renders cells as HTML.
+        value: escapePdfCell(get(item, getDataAccessor(column))),
       };
     });
     return { cells, classNames: '' };

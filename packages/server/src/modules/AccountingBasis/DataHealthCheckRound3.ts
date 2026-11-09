@@ -326,7 +326,7 @@ const getOrphanWriteOffs = async (
  *     that line's cost went into stock with the bill, and again through
  *     the landed cost.
  */
-const getLandedCostSources = async (knex: Knex) => {
+export const getLandedCostSources = async (knex: Knex) => {
   const sourcesGone: IDataHealthLandedCostSourceGone[] = [];
   const overAllocated: IDataHealthLandedCostOverAllocated[] = [];
   const fromInventory: IDataHealthLandedCostFromInventory[] = [];

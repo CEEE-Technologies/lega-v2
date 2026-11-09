@@ -32,5 +32,17 @@ export const createMaintenanceApp = async (): Promise<INestApplication> => {
   bullExtraOptions.manualRegistration = true;
 
   await app.init();
+
+  // The commands close the app and exit right after their last save: let
+  // that save's after-commit work (for example adding the cost recompute
+  // job) finish first, or it is cut off.
+  const { settleAfterCommitWork } = await import(
+    '../Tenancy/TenancyDB/TransactionsHooks'
+  );
+  const close = app.close.bind(app);
+  app.close = async () => {
+    await settleAfterCommitWork();
+    return close();
+  };
   return app;
 };

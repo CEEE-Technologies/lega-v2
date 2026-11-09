@@ -6,4 +6,5 @@ export interface MatchingReconcileTransactionValues {
   referenceNo: string;
   category: string;
   branchId: string;
+  exchangeRate: number | string;
 }

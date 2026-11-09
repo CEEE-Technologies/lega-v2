@@ -59,14 +59,14 @@ describe('AgingSummary', () => {
           saleInvoice({
             balance: 100,
             exchangeRate: 1.5,
-            dueDate: moment().subtract(10, 'days').toDate(),
+            dueDate: moment(baseQuery.asDate).subtract(10, 'days').toDate(),
           }),
         ],
         2: [
           saleInvoice({
             balance: 70,
             exchangeRate: 1,
-            dueDate: moment().subtract(5, 'days').toDate(),
+            dueDate: moment(baseQuery.asDate).subtract(5, 'days').toDate(),
           }),
         ],
       },
@@ -133,7 +133,12 @@ describe('AgingSummary', () => {
       saleInvoice({
         balance,
         exchangeRate: 1,
-        dueDate: currentMoment.clone().subtract(overdueDays, 'days').toDate(),
+        // Due dates are dates; the report counts from its `asDate`.
+        dueDate: currentMoment
+          .clone()
+          .startOf('day')
+          .subtract(overdueDays, 'days')
+          .toDate(),
       });
 
     const buildRepository = (invoices: ReturnType<typeof saleInvoice>[]) =>
@@ -145,7 +150,11 @@ describe('AgingSummary', () => {
 
     const reportFor = (invoices: ReturnType<typeof saleInvoice>[]) =>
       new ARAgingSummarySheet(
-        { ...baseQuery, customersIds: [] } as unknown as ARAgingSummaryQueryDto,
+        {
+          ...baseQuery,
+          asDate: currentMoment.format('YYYY-MM-DD'),
+          customersIds: [],
+        } as unknown as ARAgingSummaryQueryDto,
         buildRepository(invoices),
         baseMeta,
       ).reportData();
@@ -228,14 +237,22 @@ describe('AgingSummary', () => {
             bill({
               amount: 100,
               exchangeRate: 1,
-              dueDate: currentMoment.clone().subtract(60, 'days').toDate(),
+              dueDate: currentMoment
+                .clone()
+                .startOf('day')
+                .subtract(60, 'days')
+                .toDate(),
             }),
           ],
         },
         dueBillsByVendorId: {},
       } as unknown as APAgingSummaryRepository;
       const { vendors, total } = new APAgingSummarySheet(
-        { ...baseQuery, vendorsIds: [] } as unknown as APAgingSummaryQueryDto,
+        {
+          ...baseQuery,
+          asDate: currentMoment.format('YYYY-MM-DD'),
+          vendorsIds: [],
+        } as unknown as APAgingSummaryQueryDto,
         repository,
         baseMeta,
       ).reportData();
@@ -254,7 +271,7 @@ describe('AgingSummary', () => {
           bill({
             amount: 200,
             exchangeRate: 0.8,
-            dueDate: moment().subtract(45, 'days').toDate(),
+            dueDate: moment(baseQuery.asDate).subtract(45, 'days').toDate(),
           }),
         ],
       },
@@ -282,5 +299,31 @@ describe('AgingSummary', () => {
       expect(total.total.amount).toBe(200);
       expect(total.total.currencyCode).toBe('USD');
     });
+  });
+
+  // Sweep R3: the buckets count from the report's date, not today.
+  it('ages as of a past date from that date', () => {
+    const repository = {
+      customers: [{ id: 1, displayName: 'Customer A' }],
+      overdueInvoicesByContactId: {
+        1: [
+          saleInvoice({ balance: 500, exchangeRate: 1, dueDate: '2026-06-15' }),
+        ],
+      },
+      currentInvoicesByContactId: {},
+    } as unknown as ARAgingSummaryRepository;
+    const { customers } = new ARAgingSummarySheet(
+      {
+        ...baseQuery,
+        asDate: '2026-06-30',
+        customersIds: [],
+      } as unknown as ARAgingSummaryQueryDto,
+      repository,
+      baseMeta,
+    ).reportData();
+    // 15 days overdue on 30 June: the 0-30 bucket, whatever today is.
+    expect(customers[0].aging.map((period) => period.total.amount)).toEqual([
+      500, 0, 0,
+    ]);
   });
 });

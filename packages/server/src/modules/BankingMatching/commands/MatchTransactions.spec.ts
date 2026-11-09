@@ -13,6 +13,7 @@ describe('MatchBankTransactions', () => {
   };
   let matchedBankTransactions: { registry: { get: jest.Mock } };
   let uncategorizedBankTransactionModel: jest.Mock;
+  let accountModel: jest.Mock;
   let service: MatchBankTransactions;
 
   const buildUncategorizedQuery = (transactions: any[]) => {
@@ -48,17 +49,24 @@ describe('MatchBankTransactions', () => {
       buildUncategorizedQuery([
         {
           id: 1,
+          accountId: 10,
           amount: 100,
           excluded: false,
           matchedBankTransactions: [],
         },
       ]),
     );
+    accountModel = jest.fn(() => ({
+      query: () => ({
+        findById: jest.fn().mockResolvedValue({ id: 10, currencyCode: 'USD' }),
+      }),
+    }));
     service = new MatchBankTransactions(
       uow as any,
       eventPublisher as any,
       matchedBankTransactions as any,
       uncategorizedBankTransactionModel as any,
+      accountModel as any,
     );
   });
 
@@ -111,5 +119,34 @@ describe('MatchBankTransactions', () => {
 
     expect(matchedService.createMatchedTransaction).not.toHaveBeenCalled();
     expect(eventPublisher.emitAsync).not.toHaveBeenCalled();
+  });
+
+  it('checks each match against the bank account and its currency', async () => {
+    await service.matchTransaction(
+      [1],
+      [{ referenceType: 'Expense', referenceId: 5 }],
+    );
+    expect(matchedService.getMatchedTransaction).toHaveBeenCalledWith(5, {
+      accountId: 10,
+      accountCurrencyCode: 'USD',
+    });
+  });
+
+  it('refuses bank lines from two accounts', async () => {
+    uncategorizedBankTransactionModel.mockImplementation(() =>
+      buildUncategorizedQuery([
+        { id: 1, accountId: 10, amount: 50, matchedBankTransactions: [] },
+        { id: 2, accountId: 11, amount: 50, matchedBankTransactions: [] },
+      ]),
+    );
+    await expect(
+      service.matchTransaction(
+        [1, 2],
+        [{ referenceType: 'Expense', referenceId: 5 }],
+      ),
+    ).rejects.toMatchObject({
+      errorType: 'UNCATEGORIZED_TRANSACTIONS_ACCOUNTS_DIFFER',
+    });
+    expect(matchedService.createMatchedTransaction).not.toHaveBeenCalled();
   });
 });

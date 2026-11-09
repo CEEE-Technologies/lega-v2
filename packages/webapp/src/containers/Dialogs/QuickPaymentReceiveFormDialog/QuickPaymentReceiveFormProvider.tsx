@@ -67,6 +67,7 @@ function QuickPaymentReceiveFormProvider({
         'dueAmount',
         'customerId',
         'currencyCode',
+        'exchangeRate',
       ]) as QuickPaymentReceiveContextValue['invoice'],
     [invoice],
   );

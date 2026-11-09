@@ -60,6 +60,7 @@ function QuickPaymentMadeFormProvider({
         'dueAmount',
         'vendorId',
         'currencyCode',
+        'exchangeRate',
       ]) as QuickPaymentMadeContextValue['bill'],
     [bill],
   );

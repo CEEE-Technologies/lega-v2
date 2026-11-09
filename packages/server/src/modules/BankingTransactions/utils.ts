@@ -63,7 +63,8 @@ export const transformCategorizeTransToCashflow = (
     description: categorizeDTO.description,
     cashflowAccountId: uncategorizeTransaction.accountId,
     creditAccountId: categorizeDTO.creditAccountId,
-    exchangeRate: categorizeDTO.exchangeRate || 1,
+    // Required for a foreign-currency account (checked when it is created).
+    exchangeRate: categorizeDTO.exchangeRate,
     currencyCode: categorizeDTO.currencyCode,
     amount: amountAbs,
     transactionNumber: categorizeDTO.transactionNumber,

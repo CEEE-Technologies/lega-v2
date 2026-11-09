@@ -1,4 +1,5 @@
 import { Transformer } from '@/modules/Transformer/Transformer';
+import { amountInAccountCurrency } from '../_utils';
 
 export class GetMatchedTransactionExpensesTransformer extends Transformer {
   /**
@@ -46,7 +47,12 @@ export class GetMatchedTransactionExpensesTransformer extends Transformer {
    * @returns {number}
    */
   protected amount(expense) {
-    return expense.totalAmount;
+    // What the expense moves on the bank account, in its currency.
+    return amountInAccountCurrency(
+      expense.totalAmount,
+      expense,
+      this.options?.accountCurrencyCode,
+    );
   }
 
   /**
@@ -55,8 +61,8 @@ export class GetMatchedTransactionExpensesTransformer extends Transformer {
    * @returns {string}
    */
   protected amountFormatted(expense) {
-    return this.formatNumber(expense.totalAmount, {
-      currencyCode: expense.currencyCode,
+    return this.formatNumber(this.amount(expense), {
+      currencyCode: this.options?.accountCurrencyCode ?? expense.currencyCode,
       money: true,
     });
   }

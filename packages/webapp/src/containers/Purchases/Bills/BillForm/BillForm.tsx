@@ -21,10 +21,16 @@ import {
   handleErrors,
   type BillFormValues,
 } from './utils';
-import { AppToaster, Box } from '@/components';
+import {
+  AppToaster,
+  Box,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { safeSumBy } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type BillSubmitError = {
   data?: { errors?: { type: string }[] };
@@ -91,7 +97,7 @@ function BillFormInner() {
         history.push('/bills');
       }
       if (submitPayload.resetForm) {
-        resetForm();
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       }
     };
     // Handle the request error.
@@ -106,10 +112,14 @@ function BillFormInner() {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik
       validationSchema={isNewMode ? CreateBillFormSchema : EditBillFormSchema}
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form
@@ -120,6 +130,8 @@ function BillFormInner() {
           flex: 1,
         })}
       >
+        {/* Fills the rate: never a silent 1 for a foreign currency. */}
+        <DocumentExchangeRateSync isNewMode={isNewMode} />
         <PageForm flex={1}>
           <PageForm.Body>
             <BillFormTopBar />

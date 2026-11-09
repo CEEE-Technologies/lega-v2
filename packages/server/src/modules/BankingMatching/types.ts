@@ -43,6 +43,16 @@ export interface GetMatchedTransactionsFilter {
   minAmount: number;
   maxAmount: number;
   transactionType: string;
+  /** The bank account of the bank lines being matched. */
+  accountId?: number;
+  /** That account's currency: match amounts are compared in it. */
+  accountCurrencyCode?: string;
+}
+
+/** The bank account a matched transaction is checked against. */
+export interface MatchedTransactionContext {
+  accountId?: number;
+  accountCurrencyCode?: string;
 }
 
 export interface MatchedTransactionPOJO {
@@ -72,4 +82,6 @@ export const ERRORS = {
   CANNOT_MATCH_EXCLUDED_TRANSACTION: 'CANNOT_MATCH_EXCLUDED_TRANSACTION',
   CANNOT_DELETE_TRANSACTION_MATCHED: 'CANNOT_DELETE_TRANSACTION_MATCHED',
   EXCHANGE_RATE_REQUIRED: 'EXCHANGE_RATE_REQUIRED',
+  UNCATEGORIZED_TRANSACTIONS_ACCOUNTS_DIFFER:
+    'UNCATEGORIZED_TRANSACTIONS_ACCOUNTS_DIFFER',
 };

@@ -15,6 +15,7 @@ import { TenancyModule } from '../Tenancy/Tenancy.module';
 import { CreditApplicationsGLService } from './CreditApplicationsGL.service';
 import { CreditApplicationsGLSubscriber } from './CreditApplicationsGL.subscriber';
 import { StaleJournalsRepairService } from './StaleJournalsRepair.service';
+import { StockQuantitiesRepairService } from './StockQuantitiesRepair.service';
 import { RefundJournalsRepairService } from './RefundJournalsRepair.service';
 
 /**
@@ -43,12 +44,14 @@ import { RefundJournalsRepairService } from './RefundJournalsRepair.service';
     CreditApplicationsGLService,
     CreditApplicationsGLSubscriber,
     StaleJournalsRepairService,
+    StockQuantitiesRepairService,
     RefundJournalsRepairService,
   ],
   exports: [
     CashBasisRebuildService,
     CreditApplicationsGLService,
     StaleJournalsRepairService,
+    StockQuantitiesRepairService,
     RefundJournalsRepairService,
   ],
 })
