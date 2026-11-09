@@ -30,20 +30,26 @@ export const isValidExchangeRate = (value: unknown): boolean => {
  * missing rate would otherwise post at 1.
  * @param getCurrency - The foreign currency of the form (the document's
  *   currency, or the bank account's for money in/out).
+ * @param name - The rate field.
+ * @param when - Only then is the rate needed (e.g. an opening balance is set).
  */
 export const useExchangeRateValidate = <V,>(
   getCurrency: (values: V) => string | null | undefined = (values) =>
     (values as { currencyCode?: string }).currencyCode,
   name = 'exchangeRate',
+  when?: (values: V) => boolean,
 ) => {
   const baseCurrency = useCurrentOrganizationBaseCurrency();
   // The latest `getCurrency` (it may read data loaded after the first render).
   const getCurrencyRef = useRef(getCurrency);
   getCurrencyRef.current = getCurrency;
+  const whenRef = useRef(when);
+  whenRef.current = when;
 
   return useCallback(
     (values: V) => {
       const rate = (values as Record<string, unknown>)[name];
+      if (whenRef.current && !whenRef.current(values)) return {};
       if (
         isForeignCurrency(getCurrencyRef.current(values), baseCurrency) &&
         !isValidExchangeRate(rate)
@@ -168,9 +174,11 @@ export function ForeignExchangeRateSync({
 export function DocumentExchangeRateSync({
   isNewMode,
   sourceRate,
+  name,
 }: {
   isNewMode: boolean;
   sourceRate?: number | string | null;
+  name?: string;
 }) {
   const { values } = useFormikContext<{ currencyCode?: string }>();
 
@@ -179,6 +187,11 @@ export function DocumentExchangeRateSync({
       currencyCode={values.currencyCode}
       isNewMode={isNewMode}
       sourceRate={sourceRate}
+      name={name}
     />
   );
 }
+
+/** An opening balance needs its rate only when there is a balance. */
+export const hasOpeningBalance = (values: { openingBalance?: unknown }) =>
+  Number(values.openingBalance) > 0;

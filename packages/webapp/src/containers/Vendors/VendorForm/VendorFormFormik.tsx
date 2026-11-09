@@ -18,7 +18,12 @@ import {
 import { VendorFormContent } from './VendorFormContent';
 import { useVendorFormContext } from './VendorFormProvider';
 import type { VendorFormSubmitPayload } from './VendorFormProvider';
-import { AppToaster } from '@/components';
+import {
+  AppToaster,
+  DocumentExchangeRateSync,
+  hasOpeningBalance,
+  useExchangeRateValidate,
+} from '@/components';
 import { inferDisplayNameFormat } from '@/components/Select/displayNameUtils';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { saveInvoke } from '@/utils';
@@ -119,15 +124,31 @@ function VendorFormFormikBase({
     }
   };
 
+  // A new foreign-currency contact with an opening balance needs its rate
+  // (the server would post the balance at 1).
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: VendorFormValues) => (isNewMode ? values.currencyCode : null),
+    'openingBalanceExchangeRate',
+    hasOpeningBalance,
+  );
+
   return (
     <Formik<VendorFormValues>
       validationSchema={
         isNewMode ? CreateVendorFormSchema : EditVendorFormSchema
       }
       initialValues={initialFormValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form>
+        {/* Today's rate for a new foreign-currency contact, else empty. */}
+        {isNewMode && (
+          <DocumentExchangeRateSync
+            name={'openingBalanceExchangeRate'}
+            isNewMode={true}
+          />
+        )}
         <VendorFormFields>
           <VendorFormContent onCancel={onCancel} />
         </VendorFormFields>
