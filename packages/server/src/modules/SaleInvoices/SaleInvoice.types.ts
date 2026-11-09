@@ -287,6 +287,11 @@ export interface InvoicePdfTemplateAttributes {
   discount: string;
   paymentMade: string;
 
+  // Adjustment (part of the total).
+  adjustment?: string;
+  adjustmentLabel?: string;
+  showAdjustment?: boolean;
+
   // Due Amount
   dueAmount: string;
   showDueAmount: boolean;
