@@ -217,27 +217,29 @@ export const entriesFieldShouldUpdate = (
 };
 
 export const useSetPrimaryBranchToForm = () => {
-  const { setFieldValue } = useFormikContext<CreditNoteFormValues>();
+  const { setFieldValue, values } = useFormikContext<CreditNoteFormValues>();
   const { branches, isBranchesSuccess, isNewMode } = useCreditNoteFormContext();
 
   React.useEffect(() => {
-    if (isBranchesSuccess && isNewMode) {
+    // Keep one already set (from the estimate / invoice it's made from).
+    if (isBranchesSuccess && isNewMode && !values.branchId) {
       const primaryBranch = branches.find((b) => b.primary) || first(branches);
 
       if (primaryBranch) {
         setFieldValue('branchId', primaryBranch.id);
       }
     }
-  }, [isBranchesSuccess, setFieldValue, branches, isNewMode]);
+  }, [isBranchesSuccess, setFieldValue, branches, isNewMode, values.branchId]);
 };
 
 export const useSetPrimaryWarehouseToForm = () => {
-  const { setFieldValue } = useFormikContext<CreditNoteFormValues>();
+  const { setFieldValue, values } = useFormikContext<CreditNoteFormValues>();
   const { warehouses, isWarehousesSuccess, isNewMode } =
     useCreditNoteFormContext();
 
   React.useEffect(() => {
-    if (isWarehousesSuccess && isNewMode) {
+    // Keep one already set (from the estimate / invoice it's made from).
+    if (isWarehousesSuccess && isNewMode && !values.warehouseId) {
       const primaryWarehouse =
         warehouses.find((b) => b.primary) || first(warehouses);
 
@@ -245,7 +247,13 @@ export const useSetPrimaryWarehouseToForm = () => {
         setFieldValue('warehouseId', primaryWarehouse.id);
       }
     }
-  }, [isWarehousesSuccess, setFieldValue, warehouses, isNewMode]);
+  }, [
+    isWarehousesSuccess,
+    setFieldValue,
+    warehouses,
+    isNewMode,
+    values.warehouseId,
+  ]);
 };
 
 /**
