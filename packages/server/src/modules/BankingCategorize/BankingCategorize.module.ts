@@ -1,6 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { CreateUncategorizedTransactionService } from './commands/CreateUncategorizedTransaction.service';
-import { CategorizeTransactionAsExpense } from './commands/CategorizeTransactionAsExpense';
 import { BankingTransactionsModule } from '../BankingTransactions/BankingTransactions.module';
 import { ExpensesModule } from '../Expenses/Expenses.module';
 import { UncategorizedTransactionsImportable } from './commands/UncategorizedTransactionsImportable';
@@ -19,7 +18,6 @@ import { DeleteExpenseOnUncategorizeSubscriber } from './subscribers/DeleteExpen
   ],
   providers: [
     CreateUncategorizedTransactionService,
-    CategorizeTransactionAsExpense,
     UncategorizedTransactionsImportable,
     BankingCategorizeApplication,
     CategorizeBankTransaction,
@@ -29,7 +27,6 @@ import { DeleteExpenseOnUncategorizeSubscriber } from './subscribers/DeleteExpen
   ],
   exports: [
     CreateUncategorizedTransactionService,
-    CategorizeTransactionAsExpense,
     BankingCategorizeApplication,
     CategorizeBankTransaction,
     UncategorizeBankTransactionService,

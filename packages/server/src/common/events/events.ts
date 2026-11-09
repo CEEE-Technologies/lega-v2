@@ -459,9 +459,6 @@ export const events = {
 
     onTransactionUncategorizing: 'onTransactionUncategorizing',
     onTransactionUncategorized: 'onTransactionUncategorized',
-
-    onTransactionCategorizingAsExpense: 'onTransactionCategorizingAsExpense',
-    onTransactionCategorizedAsExpense: 'onTransactionCategorizedAsExpense',
   },
 
   /**
