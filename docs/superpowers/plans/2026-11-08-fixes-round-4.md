@@ -488,7 +488,7 @@ Added after the PR was opened, on the same branch and PR, as you asked. Sources:
 
 Same rules as Parts 1–4: one commit per fix, its test in the same commit, then the review loop.
 
-**Decisions taken with the recommended answers** (say if you want any changed):
+**Decisions taken with the recommended answers** (say if you want any changed). One change from D11 below: the server **does** refuse a transaction on a foreign-currency bank account without a rate (money in/out, categorizing, the matching panel), because nothing imports those.
 
 | #   | Question | Taken |
 | --- | --- | --- |
@@ -545,7 +545,7 @@ Same rules as Parts 1–4: one commit per fix, its test in the same commit, then
    - editing keeps the saved rate; it refetches only when the user changes the currency.
 2. A shared Yup rule: the rate is required and > 0 when the currency is foreign.
 3. The quick dialogs open the rate popover when the rate is empty, so the error is visible.
-4. Payments: the invoice/bill rate is added to the payment page entries on the server, so the full payment forms can use it.
+4. The full payment forms take today's rate (else empty) when the customer or vendor is picked; the quick dialogs and refunds use the document's own rate.
 5. The client-side `?? 1` on submit is removed.
 6. The server keeps `|| 1` (D11).
 
@@ -677,7 +677,7 @@ Same rules as Parts 1–4: one commit per fix, its test in the same commit, then
 
 **The fix:**
 - the banking specs create their own account and bank lines (helpers moved to `test/_utils/`) and assert exact statuses;
-- `branchId` / `warehouseId` come from a helper that reads the primary branch or warehouse.
+- (`branchId: 1` / `warehouseId: 1` left as they are: the server drops them while branches and warehouses are off, and the shared company's first branch and warehouse are id 1.)
 
 **Test:** the suite passes in a brand-new test company.
 
@@ -691,6 +691,27 @@ Same rules as Parts 1–4: one commit per fix, its test in the same commit, then
 - read-only research, at most two agents at a time;
 - a finding that puts wrong money in the books, loses data, opens a security gap or crashes a main screen is fixed here, with a test, as `fix: (sweep) …`;
 - everything else goes to the PR's "Found in passing" list.
+
+**Done 9 Nov.** Two read-only passes (reports; branches, emails/PDFs and screen forms). Each fix below has a test that fails on the old code.
+
+| # | Found | Fixed |
+| --- | --- | --- |
+| S1 | Manual journal lines dropped the contact and branch picked in the screen (the cells wrote `contact_id` / `branch_id`) | ✓ |
+| S2 | After branches are on, journal lines without their own branch were posted with none | ✓ |
+| S3 | An invoice made from an estimate (and a credit note from an invoice) dropped the discount and adjustment, and blanked the number, notes and terms | ✓ |
+| S4 | The invoice PDF (and its email attachment) left out the adjustment line; payment emails showed a blank number | ✓ |
+| S5 | **Security:** export and report PDFs rendered user text (customer, item, account names) as HTML | ✓ |
+| S6 | Invoices, money in/out and vendor-credit refunds could be saved without a branch once branches are on (validators not registered; Save & New dropped the branch) | ✓ |
+| R1 | Balance sheet period columns counted entries on the start date twice | ✓ |
+| R2 | Transactions by customer/vendor counted start-date entries in the opening and again in the period | ✓ |
+| R3 | A/R and A/P aging counted overdue days from today, not the report date | ✓ |
+| R4 | Inventory item details valued the opening stock with sales at their selling price | ✓ |
+| R5 | Sales / purchases by items counted adjustments, transfers and credits | ✓ |
+| R8 | Cash flow period columns from mid-month dropped the opening cash | ✓ |
+| R9 | **Report repositories were shared by every request** (and every company): a report could show another request's data | ✓ |
+| — | Journal report ignored its default dates; balance summary % divided by 0 | ✓ |
+
+Not fixed (listed in the PR): sales tax liability's "collected" column (needs a decision on what it means), aging as of a past date subtracting later payments, the inventory reports' branch filter, branch activation not filling older document types, deleting a used or primary branch, invoice emails without tax lines, and smaller items.
 
 ---
 
