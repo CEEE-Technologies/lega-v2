@@ -1,8 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sumMoneyBy, toMoneyNumber } from '@bigcapital/utils';
 import { GetMatchedTransactionManualJournalsTransformer } from './GetMatchedTransactionManualJournalsTransformer';
 import { GetMatchedTransactionsByType } from './GetMatchedTransactionsByType';
-import { GetMatchedTransactionsFilter } from '../types';
+import {
+  GetMatchedTransactionsFilter,
+  MatchedTransactionContext,
+} from '../types';
+import { bankAccountNet } from '../_utils';
 import { ManualJournal } from '@/modules/ManualJournals/models/ManualJournal';
 import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectable.service';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
@@ -21,8 +24,9 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
   /**
    * Retrieves the published, unmatched manual journals with a line on the
    * bank account. A journal's amount is what it moves on that account
-   * (debit - credit of those lines: a debit is money in), so the min/max
-   * filters apply to that amount, not to the journal total.
+   * (debit - credit of those lines: a debit is money in), in the account's
+   * currency, so the min/max filters apply to that amount, not to the
+   * journal total.
    * @param {GetMatchedTransactionsFilter} filter
    */
   async getMatchedTransactions(
@@ -30,6 +34,7 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
   ) {
     const accountId = filter.accountId;
     if (!accountId) return [];
+    const { accountCurrencyCode } = filter;
 
     // Not a joined graph: `withGraphJoined` inside `onBuild` failed every
     // time ("table metadata has not been fetched"), and the error was
@@ -54,7 +59,9 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
     }
     const manualJournals = await query;
     const inRange = manualJournals.filter((manualJournal) => {
-      const amount = Math.abs(bankAccountNet(manualJournal));
+      const amount = Math.abs(
+        bankAccountNet(manualJournal, accountCurrencyCode),
+      );
       if (amount === 0) return false;
       if (filter.minAmount && amount < filter.minAmount) return false;
       if (filter.maxAmount && amount > filter.maxAmount) return false;
@@ -63,6 +70,7 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
     return this.transformer.transform(
       inRange,
       new GetMatchedTransactionManualJournalsTransformer(),
+      { accountCurrencyCode },
     );
   }
 
@@ -70,13 +78,14 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
    * Retrieves the manual journal to match, with its lines on the bank
    * account (its amount). Not found when it has no line on that account.
    * @param {number} transactionId
-   * @param {{ accountId?: number }} context - The bank line's account.
+   * @param {MatchedTransactionContext} context - The bank line's account.
    */
   public async getMatchedTransaction(
     transactionId: number,
-    context?: { accountId?: number },
+    context?: MatchedTransactionContext,
   ) {
     const accountId = context?.accountId;
+    const accountCurrencyCode = context?.accountCurrencyCode;
     const manualJournal = await this.manualJournalModel()
       .query()
       .findById(transactionId)
@@ -88,20 +97,16 @@ export class GetMatchedTransactionsByManualJournals extends GetMatchedTransactio
       })
       .throwIfNotFound();
 
-    if (!accountId || bankAccountNet(manualJournal) === 0) {
+    if (
+      !accountId ||
+      bankAccountNet(manualJournal, accountCurrencyCode) === 0
+    ) {
       return null;
     }
     return this.transformer.transform(
       manualJournal,
       new GetMatchedTransactionManualJournalsTransformer(),
+      { accountCurrencyCode },
     );
   }
 }
-
-/** Debit - credit of the journal's loaded lines, rounded to the cent. */
-const bankAccountNet = (manualJournal: ManualJournal): number =>
-  sumMoneyBy(
-    (manualJournal as any).entries ?? [],
-    (entry: any) =>
-      toMoneyNumber(entry.debit || 0) - toMoneyNumber(entry.credit || 0),
-  );

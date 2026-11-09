@@ -1,6 +1,6 @@
-import { sumBy } from 'lodash';
 import { AccountNormal } from '@/interfaces/Account';
 import { Transformer } from '@/modules/Transformer/Transformer';
+import { bankAccountNet } from '../_utils';
 
 export class GetMatchedTransactionManualJournalsTransformer extends Transformer {
   /**
@@ -42,11 +42,12 @@ export class GetMatchedTransactionManualJournalsTransformer extends Transformer 
     return manualJournal.referenceNo;
   }
 
+  /**
+   * What the journal moves on the bank account (its loaded lines), in the
+   * account's currency (`accountCurrencyCode` option).
+   */
   protected total(manualJournal) {
-    const credit = sumBy(manualJournal?.entries, 'credit');
-    const debit = sumBy(manualJournal?.entries, 'debit');
-
-    return debit - credit;
+    return bankAccountNet(manualJournal, this.options?.accountCurrencyCode);
   }
 
   /**
@@ -64,8 +65,9 @@ export class GetMatchedTransactionManualJournalsTransformer extends Transformer 
    * @returns {string}
    */
   protected amountFormatted(manualJournal) {
-    return this.formatNumber(manualJournal.amount, {
-      currencyCode: manualJournal.currencyCode,
+    return this.formatNumber(this.amount(manualJournal), {
+      currencyCode:
+        this.options?.accountCurrencyCode ?? manualJournal.currencyCode,
       money: true,
     });
   }

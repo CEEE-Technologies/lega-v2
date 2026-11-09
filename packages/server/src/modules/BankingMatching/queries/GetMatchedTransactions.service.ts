@@ -13,8 +13,12 @@ import { GetMatchedTransactionsByManualJournals } from './GetMatchedTransactions
 import { GetMatchedTransactionsByCashflow } from './GetMatchedTransactionsByCashflow';
 import { GetMatchedTransactionsByInvoices } from './GetMatchedTransactionsByInvoices.service';
 import { UncategorizedBankTransaction } from '@/modules/BankingTransactions/models/UncategorizedBankTransaction';
-import { sortClosestMatchTransactions } from '../_utils';
+import {
+  sortClosestMatchTransactions,
+  validateUncategorizedTransactionsSameAccount,
+} from '../_utils';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { Account } from '@/modules/Accounts/models/Account.model';
 
 @Injectable()
 export class GetMatchedTransactions {
@@ -31,6 +35,9 @@ export class GetMatchedTransactions {
     private readonly uncategorizedBankTransactionModel: TenantModelProxy<
       typeof UncategorizedBankTransaction
     >,
+
+    @Inject(Account.name)
+    private readonly accountModel: TenantModelProxy<typeof Account>,
   ) {}
 
   /**
@@ -62,7 +69,10 @@ export class GetMatchedTransactions {
         .whereIn('id', uncategorizedTransactionIds)
         .throwIfNotFound();
 
-    const totalPending = sumBy(uncategorizedTransactions, 'amount');
+    // Every matcher lists the transactions of one bank account.
+    validateUncategorizedTransactionsSameAccount(uncategorizedTransactions);
+    const accountId = first(uncategorizedTransactions)?.accountId;
+    const account = await this.accountModel().query().findById(accountId);
 
     const filtered = filter.transactionType
       ? this.registered.filter((item) => item.type === filter.transactionType)
@@ -71,11 +81,12 @@ export class GetMatchedTransactions {
     const matchedTransactions = await PromisePool.withConcurrency(2)
       .for(filtered)
       .process(async ({ type: _type, service }) => {
-        // The matchers that read lines of the bank account (manual
-        // journals) need to know which account it is.
+        // Matchers list the bank account's own transactions, with their
+        // amounts in the account's currency.
         return service.getMatchedTransactions({
           ...filter,
-          accountId: first(uncategorizedTransactions)?.accountId,
+          accountId,
+          accountCurrencyCode: account?.currencyCode,
         });
       });
     // A matcher that fails is left out of the list; log it, so a broken
@@ -93,7 +104,7 @@ export class GetMatchedTransactions {
     return {
       perfectMatches,
       possibleMatches,
-      totalPending,
+      totalPending: sumBy(uncategorizedTransactions, 'amount'),
     };
   }
 

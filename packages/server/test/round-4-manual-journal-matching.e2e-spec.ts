@@ -37,6 +37,7 @@ describe('F5: match a bank line to a manual journal (e2e)', () => {
 
   const journal = async (
     entries: Array<{ accountId: number; debit?: number; credit?: number }>,
+    currency: { currencyCode?: string; exchangeRate?: number } = {},
   ) =>
     ok(
       await api()
@@ -45,6 +46,7 @@ describe('F5: match a bank line to a manual journal (e2e)', () => {
           date: DATE,
           journalNumber: `F5-${faker.string.alphanumeric(8)}`,
           publish: true,
+          ...currency,
           entries: entries.map((entry, i) => ({
             index: i + 1,
             debit: 0,
@@ -81,15 +83,42 @@ describe('F5: match a bank line to a manual journal (e2e)', () => {
     ].filter((m) => (m.referenceType ?? m.reference_type) === 'ManualJournal');
   };
 
-  const match = (lineId: number, journalId: number) =>
+  const match = (
+    lineId: number | number[],
+    journalId: number,
+    referenceType = 'ManualJournal',
+  ) =>
     api()
       .post('/banking/matching/match')
       .send({
-        uncategorizedTransactions: [lineId],
-        matchedTransactions: [
-          { referenceType: 'ManualJournal', referenceId: journalId },
-        ],
+        uncategorizedTransactions: Array.isArray(lineId) ? lineId : [lineId],
+        matchedTransactions: [{ referenceType, referenceId: journalId }],
       });
+
+  const matchesOf = async (lineId: number, referenceType: string) => {
+    const res = ok(
+      await api()
+        .get('/banking/matching/matched')
+        .query({ uncategorizedTransactionIds: [lineId] }),
+    );
+    return [
+      ...(res.body.perfectMatches ?? res.body.perfect_matches ?? []),
+      ...(res.body.possibleMatches ?? res.body.possible_matches ?? []),
+    ].filter((m) => (m.referenceType ?? m.reference_type) === referenceType);
+  };
+
+  const expense = async (paymentAccountId: number, amount: number) =>
+    ok(
+      await api()
+        .post('/expenses')
+        .send({
+          paymentDate: DATE,
+          paymentAccountId,
+          referenceNo: `F5-${faker.string.alphanumeric(8)}`,
+          publish: true,
+          categories: [{ index: 1, expenseAccountId: expenseId, amount }],
+        }),
+    ).body.id as number;
 
   beforeAll(async () => {
     company = await createCompany(app, 'r4mj');
@@ -255,5 +284,67 @@ describe('F5: match a bank line to a manual journal (e2e)', () => {
     expect(errorTypes(await match(lineId, res.body.id)).length).toBeGreaterThan(
       0,
     );
+  });
+
+  // Codex review on PR 27: a EUR journal debiting 100 at 1.10 moves USD 110
+  // on the USD bank account, so it matches a USD 110 line, not a USD 100 one.
+  it('a foreign-currency journal is matched at what it moves on the bank account', async () => {
+    await api()
+      .post('/currencies')
+      .send({ currencyCode: 'EUR', currencyName: 'Euro', currencySign: '€' });
+    const journalId = await journal(
+      [
+        { accountId: bankId, debit: 100 },
+        { accountId: incomeId, credit: 100 },
+      ],
+      { currencyCode: 'EUR', exchangeRate: 1.1 },
+    );
+    const wrongLine = await bankLine(bankId, 100);
+    expect(errorTypes(await match(wrongLine, journalId))).toContain(
+      'TOTAL_MATCHING_TRANSACTIONS_INVALID',
+    );
+
+    const lineId = await bankLine(bankId, 110);
+    const found = (await journalMatches(lineId)).filter(
+      (m) => (m.referenceId ?? m.reference_id) === journalId,
+    );
+    expect(found).toHaveLength(1);
+    expect(Number(found[0].amount)).toBe(110);
+    ok(await match(lineId, journalId));
+  });
+
+  it('an expense paid from another bank account is neither listed nor matched', async () => {
+    const otherExpense = await expense(otherBankId, 61.25);
+    const ownExpense = await expense(bankId, 61.25);
+    const lineId = await bankLine(bankId, -61.25);
+
+    const listed = (await matchesOf(lineId, 'Expense')).map(
+      (m) => m.referenceId ?? m.reference_id,
+    );
+    expect(listed).toContain(ownExpense);
+    expect(listed).not.toContain(otherExpense);
+
+    expect((await match(lineId, otherExpense, 'Expense')).status).toBe(400);
+    ok(await match(lineId, ownExpense, 'Expense'));
+
+    // Once matched it can't be matched to a second line.
+    const second = await bankLine(bankId, -61.25);
+    expect((await match(second, ownExpense, 'Expense')).status).toBe(400);
+  });
+
+  it('bank lines from two accounts are refused', async () => {
+    const ownExpense = await expense(bankId, 30);
+    const a = await bankLine(bankId, -15);
+    const b = await bankLine(otherBankId, -15);
+    const res = await match([a, b], ownExpense, 'Expense');
+    expect(errorTypes(res)).toContain(
+      'UNCATEGORIZED_TRANSACTIONS_ACCOUNTS_DIFFER',
+    );
+    expect(
+      await db('matched_bank_transactions').whereIn(
+        'uncategorizedTransactionId',
+        [a, b],
+      ),
+    ).toEqual([]);
   });
 });
