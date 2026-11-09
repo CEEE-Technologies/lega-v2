@@ -27,6 +27,7 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
   const tag = faker.string.alphanumeric(6);
   const customerName = `F18 USD customer ${tag}`;
   let usdBankId: number;
+  let aedBankId: number;
 
   const api = async (method: string, url: string, body?: unknown) => {
     const res = await fetch(`${API_BASE}/api${url}`, {
@@ -98,6 +99,27 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
     await db('accounts')
       .where({ id: usdBankId })
       .increment('uncategorizedTransactions', 1);
+
+    // F22: a line on the AED (base currency) bank account.
+    aedBankId = (
+      await api('POST', '/accounts', {
+        name: `F22 AED bank ${tag}`,
+        code: `A${faker.string.numeric(5)}`,
+        accountType: 'bank',
+        currencyCode: 'AED',
+      })
+    ).id;
+    await db('uncategorized_cashflow_transactions').insert({
+      date: '2026-05-12',
+      accountId: aedBankId,
+      amount: 750,
+      currencyCode: 'AED',
+      description: `F22 AED deposit ${tag}`,
+      categorized: false,
+    });
+    await db('accounts')
+      .where({ id: aedBankId })
+      .increment('uncategorizedTransactions', 1);
   });
 
   test.afterAll(async () => {
@@ -143,5 +165,21 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
     await rate.fill('3.67');
     await rate.blur();
     await expect(page.getByText(REQUIRED)).toHaveCount(0);
+  });
+
+  // F22: the matching panel's "Pending" total is in the account's currency
+  // (it was always formatted as USD).
+  test('the matching panel shows the pending total in the account currency', async ({
+    page,
+  }) => {
+    await open(page, `/cashflow-accounts/${aedBankId}/transactions`);
+    await page.getByText('Uncategorized Transactions').first().click();
+    await page.getByText(`F22 AED deposit ${tag}`).first().click();
+    await page.getByRole('tab', { name: /match/i }).first().click();
+
+    const pending = page.getByText(/^Pending/).first();
+    await expect(pending).toBeVisible({ timeout: 30_000 });
+    await expect(pending).toContainText('AED');
+    await expect(pending).not.toContainText('$');
   });
 });
