@@ -289,4 +289,36 @@ describe('Round 4 users and roles (e2e)', () => {
       expect(invite.status).toBe(200);
     });
   });
+
+  // F28: a user manager without Role View still gets the role list (they
+  // pick a role when inviting); staff with neither permission don't.
+  describe('F28: the role list for user managers', () => {
+    it('a user manager without Role View lists the roles', async () => {
+      const res = await by(manny).get('/roles');
+      expect(res.status).toBe(200);
+      const roles = Array.isArray(res.body) ? res.body : res.body.data;
+      expect(roles.map((role: any) => role.id)).toEqual(
+        expect.arrayContaining([staffRoleId, managerRoleId]),
+      );
+    });
+
+    it('a role viewer lists the roles', async () => {
+      expect((await by(rory).get('/roles')).status).toBe(200);
+    });
+
+    it('staff with neither permission are refused', async () => {
+      // Its own role: the F7 tests add permissions to the Staff role.
+      const viewerRoleId = await createRole(app, company, 'CustomerViewer', [
+        { subject: 'Customer', ability: 'View' },
+      ]);
+      const sam = await inviteAndAccept(
+        app,
+        company,
+        priya,
+        uniqueEmail('sam2'),
+        viewerRoleId,
+      );
+      expect((await by(sam).get('/roles')).status).toBe(403);
+    });
+  });
 });

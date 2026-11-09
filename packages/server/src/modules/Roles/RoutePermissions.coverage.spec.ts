@@ -19,6 +19,7 @@ import {
 import { AbilitySchema } from './AbilitySchema';
 import { getInvalidPermissions } from './utils';
 import { CONTACT_PERMISSION_KEY } from '../Contacts/ContactPermission.guard';
+import { ANY_PERMISSION_KEY } from './AnyPermission.guard';
 
 /**
  * Routes that anyone may call without signing in. Each one checks its own
@@ -100,8 +101,9 @@ interface RouteInfo {
 const getGrants = (
   rule: RequiredPermission | undefined,
   contactAction: string | undefined,
+  anyOf: RequiredPermission[] | undefined = [],
 ): RequiredPermission[] => {
-  const grants: RequiredPermission[] = [];
+  const grants: RequiredPermission[] = [...anyOf];
   if (rule && !(rule.ability === 'manage' && rule.subject === 'all')) {
     grants.push(rule);
   }
@@ -158,6 +160,7 @@ const collectRoutes = (): RouteInfo[] => {
             grants: getGrants(
               read(REQUIRED_PERMISSION_KEY),
               read(CONTACT_PERMISSION_KEY),
+              read(ANY_PERMISSION_KEY),
             ),
           });
         }

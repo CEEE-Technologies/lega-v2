@@ -27,6 +27,8 @@ import { RequirePermission } from './RequirePermission.decorator';
 import { PermissionGuard } from './Permission.guard';
 import { AuthorizationGuard } from './Authorization.guard';
 import { AbilitySubject, RoleAction } from './Roles.types';
+import { RequireAnyPermission } from './AnyPermission.guard';
+import { UserAction } from '../UsersModule/Users.types';
 
 @ApiTags('Roles')
 @Controller('roles')
@@ -105,7 +107,12 @@ export class RolesController {
   }
 
   @Get()
-  @RequirePermission(RoleAction.View, AbilitySubject.Role)
+  // User managers pick a role when they invite someone or change a user's
+  // role, so they may list the roles too (F7 limits which they can give).
+  @RequireAnyPermission(
+    { ability: RoleAction.View, subject: AbilitySubject.Role },
+    { ability: UserAction.Manage, subject: AbilitySubject.User },
+  )
   @ApiOperation({ summary: 'Get all roles' })
   @ApiResponse({
     status: HttpStatus.OK,

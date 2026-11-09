@@ -4,6 +4,7 @@ import { Ability } from '@casl/ability';
 import { PermissionGuard } from './Permission.guard';
 import { RolesController } from './Roles.controller';
 import { AbilitySubject, RoleAction } from './Roles.types';
+import { AnyPermissionGuard } from './AnyPermission.guard';
 
 describe('RolesController authorization', () => {
   const reflector = new Reflector();
@@ -20,7 +21,6 @@ describe('RolesController authorization', () => {
     ['createRole', RoleAction.Create],
     ['editRole', RoleAction.Edit],
     ['deleteRole', RoleAction.Delete],
-    ['getRoles', RoleAction.View],
     ['getRole', RoleAction.View],
     ['getRolePermissionsSchema', RoleAction.View],
   ];
@@ -54,5 +54,37 @@ describe('RolesController authorization', () => {
         guard.canActivate(ctx(RolesController.prototype[method], admin)),
       ).toBe(true);
     }
+  });
+
+  // F28: the role list is for role viewers and for user managers, who pick
+  // a role when they invite someone.
+  describe('getRoles (any of Role View, User Manage)', () => {
+    const anyGuard = new AnyPermissionGuard(reflector);
+    const handler = RolesController.prototype.getRoles;
+    const check = (rules: any[]) =>
+      anyGuard.canActivate(ctx(handler, new Ability(rules)));
+
+    it('is denied without either permission', () => {
+      expect(() => check([])).toThrow(ForbiddenException);
+      expect(() =>
+        check([{ action: RoleAction.Create, subject: AbilitySubject.Role }]),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('is allowed with Role View', () => {
+      expect(
+        check([{ action: RoleAction.View, subject: AbilitySubject.Role }]),
+      ).toBe(true);
+    });
+
+    it('is allowed with User Manage', () => {
+      expect(check([{ action: 'Manage', subject: AbilitySubject.User }])).toBe(
+        true,
+      );
+    });
+
+    it('passes the generic guard (the any-of guard does the check)', () => {
+      expect(guard.canActivate(ctx(handler, new Ability([])))).toBe(true);
+    });
   });
 });
