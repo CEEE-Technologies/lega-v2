@@ -2,6 +2,7 @@ import {
   BeforeApplicationShutdown,
   Inject,
   Injectable,
+  Logger,
   OnApplicationShutdown,
 } from '@nestjs/common';
 import { Knex } from 'knex';
@@ -43,5 +44,6 @@ export class DatabasePoolsShutdown
     await settleAfterCommitWork();
     await KnexPoolCache.closeAllCaches();
     await this.systemKnex.destroy().catch(() => undefined);
+    new Logger(DatabasePoolsShutdown.name).log('Database pools closed.');
   }
 }

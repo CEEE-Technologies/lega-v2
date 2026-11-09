@@ -42,6 +42,11 @@ async function bootstrap() {
     );
   }
 
+  // On SIGTERM/SIGINT (a deploy, a restart) run the shutdown hooks: the
+  // queue workers finish their running jobs, the work queued after the last
+  // saves runs, and the database pools close (DatabasePoolsShutdown).
+  app.enableShutdownHooks();
+
   // SERVER_PORT is shared with the webapp dev server and the browser tests;
   // PORT still works on its own.
   await app.listen(process.env.SERVER_PORT ?? process.env.PORT ?? 3000);
