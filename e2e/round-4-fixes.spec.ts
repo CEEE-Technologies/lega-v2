@@ -489,3 +489,50 @@ test.describe('F6: the users list explains an admin-only refusal', () => {
     });
   });
 });
+
+/**
+ * F21: the opening-balance dialog shows the saved date; saving it without
+ * touching the date keeps it (it used to show today's date and move the
+ * opening balance to today).
+ */
+test.describe('F21: the opening-balance dialog keeps its date', () => {
+  let owner: OnboardedSession;
+  const name = `F21 customer ${faker.string.alphanumeric(6)}`;
+  let customerId: number;
+
+  test.beforeAll(async () => {
+    test.setTimeout(120_000);
+    owner = await createOnboardedUser(API_BASE);
+    customerId = (
+      await api(owner, 'POST', '/customers', {
+        displayName: name,
+        customerType: 'business',
+        currencyCode: 'AED',
+        openingBalance: 250,
+        openingBalanceAt: '2026-01-15',
+      })
+    ).id;
+  });
+
+  test('saving the dialog unchanged keeps 2026-01-15', async ({ page }) => {
+    await signInPage(page, owner, '/customers');
+    await page.getByText(name, { exact: true }).first().click();
+    const drawer = page.locator('.bp4-drawer');
+    await expect(drawer).toBeVisible({ timeout: 30_000 });
+    await drawer.locator('.bp4-navbar button').last().click();
+    await page.getByText('Edit Opening Balance').click();
+
+    const dialog = page.locator('.bp4-dialog');
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.locator('input[name="openingBalance"]')).toHaveValue(
+      /250/,
+    );
+    await dialog.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+
+    const customer = await api(owner, 'GET', `/customers/${customerId}`);
+    const record = customer.data ?? customer.customer ?? customer;
+    const saved = record.openingBalanceAt ?? record.opening_balance_at;
+    expect(String(saved)).toContain('2026-01-15');
+  });
+});

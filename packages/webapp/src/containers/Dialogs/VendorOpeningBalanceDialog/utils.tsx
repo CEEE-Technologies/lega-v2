@@ -1,5 +1,6 @@
 import { useFormikContext } from 'formik';
 import { first, pick } from 'lodash';
+import moment from 'moment';
 import React from 'react';
 import { useVendorOpeningBalanceContext } from './VendorOpeningBalanceFormProvider';
 
@@ -22,22 +23,31 @@ export interface VendorOpeningBalanceSeed {
   id?: number;
   openingBalance?: string | number;
   openingBalanceExchangeRate?: number;
+  openingBalanceAt?: string;
+  openingBalanceBranchId?: string | number;
   currencyCode?: string;
 }
 
 export const useSetPrimaryBranchToForm = () => {
-  const { setFieldValue } = useFormikContext<VendorOpeningBalanceFormValues>();
+  const { setFieldValue, values } =
+    useFormikContext<VendorOpeningBalanceFormValues>();
   const { branches, isBranchesSuccess } = useVendorOpeningBalanceContext();
 
   React.useEffect(() => {
-    if (isBranchesSuccess) {
+    // Keep the opening balance's own branch; the primary one only if none.
+    if (isBranchesSuccess && !values.openingBalanceBranchId) {
       const primaryBranch = branches.find((b) => b.primary) || first(branches);
 
       if (primaryBranch) {
         setFieldValue('openingBalanceBranchId', primaryBranch.id);
       }
     }
-  }, [isBranchesSuccess, setFieldValue, branches]);
+  }, [
+    isBranchesSuccess,
+    setFieldValue,
+    branches,
+    values.openingBalanceBranchId,
+  ]);
 };
 
 export function transfromVendorToForm(
@@ -53,5 +63,18 @@ export function transfromVendorToForm(
       'openingBalanceExchangeRate',
       'currencyCode',
     ]),
+    // Its own branch, when it has one (null with branches off).
+    ...(values.openingBalanceBranchId
+      ? { openingBalanceBranchId: values.openingBalanceBranchId }
+      : {}),
+    // The saved date (the dialog used to show today's, and saving moved
+    // the opening balance to it).
+    ...(values.openingBalanceAt
+      ? {
+          openingBalanceAt: moment(values.openingBalanceAt).format(
+            'YYYY-MM-DD',
+          ),
+        }
+      : {}),
   };
 }
