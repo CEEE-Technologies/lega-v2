@@ -956,6 +956,43 @@ describe('Deletes, undo and bank matching (e2e)', () => {
         )?.recognizedTransactionId,
       );
 
+    // F27 (round 4): an account a rule assigns lines to can't be deleted
+    // (its foreign key gave a raw 500); the error names the rule.
+    it('F27: an account a bank rule assigns to is refused, with the rule named', async () => {
+      const bank = await createAccount({ accountType: 'bank' });
+      const target = await createAccount({ accountType: 'equity' });
+      const name = `F27 rule ${uid()}`;
+      const ruleId = ok(
+        await api()
+          .post('/banking/rules')
+          .send({
+            name,
+            order: 1,
+            applyIfAccountId: bank,
+            applyIfTransactionType: 'deposit',
+            conditions: [
+              {
+                field: 'description',
+                comparator: 'contains',
+                value: `nomatch-${uid()}`,
+              },
+            ],
+            assignCategory: 'Deposit',
+            assignAccountId: target,
+          }),
+      ).body.id as number;
+
+      const refused = await api().delete(`/accounts/${target}`);
+      expect(refused.status).toBe(400);
+      expect(errorType(refused)).toBe('ACCOUNT_USED_BY_BANK_RULES');
+      expect(JSON.stringify(refused.body)).toContain(name);
+      expect(await db('accounts').where({ id: target })).toHaveLength(1);
+
+      ok(await api().delete(`/banking/rules/${ruleId}`));
+      ok(await api().delete(`/accounts/${target}`));
+      expect(await db('accounts').where({ id: target })).toEqual([]);
+    });
+
     it('B6: deleting an account with no rules keeps every suggestion; one with rules only undoes its own', async () => {
       const bankA = await createAccount({ accountType: 'bank' });
       const bankB = await createAccount({ accountType: 'bank' });

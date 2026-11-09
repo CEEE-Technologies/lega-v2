@@ -1538,6 +1538,7 @@
   "roles.error.permissions_not_held": "يمكنك فقط منح الصلاحيات التي تملكها بنفسك.",
   "exchange_rate.error.required": "سعر الصرف مطلوب للعملة الأجنبية.",
   "exchange_rate.enter_rate": "أدخل سعر الصرف",
+  "accounts.error.used_by_bank_rules": "هذا الحساب مستخدم في قواعد بنكية. غيّر هذه القواعد أو احذفها أولاً.",
   "roles.label.role_name_": "اسم دور المستخدم ",
   "roles.permission_schema.success_message": "تم اضافة دور المستخدم بنجاح.",
   "roles.permission_schema.upload_message": "تم تحديث دور المستخدم بنجاح.",

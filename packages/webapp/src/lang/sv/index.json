@@ -1518,6 +1518,7 @@
   "roles.error.permissions_not_held": "Du kan bara ge behörigheter som du själv har.",
   "exchange_rate.error.required": "Växelkurs krävs för en utländsk valuta.",
   "exchange_rate.enter_rate": "Ange växelkursen",
+  "accounts.error.used_by_bank_rules": "Kontot används av bankregler. Ändra eller ta bort reglerna först.",
   "roles.permission_schema.success_message": "Rollen har skapats på ett framgångsrikt sätt.",
   "roles.permission_schema.upload_message": "Den angivna rollen har uppdaterats framgångsrikt.",
   "roles.permission_schema.delete.alert_message": "Den angivna rollen har tagits bort framgångsrikt.",
