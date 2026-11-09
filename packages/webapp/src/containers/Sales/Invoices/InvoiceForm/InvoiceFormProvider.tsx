@@ -2,6 +2,7 @@ import { isEmpty, pick } from 'lodash';
 import React, { createContext, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { transformToEditForm, ITEMS_FILTER_ROLES_QUERY } from './utils';
+import type { InvoiceFormValues } from './utils';
 import type {
   SaleInvoice,
   CreateSaleInvoiceBody,
@@ -130,17 +131,28 @@ function InvoiceFormProvider({
   const { data: paymentServices, isLoading: isPaymentServicesLoading } =
     useGetPaymentServices();
 
+  // An invoice made from an estimate takes what the customer agreed to:
+  // its lines, rate, discount and adjustment (they were dropped, so the
+  // invoice billed the undiscounted total), branch and warehouse. Only
+  // those fields: the rest keeps the new invoice's defaults (its number,
+  // notes and terms used to be blanked).
+  const ESTIMATE_FIELDS = [
+    'customerId',
+    'currencyCode',
+    'exchangeRate',
+    'discount',
+    'discountType',
+    'adjustment',
+    'branchId',
+    'warehouseId',
+  ];
   const newInvoice = !isEmpty(estimate)
-    ? transformToEditForm({
-        // The estimate's rate too: its entries are priced at it (the
-        // invoice used to start at 1).
-        ...pick(estimate, [
-          'customerId',
-          'currencyCode',
-          'entries',
-          'exchangeRate',
-        ]),
-      })
+    ? (pick(
+        transformToEditForm({
+          ...pick(estimate, [...ESTIMATE_FIELDS, 'entries']),
+        } as Parameters<typeof transformToEditForm>[0]),
+        [...ESTIMATE_FIELDS, 'entries'],
+      ) as InvoiceFormValues) // the picked fields; spread over the defaults
     : ([] as []);
 
   // Handle fetching the items table based on the given query.

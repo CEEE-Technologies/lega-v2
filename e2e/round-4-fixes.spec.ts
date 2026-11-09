@@ -610,3 +610,69 @@ test.describe('S1: manual journal line contacts', () => {
     expect(receivable.contactId ?? receivable.contact_id).toBeTruthy();
   });
 });
+
+/**
+ * Sweep S3: an invoice made from an estimate keeps the estimate's discount
+ * and adjustment (it billed the undiscounted total), and (S12) keeps the new
+ * invoice's own defaults such as its number.
+ */
+test.describe('S3: estimate to invoice', () => {
+  let owner: OnboardedSession;
+  let estimateId: number;
+  const estimateNumber = `S3-EST-${faker.string.alphanumeric(6)}`;
+
+  test.beforeAll(async () => {
+    test.setTimeout(120_000);
+    owner = await createOnboardedUser(API_BASE);
+    const accountsRes = await api(owner, 'GET', '/accounts');
+    const accounts: any[] = Array.isArray(accountsRes)
+      ? accountsRes
+      : (accountsRes.accounts ?? accountsRes.data);
+    const byType = (type: string) =>
+      accounts.find((a) => (a.accountType ?? a.account_type) === type).id;
+    const item = await api(owner, 'POST', '/items', {
+      name: `S3 service ${faker.string.alphanumeric(6)}`,
+      type: 'service',
+      sellable: true,
+      sellAccountId: byType('income'),
+      sellPrice: 1000,
+    });
+    const customer = await api(owner, 'POST', '/customers', {
+      displayName: `S3 customer ${faker.string.alphanumeric(6)}`,
+      customerType: 'business',
+      currencyCode: 'AED',
+    });
+    estimateId = (
+      await api(owner, 'POST', '/sale-estimates', {
+        customerId: customer.id,
+        estimateDate: '2026-06-01',
+        expirationDate: '2026-06-30',
+        estimateNumber,
+        discount: 10,
+        discountType: 'percentage',
+        adjustment: 5,
+        delivered: true,
+        entries: [{ index: 1, itemId: item.id, quantity: 1, rate: 1000 }],
+      })
+    ).id;
+  });
+
+  test('the new invoice shows the discounted total and its own number', async ({
+    page,
+  }) => {
+    // The estimate id comes in the navigation state, so convert from the
+    // estimate's drawer.
+    expect(estimateId).toBeGreaterThan(0);
+    await signInPage(page, owner, '/estimates');
+    await page.getByText(estimateNumber, { exact: true }).first().click();
+    const drawer = page.locator('.bp4-drawer');
+    await expect(drawer).toBeVisible({ timeout: 30_000 });
+    await drawer.getByRole('button', { name: 'Convert to Invoice' }).click();
+    await expect(page).toHaveURL(/\/invoices\/new/, { timeout: 30_000 });
+    // 1,000 less 10% plus 5.
+    await expect(page.getByText('905.00').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.locator('input[name="invoiceNo"]')).not.toHaveValue('');
+  });
+});
