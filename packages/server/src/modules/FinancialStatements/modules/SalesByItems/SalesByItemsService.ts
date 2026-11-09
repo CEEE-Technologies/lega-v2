@@ -61,6 +61,9 @@ export class SalesByItemsReportService {
       .onBuild((builder: any) => {
         builder.modify('itemsTotals');
         builder.modify('OUTDirection');
+        // Sales only: warehouse transfers, adjustments and vendor credits
+        // also move stock out and were counted as sold.
+        builder.whereIn('transactionType', ['SaleInvoice', 'SaleReceipt']);
 
         // Filter the inventory items only.
         builder.whereIn('itemId', inventoryItemsIds);

@@ -10,6 +10,8 @@ import { findNode } from './_utils/balance-sheet';
  * - R1: balance sheet date-period columns counted the entries dated on the
  *   start date twice (the opening closed on it and the first period
  *   started on it).
+ * - R5: Sales / Purchases by Items counted inventory adjustments (and
+ *   transfers) as sales and purchases.
  * - R2: Transactions by Customer/Vendor did the same with the opening
  *   balance (start-date entries in the opening and again in the period).
  */
@@ -140,5 +142,91 @@ describe('Round 4 sweep: reports (e2e)', () => {
       opening: row.opening_balance.amount,
       closing: row.closing_balance.amount,
     }).toEqual({ opening: 0, closing: 1000 });
+  });
+
+  it('R5: sales and purchases by items count only sales and purchases', async () => {
+    const stockItemId = ok(
+      await api()
+        .post('/items')
+        .send({
+          name: `R5 stock ${Date.now()}`,
+          type: 'inventory',
+          sellable: true,
+          purchasable: true,
+          sellAccountId: await byType('income'),
+          costAccountId: await byType('cost-of-goods-sold'),
+          inventoryAccountId: await byType('inventory'),
+          sellPrice: 20,
+          costPrice: 5,
+        }),
+    ).body.id;
+    const vendorId = ok(
+      await api()
+        .post('/vendors')
+        .send({ displayName: `R5 vendor ${Date.now()}`, currencyCode: 'USD' }),
+    ).body.id;
+    ok(
+      await api()
+        .post('/bills')
+        .send({
+          vendorId,
+          billDate: '2026-07-01',
+          dueDate: '2026-07-31',
+          billNumber: `R5-B-${Date.now()}`,
+          open: true,
+          entries: [{ index: 1, itemId: stockItemId, quantity: 10, rate: 5 }],
+        }),
+    );
+    ok(
+      await api()
+        .post('/sale-invoices')
+        .send({
+          customerId,
+          invoiceDate: '2026-07-02',
+          dueDate: '2026-07-31',
+          invoiceNo: `R5-I-${Date.now()}`,
+          delivered: true,
+          entries: [{ index: 1, itemId: stockItemId, quantity: 2, rate: 20 }],
+        }),
+    );
+    for (const [type, quantity] of [
+      ['decrement', 3],
+      ['increment', 4],
+    ] as const) {
+      ok(
+        await api()
+          .post('/inventory-adjustments/quick')
+          .send({
+            date: '2026-07-03',
+            type,
+            adjustmentAccountId: await byType('expense'),
+            reason: 'R5',
+            referenceNo: `R5-${type}`,
+            itemId: stockItemId,
+            quantity,
+            cost: 5,
+            publish: true,
+          }),
+      );
+    }
+    const quantityOf = async (url: string) => {
+      const res = ok(
+        await api()
+          .get(url)
+          .query({ fromDate: '2026-07-01', toDate: '2026-07-31' }),
+      );
+      const rows = res.body.data?.items ?? res.body.data ?? res.body.items;
+      const row = rows.find((r: any) => r.id === stockItemId);
+      return row?.quantity_sold ?? row?.quantity_purchased ?? row?.quantity;
+    };
+    const sold = await quantityOf('/reports/sales-by-items');
+    const bought = await quantityOf('/reports/purchases-by-items');
+    expect({
+      sold: Number(sold?.amount ?? sold),
+      bought: Number(bought?.amount ?? bought),
+    }).toEqual({
+      sold: 2,
+      bought: 10,
+    });
   });
 });
