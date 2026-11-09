@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { Inject, Injectable } from '@nestjs/common';
 import { SettingsStore } from '../Settings/SettingsStore';
 import { SETTINGS_PROVIDER } from '../Settings/Settings.types';
@@ -12,13 +13,14 @@ export class BranchesSettingsService {
 
   /**
    * Marks multi-branches as activated.
+   * @param {Knex.Transaction} trx - Saved inside this transaction when given.
    */
-  public markMultiBranchesAsActivated = async () => {
+  public markMultiBranchesAsActivated = async (trx?: Knex.Transaction) => {
     const settingsStore = await this.settingsStore();
 
     settingsStore.set({ group: 'features', key: Features.BRANCHES, value: 1 });
 
-    await settingsStore.save();
+    await settingsStore.save(trx);
   };
 
   /**
