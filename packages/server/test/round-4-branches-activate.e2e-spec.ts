@@ -54,4 +54,31 @@ describe('F26: turning branches on (e2e)', () => {
     expect(again.status).toBe(400);
     expect(await db('branches')).toHaveLength(1);
   });
+
+  // Sweep S2: a journal's lines without their own branch take the journal's
+  // branch, so its ledger rows show in branch reports (they had none).
+  it('a journal line without a branch is posted with the journal branch', async () => {
+    const [branch] = await db('branches');
+    const byType = async (type: string) =>
+      (await db('accounts').where('accountType', type).first('id')).id;
+    const res = await api()
+      .post('/manual-journals')
+      .send({
+        date: '2026-06-01',
+        journalNumber: `S2-${Date.now()}`,
+        publish: true,
+        branchId: branch.id,
+        entries: [
+          { index: 1, accountId: await byType('bank'), debit: 90, credit: 0 },
+          { index: 2, accountId: await byType('income'), debit: 0, credit: 90 },
+        ],
+      });
+    expect([200, 201]).toContain(res.status);
+    const rows = await db('accounts_transactions').where({
+      referenceType: 'Journal',
+      referenceId: res.body.id,
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.branchId === branch.id)).toBe(true);
+  });
 });
