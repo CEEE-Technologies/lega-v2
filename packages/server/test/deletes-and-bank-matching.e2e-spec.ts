@@ -707,6 +707,46 @@ describe('Deletes, undo and bank matching (e2e)', () => {
       expect(Number(bill.paymentAmount)).toBe(0);
     });
 
+    // F23 (round 4): unmatching deletes the payment the match created, so
+    // in a closed period it is refused and the payment stays.
+    it('an invoice match in a closed period: unmatch is refused, the payment stays', async () => {
+      const invoiceId = await createInvoice(275);
+      const lineId = await createBankLine(accounts.bank, 275);
+      ok(await match(lineId, 'SaleInvoice', invoiceId));
+      const paymentId = (await matchesOf(lineId)).find(
+        (m) => m.referenceType === 'PaymentReceive',
+      ).referenceId;
+
+      ok(
+        await api()
+          .put('/transactions-locking/lock')
+          .send({ module: 'all', lockToDate: DATE, reason: 'F23 e2e' }),
+      );
+      try {
+        const refused = await api().patch(
+          `/banking/matching/unmatch/${lineId}`,
+        );
+        expect(refused.status).toBe(400);
+        expect(errorType(refused)).toBe('TRANSACTIONS_DATE_LOCKED');
+        expect(await matchesOf(lineId)).not.toEqual([]);
+        expect(
+          await db('payment_receives').where({ id: paymentId }),
+        ).toHaveLength(1);
+        expect(
+          await bankNet(accounts.bank, 'PaymentReceive', [paymentId]),
+        ).toBe(275);
+      } finally {
+        ok(
+          await api()
+            .put('/transactions-locking/cancel-lock')
+            .send({ module: 'all', reason: 'F23 e2e done' }),
+        );
+      }
+      // Open again: it unmatches.
+      ok(await api().patch(`/banking/matching/unmatch/${lineId}`));
+      expect(await matchesOf(lineId)).toEqual([]);
+    });
+
     it('an expense match: the expense stays', async () => {
       const expenseId = ok(
         await api()
