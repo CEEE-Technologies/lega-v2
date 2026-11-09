@@ -28,7 +28,11 @@ import {
   type MakeJournalFormValues,
   type MakeJournalErrorResponse,
 } from './utils';
-import { AppToaster } from '@/components';
+import {
+  AppToaster,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { CLASSES } from '@/constants/classes';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
@@ -163,6 +167,9 @@ function MakeJournalEntriesFormInner() {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <div
       className={classNames(
@@ -173,6 +180,7 @@ function MakeJournalEntriesFormInner() {
     >
       <Formik
         initialValues={initialValues}
+        validate={validateExchangeRate}
         validationSchema={isNewMode ? CreateJournalSchema : EditJournalSchema}
         onSubmit={handleSubmit}
       >
@@ -184,6 +192,8 @@ function MakeJournalEntriesFormInner() {
             flex: 1,
           })}
         >
+          {/* Fills the rate: never a silent 1 for a foreign currency. */}
+          <DocumentExchangeRateSync isNewMode={isNewMode} />
           <PageForm flex={1}>
             <PageForm.Body>
               <MakeJournalFormTopBar />

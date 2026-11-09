@@ -132,7 +132,14 @@ function InvoiceFormProvider({
 
   const newInvoice = !isEmpty(estimate)
     ? transformToEditForm({
-        ...pick(estimate, ['customerId', 'currencyCode', 'entries']),
+        // The estimate's rate too: its entries are priced at it (the
+        // invoice used to start at 1).
+        ...pick(estimate, [
+          'customerId',
+          'currencyCode',
+          'entries',
+          'exchangeRate',
+        ]),
       })
     : ([] as []);
 

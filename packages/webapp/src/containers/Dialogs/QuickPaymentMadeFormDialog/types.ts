@@ -7,6 +7,7 @@ export interface QuickPaymentMadeBill {
   dueAmount?: number;
   vendorId?: number | string;
   currencyCode?: string;
+  exchangeRate?: number;
   [key: string]: unknown;
 }
 

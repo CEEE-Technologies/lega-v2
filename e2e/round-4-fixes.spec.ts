@@ -163,9 +163,9 @@ test.describe('F1: quick payment and refund dialogs rate label', () => {
   for (const [name, listPath, key, actionText] of cases) {
     test(`${name}: "1 USD = <rate> AED"`, async ({ page }) => {
       const dialog = await openDialog(page, listPath, numbers[key], actionText);
-      // The rate itself is typed by the user (it starts at 1); the label
-      // must read in the server's direction whatever the value.
-      await expect(dialog).toContainText(/1 USD = [\d.]+ AED/);
+      // The label reads in the server's direction, and (F18) the rate
+      // starts at the document's own rate, not 1.
+      await expect(dialog).toContainText('1 USD = 3.67 AED');
       await expect(dialog).not.toContainText(/1 AED =/);
     });
   }

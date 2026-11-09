@@ -26,6 +26,7 @@ export interface RefundVendorCreditSummary {
   id: number;
   creditsRemaining: number;
   currencyCode: string;
+  exchangeRate?: number;
   amount: number;
 }
 

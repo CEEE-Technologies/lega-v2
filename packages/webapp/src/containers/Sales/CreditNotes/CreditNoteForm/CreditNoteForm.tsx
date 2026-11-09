@@ -27,7 +27,7 @@ import {
   type CreditNoteFormValues,
   type CreditNoteEntry,
 } from './utils';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { orderingLinesIndexes, transactionNumber, safeSumBy } from '@/utils';
@@ -141,12 +141,16 @@ function CreditNoteFormInner({}: CreditNoteFormInnerProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<CreditNoteFormValues>
       validationSchema={
         isNewMode ? CreateCreditNoteFormSchema : EditCreditNoteFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form

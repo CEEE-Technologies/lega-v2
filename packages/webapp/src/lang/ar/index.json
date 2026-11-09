@@ -1536,6 +1536,8 @@
   "roles.error.you_cannot_change_your_own_role": "لا يمكنك تغيير دور المستخدم الخاص بك.",
   "roles.error.admin_only": "يمكن للمسؤول فقط القيام بذلك.",
   "roles.error.permissions_not_held": "يمكنك فقط منح الصلاحيات التي تملكها بنفسك.",
+  "exchange_rate.error.required": "سعر الصرف مطلوب للعملة الأجنبية.",
+  "exchange_rate.enter_rate": "أدخل سعر الصرف",
   "roles.label.role_name_": "اسم دور المستخدم ",
   "roles.permission_schema.success_message": "تم اضافة دور المستخدم بنجاح.",
   "roles.permission_schema.upload_message": "تم تحديث دور المستخدم بنجاح.",

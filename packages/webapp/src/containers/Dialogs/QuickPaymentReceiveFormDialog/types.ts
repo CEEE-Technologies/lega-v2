@@ -7,6 +7,7 @@ export interface QuickPaymentReceiveInvoice {
   dueAmount?: number;
   customerId?: number | string;
   currencyCode?: string;
+  exchangeRate?: number;
   [key: string]: unknown;
 }
 

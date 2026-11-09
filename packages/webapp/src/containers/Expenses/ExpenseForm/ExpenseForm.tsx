@@ -25,7 +25,12 @@ import {
 } from './utils';
 import type { ExpenseErrorResponse, ExpenseFormValues } from './types';
 import type { CreateExpenseBody, EditExpenseBody } from '@bigcapital/sdk-ts';
-import { AppToaster, Box } from '@/components';
+import {
+  AppToaster,
+  Box,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
@@ -131,12 +136,16 @@ function ExpenseFormInner() {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik
       validationSchema={
         isNewMode ? CreateExpenseFormSchema : EditExpenseFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleSubmit}
     >
       <Form
@@ -147,6 +156,8 @@ function ExpenseFormInner() {
           flex: 1,
         })}
       >
+        {/* Fills the rate: never a silent 1 for a foreign currency. */}
+        <DocumentExchangeRateSync isNewMode={isNewMode} />
         <PageForm flex={1}>
           <PageForm.Body>
             <ExpenseFormTopBar />
