@@ -77,6 +77,11 @@ export const useUpdateEntriesOnExchangeRateChange = () => {
 
   return React.useMemo(() => {
     return (oldExchangeRate: number, newExchangeRate: number) => {
+      // Re-price only between two real rates. A rate left empty (no rate
+      // found, F18) reads as 0, which priced every line at 0.
+      if (!(Number(oldExchangeRate) > 0) || !(Number(newExchangeRate) > 0)) {
+        return entries;
+      }
       return FF.pipe(
         entries,
         // Assign a new rate of the given new exchange rate from the old exchange rate.

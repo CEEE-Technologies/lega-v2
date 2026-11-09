@@ -4,7 +4,7 @@ import { knex as knexFactory, Knex } from 'knex';
 import { knexSnakeCaseMappers } from 'objection';
 import { authCookies, createOnboardedUser, type OnboardedSession } from './_auth';
 import { API_BASE, WEBAPP_BASE } from './_env';
-import { selectCustomer } from './_invoices';
+import { selectCustomer, selectEntryItem } from './_invoices';
 
 /**
  * F18 / F19: a foreign-currency form never posts at a silent 1.
@@ -26,6 +26,7 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
   let db: Knex;
   const tag = faker.string.alphanumeric(6);
   const customerName = `F18 USD customer ${tag}`;
+  const itemName = `F18 service ${tag}`;
   let usdBankId: number;
   let aedBankId: number;
 
@@ -62,6 +63,19 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
       currencyName: 'US Dollar',
       currencySign: '$',
     }).catch(() => undefined);
+    const accountsRes = await api('GET', '/accounts');
+    const accounts: any[] = Array.isArray(accountsRes)
+      ? accountsRes
+      : (accountsRes.accounts ?? accountsRes.data);
+    await api('POST', '/items', {
+      name: itemName,
+      type: 'service',
+      sellable: true,
+      sellAccountId: accounts.find(
+        (a) => (a.accountType ?? a.account_type) === 'income',
+      ).id,
+      sellPrice: 100,
+    });
     await api('POST', '/customers', {
       displayName: customerName,
       customerType: 'business',
@@ -142,6 +156,39 @@ test.describe('F18 / F19: foreign-currency rates are never a silent 1', () => {
     await expect(page.getByText(REQUIRED).first()).toBeVisible({
       timeout: 15_000,
     });
+  });
+
+  // Review: with the rate left empty, typing it and confirming "re-calculate
+  // prices" re-priced from an old rate of 0, so every line became 0.
+  test('typing the rate into an empty field keeps the line prices', async ({
+    page,
+  }) => {
+    await open(page, '/invoices/new');
+    await selectCustomer(page, customerName);
+    const rate = page.locator('input[name="exchangeRate"]');
+    await expect(rate).toHaveValue('', { timeout: 30_000 });
+    await selectEntryItem(page, itemName);
+
+    // The line's rate: the item's price (100) in the first row's inputs.
+    const rowValues = () =>
+      page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll('.tbody .tr:first-child input'),
+        ).map((input) => (input as HTMLInputElement).value),
+      );
+    await expect
+      .poll(async () => (await rowValues()).some((v) => /^100(\.0+)?$/.test(v)))
+      .toBe(true);
+
+    await rate.fill('3.67');
+    await rate.blur();
+    const calculate = page.getByRole('button', { name: 'Calculate' });
+    if (await calculate.isVisible().catch(() => false)) {
+      await calculate.click();
+    }
+    await page.waitForTimeout(500);
+    // Still priced (unchanged: there was no old rate to convert from).
+    expect((await rowValues()).some((v) => /^100(\.0+)?$/.test(v))).toBe(true);
   });
 
   test('categorizing a line on a USD bank account asks for the rate', async ({
