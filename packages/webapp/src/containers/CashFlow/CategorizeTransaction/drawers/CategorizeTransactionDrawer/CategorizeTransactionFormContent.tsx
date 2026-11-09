@@ -2,10 +2,19 @@ import { FormGroup } from '@blueprintjs/core';
 import { useFormikContext } from 'formik';
 import React, { lazy } from 'react';
 import styled from 'styled-components';
+import { useCategorizeBankAccountCurrency } from './_utils';
 import { useCategorizeTransactionBoot } from './CategorizeTransactionBoot';
 import type { CategorizeTransactionFormValues } from './_utils';
-import { Box, FFormGroup, FSelect } from '@/components';
+import {
+  Box,
+  ExchangeRateInputGroup,
+  FFormGroup,
+  FSelect,
+  ForeignExchangeRateSync,
+  isForeignCurrency,
+} from '@/components';
 import { getAddMoneyInOptions, getAddMoneyOutOptions } from '@/constants';
+import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 
 // Retrieves the add money in button options.
 const MoneyInOptions = getAddMoneyInOptions();
@@ -32,6 +41,8 @@ export function CategorizeTransactionFormContent() {
         <Title>{formattedAmount}</Title>
       </FormGroup>
 
+      <CategorizeTransactionExchangeRate />
+
       <FFormGroup name={'category'} label={'Category'} fastField inline>
         <FSelect
           name={'transactionType'}
@@ -45,6 +56,36 @@ export function CategorizeTransactionFormContent() {
 
       <CategorizeTransactionFormSubContent />
     </Box>
+  );
+}
+
+/**
+ * The rate of a line on a foreign-currency bank account: filled with
+ * today's rate, else empty and required. It used to be sent as 1 with no
+ * field, posting the line at 1.
+ */
+function CategorizeTransactionExchangeRate() {
+  const { values } = useFormikContext<CategorizeTransactionFormValues>();
+  const baseCurrency = useCurrentOrganizationBaseCurrency();
+  const accountCurrency = useCategorizeBankAccountCurrency()(
+    values.debitAccountId,
+  );
+
+  return (
+    <>
+      <ForeignExchangeRateSync
+        currencyCode={accountCurrency}
+        isNewMode={true}
+      />
+      {isForeignCurrency(accountCurrency, baseCurrency) && (
+        <ExchangeRateInputGroup
+          name={'exchangeRate'}
+          fromCurrency={accountCurrency ?? ''}
+          toCurrency={baseCurrency ?? ''}
+          formGroupProps={{ label: 'Exchange rate', inline: true }}
+        />
+      )}
+    </>
   );
 }
 
