@@ -51,10 +51,10 @@ export class GetMatchedTransactionsByCashflow extends GetMatchedTransactionsByTy
           q.where('cashflowAccountId', filter.accountId);
         }
         if (filter.minAmount) {
-          q.where('amount', '>=', filter.minAmount);
+          q.where('cashflow_transactions.amount', '>=', filter.minAmount);
         }
         if (filter.maxAmount) {
-          q.where('amount', '<=', filter.maxAmount);
+          q.where('cashflow_transactions.amount', '<=', filter.maxAmount);
         }
         if (filter.fromDate) {
           q.where('date', '>=', filter.fromDate);

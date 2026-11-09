@@ -347,4 +347,44 @@ describe('F5: match a bank line to a manual journal (e2e)', () => {
       ),
     ).toEqual([]);
   });
+
+  // Review: the money in/out list with min/max amounts (the amount column
+  // was ambiguous with the matched-transactions join, so the matcher failed
+  // and offered nothing).
+  it('money in on the bank account is listed within the amount filters', async () => {
+    const equityId = (
+      await db('accounts').where('accountType', 'equity').first('id')
+    ).id;
+    const moneyIn = ok(
+      await api().post('/banking/transactions').send({
+        date: DATE,
+        transactionType: 'owner_contribution',
+        amount: 55,
+        cashflowAccountId: bankId,
+        creditAccountId: equityId,
+        description: 'F17 money in',
+        publish: true,
+      }),
+    ).body;
+    const moneyInId = moneyIn.id ?? moneyIn.data?.id;
+    const lineId = await bankLine(bankId, 55);
+    const res = ok(
+      await api()
+        .get('/banking/matching/matched')
+        .query({
+          uncategorizedTransactionIds: [lineId],
+          minAmount: 50,
+          maxAmount: 60,
+        }),
+    );
+    const ids = [
+      ...(res.body.perfectMatches ?? res.body.perfect_matches ?? []),
+      ...(res.body.possibleMatches ?? res.body.possible_matches ?? []),
+    ]
+      .filter(
+        (m) => (m.referenceType ?? m.reference_type) === 'CashflowTransaction',
+      )
+      .map((m) => m.referenceId ?? m.reference_id);
+    expect(ids).toContain(moneyInId);
+  });
 });
