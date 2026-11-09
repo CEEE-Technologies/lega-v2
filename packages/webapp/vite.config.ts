@@ -21,11 +21,14 @@ export default defineConfig(({ mode }) => {
   const envDir = path.resolve(rootDir, '../..');
   const env = loadEnv(mode, envDir, '');
   const clientEnv = pickClientEnv(env);
-  const port = Number(env.PORT) || 4000;
-  // API calls go to the server's port (SERVER_PORT in the root .env, the
-  // same setting the server reads). VITE_API_PROXY_TARGET still overrides it.
+  // The webapp's own port. Not PORT: the server listens on SERVER_PORT, or
+  // PORT when that isn't set, so reading PORT here made both want it.
+  const port = Number(env.WEBAPP_PORT) || 4000;
+  // API calls go to the server's port, read the same way the server reads
+  // it (SERVER_PORT, then PORT). VITE_API_PROXY_TARGET still overrides it.
   const apiProxyTarget =
-    env.VITE_API_PROXY_TARGET || `http://localhost:${env.SERVER_PORT || 3000}`;
+    env.VITE_API_PROXY_TARGET ||
+    `http://localhost:${env.SERVER_PORT || env.PORT || 3000}`;
   const plugins: PluginOption[] = [
     react(),
     legacy({
