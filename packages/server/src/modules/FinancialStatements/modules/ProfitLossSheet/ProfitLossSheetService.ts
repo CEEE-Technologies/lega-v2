@@ -11,6 +11,7 @@ import { events } from '@/common/events/events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Injectable } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class ProfitLossSheetService {
@@ -18,7 +19,7 @@ export class ProfitLossSheetService {
     private readonly profitLossSheetMeta: ProfitLossSheetMeta,
     private readonly eventPublisher: EventEmitter2,
     private readonly i18nService: I18nService,
-    private readonly profitLossRepository: ProfitLossSheetRepository,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -37,15 +38,25 @@ export class ProfitLossSheetService {
     const filter = mergeQueryWithDefaults(query);
 
     // Loads the profit/loss sheet data.
-    this.profitLossRepository.setFilter(filter);
-    await this.profitLossRepository.asyncInitialize();
+    // A new repository per report: it holds this report's query and
+    // data, and one instance shared by every request (the service is
+    // a singleton) let concurrent reports overwrite each other's.
+    const profitLossRepository = await this.moduleRef.resolve(
+      ProfitLossSheetRepository,
+      undefined,
+      {
+        strict: false,
+      },
+    );
+    profitLossRepository.setFilter(filter);
+    await profitLossRepository.asyncInitialize();
 
     // Retrieve the profit/loss sheet meta first to get date format.
     const meta = await this.profitLossSheetMeta.meta(filter);
 
     // Profit/Loss report instance.
     const profitLossInstance = new ProfitLossSheet(
-      this.profitLossRepository,
+      profitLossRepository,
       filter,
       this.i18nService,
       { baseCurrency: meta.baseCurrency, dateFormat: meta.dateFormat },

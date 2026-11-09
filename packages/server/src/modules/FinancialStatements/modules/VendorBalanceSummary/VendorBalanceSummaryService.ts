@@ -9,11 +9,12 @@ import { VendorBalanceSummaryRepository } from './VendorBalanceSummaryRepository
 import { VendorBalanceSummaryMeta } from './VendorBalanceSummaryMeta';
 import { getVendorBalanceSummaryDefaultQuery } from './utils';
 import { events } from '@/common/events/events';
+import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class VendorBalanceSummaryService {
   constructor(
-    private readonly vendorBalanceSummaryRepository: VendorBalanceSummaryRepository,
+    private readonly moduleRef: ModuleRef,
     private readonly vendorBalanceSummaryMeta: VendorBalanceSummaryMeta,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -28,15 +29,25 @@ export class VendorBalanceSummaryService {
   ): Promise<IVendorBalanceSummaryStatement> {
     const filter = { ...getVendorBalanceSummaryDefaultQuery(), ...query };
 
-    this.vendorBalanceSummaryRepository.setFilter(filter);
-    await this.vendorBalanceSummaryRepository.asyncInit();
+    // A new repository per report: it holds this report's query and
+    // data, and one instance shared by every request (the service is
+    // a singleton) let concurrent reports overwrite each other's.
+    const vendorBalanceSummaryRepository = await this.moduleRef.resolve(
+      VendorBalanceSummaryRepository,
+      undefined,
+      {
+        strict: false,
+      },
+    );
+    vendorBalanceSummaryRepository.setFilter(filter);
+    await vendorBalanceSummaryRepository.asyncInit();
 
     // Retrieve the vendor balance summary meta first to get date format.
     const meta = await this.vendorBalanceSummaryMeta.meta(filter);
 
     // Report instance.
     const reportInstance = new VendorBalanceSummaryReport(
-      this.vendorBalanceSummaryRepository,
+      vendorBalanceSummaryRepository,
       filter,
       { baseCurrency: meta.baseCurrency, dateFormat: meta.dateFormat },
     );

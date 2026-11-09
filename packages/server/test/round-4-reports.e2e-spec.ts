@@ -14,6 +14,8 @@ import { findNode } from './_utils/balance-sheet';
  *   transfers) as sales and purchases.
  * - R8: cash flow monthly columns from mid-month dropped the cash at
  *   beginning of the first column.
+ * - R9: report repositories (balance sheet, P&L...) were one instance
+ *   shared by every request, so concurrent reports could mix their data.
  * - R2: Transactions by Customer/Vendor did the same with the opening
  *   balance (start-date entries in the opening and again in the period).
  */
@@ -276,4 +278,66 @@ describe('Round 4 sweep: reports (e2e)', () => {
       totalBeginning,
     );
   });
+
+  it('R9: concurrent balance sheets of two companies keep their own figures', async () => {
+    const other = await createCompany(app, 'r4rep2');
+    const otherApi = () => as(app, other.owner, other.organizationId);
+    const otherBank = (
+      await otherApi()
+        .get('/accounts')
+        .query({ accountTypes: ['bank'] })
+    ).body;
+    const otherAccounts = Array.isArray(otherBank)
+      ? otherBank
+      : (otherBank.accounts ?? otherBank.data);
+    const otherBankId = otherAccounts.find(
+      (a: any) => (a.accountType ?? a.account_type) === 'bank',
+    ).id;
+    const otherEquityId = otherAccounts.find(
+      (a: any) => (a.accountType ?? a.account_type) === 'equity',
+    )?.id;
+    const accountsRes = (await otherApi().get('/accounts')).body;
+    const allOther = Array.isArray(accountsRes)
+      ? accountsRes
+      : (accountsRes.accounts ?? accountsRes.data);
+    const equity =
+      otherEquityId ??
+      allOther.find((a: any) => (a.accountType ?? a.account_type) === 'equity')
+        .id;
+    ok(
+      await otherApi()
+        .post('/manual-journals')
+        .send({
+          date: '2026-02-01',
+          journalNumber: `R9-${Date.now()}`,
+          publish: true,
+          entries: [
+            { index: 1, accountId: otherBankId, debit: 777, credit: 0 },
+            { index: 2, accountId: equity, debit: 0, credit: 777 },
+          ],
+        }),
+    );
+    const query = { fromDate: '2026-01-01', toDate: '2026-12-31' };
+    const bankTotal = async (client: () => any, bankId: number) =>
+      findNode(
+        ok(await client().get('/reports/balance-sheet').query(query)).body.data,
+        bankId,
+      ).total.amount;
+
+    const ownBankId = await byType('bank');
+    const ownExpected = await bankTotal(api, ownBankId);
+    const otherExpected = await bankTotal(otherApi, otherBankId);
+    expect(otherExpected).toBe(777);
+
+    const results = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        i % 2 === 0
+          ? bankTotal(api, ownBankId).then((v) => ['own', v])
+          : bankTotal(otherApi, otherBankId).then((v) => ['other', v]),
+      ),
+    );
+    for (const [who, value] of results) {
+      expect(value).toBe(who === 'own' ? ownExpected : otherExpected);
+    }
+  }, 300000);
 });
