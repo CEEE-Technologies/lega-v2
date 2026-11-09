@@ -1,6 +1,8 @@
 # Fixes, round 4
 
-Status: **approved 8 Nov 2026** with the recommended answers to D1–D9. Work is on branch `fix/round-4`.
+Status: **approved 8 Nov 2026** with the recommended answers to D1–D9. Work is on branch `fix/round-4` (PR 27).
+
+**9 Nov 2026:** Parts 5 and 6 added on the same branch and PR: the Codex review comment, every item left open, and a sweep of the areas never checked. Stripe and Plaid stay out.
 
 Written 8 Nov 2026. Every item was re-checked against `origin/develop` at `3fb371197` (after PRs 19–26). It follows [2026-11-07-critical-fixes-round-3.md](2026-11-07-critical-fixes-round-3.md), which is fully merged.
 
@@ -476,35 +478,235 @@ Plus a transformer unit test with no rule suggestion.
 
 ---
 
+# Part 5: Additions (9 Nov 2026)
+
+Added after the PR was opened, on the same branch and PR, as you asked. Sources:
+
+- the Codex review comment on PR 27 (manual-journal amounts);
+- everything the PR and this plan listed as "not fixed" or "not in this plan", except Stripe and Plaid;
+- two read-only research passes over the code (9 Nov), which also found F20, F21 and F27.
+
+Same rules as Parts 1–4: one commit per fix, its test in the same commit, then the review loop.
+
+**Decisions taken with the recommended answers** (say if you want any changed):
+
+| #   | Question | Taken |
+| --- | --- | --- |
+| D10 | **F18:** what should a foreign-currency form start with? | The latest rate when the rate service works; for a payment or refund, the document's own rate when that is all there is; otherwise **empty and required**, never a silent 1 |
+| D11 | **F18:** should the server also refuse a foreign document with no rate? | No. The CSV importers rely on the server's `|| 1`; the screens are where rates are typed, so the rule is there |
+| D12 | Socket CORS `'*'` | No change. Sign-in is by token, never cookies, so another site gains nothing; changing it could break live updates behind a proxy |
+| D13 | Pricing cards (T4) | Not a bug: the pages exist but were never linked. Left for a product decision |
+
+---
+
+## Money and books
+
+### F17. Matching compares amounts in the wrong currency and across bank accounts (High) — Codex review on PR 27
+
+**The issue today**
+
+1. **Codex:** the manual-journal matcher sums the journal's raw debit/credit. A foreign-currency journal on a base-currency bank account (allowed by `validateJournalCurrencyWithAccountsCurrency`) posts each line × rate (`ManualJournalGL.getManualJournalEntry`). So a EUR journal debiting 100 at 1.10 moves USD 110 on the bank, but the matcher accepted a USD 100 line and refused the USD 110 one.
+2. **Expenses have the same gap:** the expense credits the bank `totalAmount × rate` (`ExpenseGL.ts:50`), but the matcher compared `totalAmount`.
+3. **Expenses and money in/out from any account were offered** (`GetMatchedTransactionsByExpenses.ts`, `GetMatchedTransactionsByCashflow.ts`): matching one from account B marked account A's line as done, though the money never left A in the books.
+4. **An expense could be matched twice, or as a draft:** `getMatchedTransaction` for expenses checked neither.
+5. **Bank lines from two accounts** matched together all used the first line's account.
+
+**Before:** a USD 100 bank line is matched to the EUR 100 journal; the books show USD 110 left the bank. Or a line on Checking is matched to an expense paid from Savings.
+
+**The fix**
+
+- One helper, `amountInAccountCurrency` / `bankAccountNet` (`BankingMatching/_utils.ts`): a transaction in the account's currency counts its amount; one in another currency counts amount × its rate, per line, as its ledger lines post. Used for the list, the min/max filters, the amount shown and the match check.
+- The list and the match load the bank account and pass its id and currency to every matcher.
+- Expenses and money in/out are filtered to the bank line's account; an expense must be published and not already matched.
+- Bank lines on two accounts are refused: `UNCATEGORIZED_TRANSACTIONS_ACCOUNTS_DIFFER`.
+
+**After:** the EUR 100 journal is offered as USD 110 and matches the USD 110 line only. Savings' expense isn't offered for a Checking line.
+
+**Test:** unit tests for the helpers and the match check; e2e (`round-4-manual-journal-matching`): the Codex example, an expense from another account, a second match of one expense, lines from two accounts.
+
+### F18. Most forms start a foreign-currency rate at 1 (High)
+
+**The issue today**
+
+- **Start at 1 and never fetch a rate:** payment received and payment made (full forms and quick dialogs), refunds of credit notes and vendor credits, bills, vendor credits, expenses, manual journals, money in/out.
+- **Sales forms** (invoice, estimate, receipt, credit note) fetch the latest rate only when the user picks a customer, and fall back to `|| 1` when the rate service fails (`withExRateItemEntriesPriceRecalc.tsx:146`). An invoice made from an estimate keeps 1 (`InvoiceFormProvider.tsx:133-135` copies the currency, not the rate).
+- **The source rate is thrown away:** the quick dialogs and refund dialogs load the invoice, bill or credit note but copy only its currency (`QuickPaymentReceiveFormDialog/utils.tsx:83-91`, `RefundCreditNoteFormProvider.tsx:67-80`). The refund server even falls back to the credit note's rate, but the screen always sends 1.
+- **Every schema is a plain `Yup.number()`,** so nothing stops a save at 1 or empty; money in/out and the vendor form also add `?? 1` on submit.
+- **The quick dialogs hide the input** in a popover behind a pencil (`ExchangeRateMutedField`).
+
+**Before:** a 1,000 USD payment in an AED company saved without touching the rate posts the bank at AED 1,000 instead of 3,670, and books a made-up AED 2,670 exchange loss.
+
+**The fix**
+
+1. A shared hook, `useForeignExchangeRate`, for every form above:
+   - a base-currency document is always 1;
+   - a new foreign document, or a change of currency: the source document's rate when given (payments, refunds), else the latest rate from the server;
+   - the fetch fails: the field is left **empty**, never 1;
+   - editing keeps the saved rate; it refetches only when the user changes the currency.
+2. A shared Yup rule: the rate is required and > 0 when the currency is foreign.
+3. The quick dialogs open the rate popover when the rate is empty, so the error is visible.
+4. Payments: the invoice/bill rate is added to the payment page entries on the server, so the full payment forms can use it.
+5. The client-side `?? 1` on submit is removed.
+6. The server keeps `|| 1` (D11).
+
+**After:** the same payment starts at the invoice's rate (or today's rate), and an empty rate stops the save with "Exchange rate is required".
+
+**Test:** Playwright in an AED company with USD contacts: each form starts at the source or latest rate, or empty and blocks the save; editing keeps the saved rate; a base-currency document stays at 1.
+
+### F19. Categorizing a bank line on a foreign-currency account always posts at 1, with no rate field (High)
+
+**The issue today:** the categorize drawer sends `exchangeRate: '1'` and shows no field (`CategorizeTransactionDrawer/_utils.ts:25,50`). Creating a transaction from the matching panel hard-codes 1 too (`MatchingReconcileTransactionAside/_utils.ts:18`).
+
+**Before:** a USD 500 line on a USD account in an AED company is categorized as an expense; the books show AED 500 instead of 1,835.
+
+**The fix:** both show the rate field when the account is foreign, filled by `useForeignExchangeRate` (latest rate, else empty and required).
+
+**After:** the categorized expense posts AED 1,835 at the rate shown.
+
+**Test:** Playwright for the drawer; server e2e that a categorization with rate 3.67 posts 1,835 on the ledger.
+
+### F20. Money in/out labels the rate the wrong way round (High; same as F1)
+
+**The issue today:** the label reads "1 {base} = x {account currency}" (`MoneyInFormFields`/`MoneyOutFormFields`), but the server books `amount × rate` (`BankTransaction.ts:83`).
+
+**The fix and test:** swap the two props, as in F1; Playwright checks `1 USD = 3.67 AED`.
+
+### F21. The opening-balance dialogs show today's date, and saving moves the opening balance (Medium)
+
+**The issue today:** `transfromCustomertoForm` (`CustomerOpeningBalanceDialog/utils.tsx:50-56`, vendor the same) doesn't pick `openingBalanceAt` or `openingBalanceBranchId`, so the form shows today. The branch is also overwritten with the primary one.
+
+**Before:** an opening balance dated 1 Jan 2026, opened and saved on 9 Nov to fix its amount, moves to 9 Nov in the books.
+
+**The fix:** pick the date and branch; set the primary branch only when there is none.
+
+**Test:** Playwright: reopening shows the saved date; saving keeps it.
+
+---
+
+## Bank matching
+
+### F22. The matching panel's "Pending" total is always shown as USD (Low)
+
+**The issue today:** `MatchingTransaction.tsx:410-415` passes `currency={'USD'}`.
+
+**The fix:** the server returns the bank account's currency with `totalPending`; the panel uses it.
+
+**Test:** e2e for the field; Playwright in an AED company.
+
+### F23. No test for unmatching in a closed period (Low)
+
+**The issue today:** the code is guarded (deleting the match's payment hits the lock), but nothing tests it.
+
+**The fix and test:** e2e: match an invoice, lock the month, unmatch is refused and the payment is kept.
+
+---
+
+## Running the app
+
+### F24. Shutdown hooks are never turned on (Medium)
+
+**The issue today:** `main.ts` never calls `app.enableShutdownHooks()`. On a deploy's SIGTERM, the queue workers, after-commit work and DB pools are not closed or waited for (the F15 shutdown code only runs in tests and the CLI).
+
+**The fix:** turn them on in `main.ts`.
+
+**Test:** start the built server, send SIGTERM, check it logs the pools closing and exits 0.
+
+### F25. One place hard-codes the company database prefix (Medium)
+
+**The issue today:** `TenancyDB.module.ts:20` uses `bigcapital_tenant_`; everything else reads `TENANT_DB_NAME_PERFIX` (`common/config/tenant-database.ts:10`).
+
+**The fix:** read `tenantDatabase.dbNamePrefix` from config.
+
+**Test:** unit test with a different prefix.
+
+### F26. Turning branches on can leave half the work saved (Medium; found 9 Nov)
+
+**The issue today:** `ActivateBranchesFeature.service.ts:64-67` creates the first branch and saves "branches on" **outside** the transaction. If a later step fails, those two stay, the transactions never get their branch, and a retry says "already on".
+
+**The fix:** both run inside the transaction (`trx` added to the branch insert and to `BranchesSettings`).
+
+**Test:** e2e with a failing step: no branch and the setting still off.
+
+### F27. Deleting an account a bank rule assigns to gives a 500 (Low)
+
+**The issue today:** `bank_rules.assign_account_id` (and recognized rows' `assigned_account_id`) have a foreign key to accounts, and nothing checks them before delete.
+
+**The fix:** `DeleteAccount` refuses with `ACCOUNT_USED_BY_BANK_RULES` ("Used by bank rules: …"); the screen shows it.
+
+**Test:** e2e.
+
+---
+
+## Permissions and screens
+
+### F28. A user manager without "View roles" can't invite anyone (Medium)
+
+**The issue today:** `GET /roles` needs Role View (`Roles.controller.ts:107`), but inviting needs User Manage; `RequirePermission` takes one rule only.
+
+**The fix:** `RequirePermission` accepts several rules (any of); `GET /roles` allows Role View **or** User Manage. The route-permission coverage test is updated.
+
+**Test:** e2e: a user manager without Role View gets the roles; a user with neither gets 403.
+
+### F29. Bulk delete gives no reason (Low)
+
+**The issue today:** the validate response only has counts and ids (`common/dtos/BulkDelete.dto.ts`); every validator drops the error.
+
+**The fix:** a shared helper adds `nonDeletableReasons: [{ id, type, message }]`; the dialog shows the first few.
+
+**Test:** e2e for customers and accounts; Playwright for the dialog text.
+
+### F30. The unfinished "categorize as expense" code (Low)
+
+**The issue today:** `CategorizeTransactionAsExpense.ts` creates an expense outside the transaction and marks the line uncategorized; nothing calls it.
+
+**The fix:** delete it and its wiring.
+
+---
+
+## Tooling and tests
+
+### F31. The `.env` `PORT` is read by both the server and the webapp (Low)
+
+**The issue today:** the server listens on `SERVER_PORT ?? PORT`; Vite also uses `PORT` for itself (`vite.config.ts:24`) and proxies to `SERVER_PORT || 3000`. With only `PORT` set, both want the same port and the proxy points elsewhere.
+
+**The fix:** Vite uses `WEBAPP_PORT || 4000` for itself and proxies to `SERVER_PORT || PORT || 3000`.
+
+### F32. E2E tests that depend on shared data (Low)
+
+**The issue today:** the banking specs use bank line, rule or category id 1 and accept `[200, 404]`; 32 specs send `branchId: 1` / `warehouseId: 1`.
+
+**The fix:**
+- the banking specs create their own account and bank lines (helpers moved to `test/_utils/`) and assert exact statuses;
+- `branchId` / `warehouseId` come from a helper that reads the primary branch or warehouse.
+
+**Test:** the suite passes in a brand-new test company.
+
+---
+
+# Part 6: Sweep of the areas never checked
+
+**Areas:** reports (beyond those fixed), form logic in the screens, branches, email and PDF content.
+
+**How:**
+- read-only research, at most two agents at a time;
+- a finding that puts wrong money in the books, loses data, opens a security gap or crashes a main screen is fixed here, with a test, as `fix: (sweep) …`;
+- everything else goes to the PR's "Found in passing" list.
+
+---
+
 # Not in this plan
 
-- **Stripe** (left out as you asked):
+- **Stripe** (left out as you asked; not critical for you):
   - foreign-currency payments recorded at rate 1;
   - the hard-coded ngrok address;
   - duplicate notices racing;
   - `account.updated` never activating the integration.
 - **Plaid** (left out as you asked): the sync itself was never checked.
-- **Low items** from the round-3 list:
-  - the bank match pre-fill uses today's rate, not the bank line's date;
-  - the match panel's "Pending" total is always formatted as USD;
-  - deleting an account that a bank rule uses gives a raw 500;
-  - the opening-balance dialogs show today's date;
-  - company setup polling can briefly return 403;
-  - documents replace all their lines on every edit;
-  - the settings store keeps a rolled-back value in memory;
-  - socket CORS is `*`;
-  - the `.env` `PORT` clash;
-  - no test for unmatching in a locked period;
-  - the unfinished `CategorizeTransactionAsExpense` stub;
-  - pricing cards (T4) aren't shown anywhere.
-- **Found while researching this plan** (not yet checked in depth):
-  - the expense and deposit match lists don't filter by bank account, so an expense paid from another account is offered;
-  - `TenancyDB.module.ts:20` hard-codes the `bigcapital_tenant_` database prefix instead of reading the configured one.
-- **A fresh sweep of areas never checked:**
-  - report calculations beyond those already fixed;
-  - form logic in the screens;
-  - branches;
-  - email and PDF content.
+- **Checked on 9 Nov and not a problem:**
+  - **the settings store keeps a rolled-back value:** it is per request, and the one save inside a transaction belongs to a request that has already failed;
+  - **documents replace all their lines on every edit:** bills keep their line ids (landed costs stay linked); other documents' new ids are referenced by nothing that survives the edit;
+  - **socket CORS `*`:** see D12.
+- **Pricing cards (T4):** see D13.
 
 ---
 
