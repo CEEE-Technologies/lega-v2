@@ -63,6 +63,10 @@ export const SaleInvoiceMeta = {
       name: 'invoice.field.amount',
       column: 'balance',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     payment_amount: {
       name: 'invoice.field.payment_amount',
@@ -75,6 +79,7 @@ export const SaleInvoiceMeta = {
       column: 'due_amount',
       fieldType: 'number',
       virtualColumn: true,
+      filterCustomQuery: (query, role) => query.modify('dueAmountFilter', role),
       // There is no due_amount column: sort by the due SQL (the same
       // formula as the dueAmount getter) instead of an unknown column.
       sortCustomQuery: DueAmountFieldSortQuery,

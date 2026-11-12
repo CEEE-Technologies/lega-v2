@@ -65,7 +65,7 @@ export const PaymentReceivedMeta = {
     created_at: {
       name: 'payment_receive.field.created_at',
       column: 'created_at',
-      fieldDate: 'date',
+      fieldType: 'date',
     },
   },
   columns: {

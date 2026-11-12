@@ -1,3 +1,5 @@
+import * as moment from 'moment';
+import { SALE_INVOICE_MONEY_SQL } from '@/modules/SaleInvoices/models/SaleInvoice';
 export const CustomerMeta = {
   importable: true,
   exportable: true,
@@ -77,21 +79,12 @@ export const CustomerMeta = {
     },
     status: {
       name: 'vendor.field.status',
-      type: 'enumeration',
+      fieldType: 'enumeration',
       options: [
         { key: 'overdue', label: 'vendor.field.status.overdue' },
         { key: 'unpaid', label: 'vendor.field.status.unpaid' },
       ],
-      filterCustomQuery: (query, role) => {
-        switch (role.value) {
-          case 'overdue':
-            query.modify('overdue');
-            break;
-          case 'unpaid':
-            query.modify('unpaid');
-            break;
-        }
-      },
+      filterCustomQuery: StatusFieldFilterQuery,
     },
   },
   columns: {
@@ -410,13 +403,28 @@ export const CustomerMeta = {
   },
 };
 
-function _statusFieldFilterQuery(query, role) {
+/**
+ * Status field filter query. Overdue: has a delivered invoice that is still owed past its
+ * due date. Unpaid: has a balance. Written as plain where clauses so the
+ * filter can be grouped (AND/OR) and negated ("is not").
+ */
+function StatusFieldFilterQuery(query, role) {
   switch (role.value) {
     case 'overdue':
-      query.modify('overdue');
+      query.whereExists((subquery) =>
+        subquery
+          .select(1)
+          .from('sales_invoices')
+          .whereRaw('?? = ??', ['sales_invoices.customer_id', 'contacts.id'])
+          .whereNotNull('sales_invoices.delivered_at')
+          .where('sales_invoices.due_date', '<', moment().format('YYYY-MM-DD'))
+          .whereRaw(`${SALE_INVOICE_MONEY_SQL.due} > 0`),
+      );
       break;
     case 'unpaid':
-      query.modify('unpaid');
+      query.whereRaw('ROUND(COALESCE(??, 0), 2) <> 0', ['contacts.balance']);
       break;
+    default:
+      query.whereRaw('1 = 0');
   }
 }

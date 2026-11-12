@@ -35,6 +35,7 @@ import {
   sqlMoneyLeft,
   sqlSumMoney,
 } from '@/utils/document-money-sql';
+import { rawNumberFilterQuery } from '@/modules/DynamicListing/DynamicFilter/rawNumberFilterQuery';
 
 /**
  * SQL of the invoice total, due and settled amounts in cents: the same
@@ -412,6 +413,18 @@ export class SaleInvoice extends TenantBaseModel {
   static get modifiers() {
     return {
       /**
+       * Filters by the document total (the list's Amount column).
+       */
+      totalAmountFilter(query, role) {
+        rawNumberFilterQuery(INVOICE_TOTAL_SQL)(query, role);
+      },
+      /**
+       * Filters by the due amount (there is no due_amount column).
+       */
+      dueAmountFilter(query, role) {
+        rawNumberFilterQuery(INVOICE_DUE_SQL)(query, role);
+      },
+      /**
        * Filters the due invoices.
        */
       dueInvoices(query) {
@@ -540,16 +553,23 @@ export class SaleInvoice extends TenantBaseModel {
             query.modify('delivered');
             break;
           case 'unpaid':
+            query.modify('delivered');
             query.modify('unpaid');
             break;
+          // Overdue, like the status shown on the list: delivered, still
+          // owed and past its due date.
           case 'overdue':
           default:
+            query.modify('delivered');
+            query.modify('dueInvoices');
             query.modify('overdue');
             break;
           case 'partially-paid':
+            query.modify('delivered');
             query.modify('partiallyPaid');
             break;
           case 'paid':
+            query.modify('delivered');
             query.modify('paid');
             break;
         }

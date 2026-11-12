@@ -70,6 +70,10 @@ export const BillMeta = {
       name: 'bill.field.amount',
       column: 'amount',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     payment_amount: {
       name: 'bill.field.payment_amount',

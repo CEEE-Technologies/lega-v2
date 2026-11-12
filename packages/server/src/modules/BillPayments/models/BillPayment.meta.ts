@@ -33,11 +33,6 @@ export const BillPaymentMeta = {
       column: 'amount',
       fieldType: 'number',
     },
-    due_amount: {
-      name: 'bill_payment.field.due_amount',
-      column: 'due_amount',
-      fieldType: 'number',
-    },
     payment_account: {
       name: 'bill_payment.field.payment_account',
       column: 'payment_account_id',
@@ -66,7 +61,7 @@ export const BillPaymentMeta = {
     },
     description: {
       name: 'bill_payment.field.description',
-      column: 'description',
+      column: 'statement',
       fieldType: 'text',
     },
     created_at: {

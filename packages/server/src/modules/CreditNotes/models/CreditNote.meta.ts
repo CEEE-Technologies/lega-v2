@@ -57,11 +57,15 @@ export const CreditNoteMeta = {
       name: 'credit_note.field.amount',
       column: 'amount',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     currency_code: {
       name: 'credit_note.field.currency_code',
       column: 'currency_code',
-      fieldType: 'number',
+      fieldType: 'text',
     },
     note: {
       name: 'credit_note.field.note',
