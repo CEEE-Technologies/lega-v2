@@ -13,6 +13,7 @@ import {
 } from './AdvancedFilterDropdownContext';
 import AdvancedFilterValueField from './AdvancedFilterValueField';
 import { useAdvancedFilterAutoSubmit } from './components';
+import { IFieldType } from './interfaces';
 import {
   filterConditionRoles,
   getConditionalsOptions,
@@ -39,7 +40,6 @@ import {
   FSelect,
   FFormGroup,
 } from '@/components';
-import { useUpdateEffect } from '@/hooks';
 
 type ConditionRenderHelpers = {
   handleClick: (event: React.MouseEvent<HTMLElement>) => void;
@@ -153,11 +153,17 @@ function useDefaultComparatorFieldValue({
     [fieldMeta],
   );
 
-  useUpdateEffect(() => {
-    if (fieldKeyValue) {
+  // Only when the field itself changes: the field meta is rebuilt whenever
+  // the list re-renders (e.g. after the filter applies), which used to reset
+  // a chosen comparator ("Not Contain", "Is Not") back to the default.
+  const prevFieldKey = React.useRef(fieldKeyValue);
+
+  React.useEffect(() => {
+    if (fieldKeyValue && prevFieldKey.current !== fieldKeyValue) {
       const defaultValue = get(first(comparatorsOptions), 'value');
       setConditionValue('comparator', defaultValue);
     }
+    prevFieldKey.current = fieldKeyValue;
   }, [fieldKeyValue, setConditionValue, comparatorsOptions]);
 }
 
@@ -203,8 +209,14 @@ function FilterFieldsField(): JSX.Element {
             onItemSelect={(option: IConditionOption) => {
               form.setFieldValue(fieldPath, option.value);
 
-              // Resets the value field to empty once the field option changing.
-              form.setFieldValue(valueFieldPath, '');
+              // Resets the value field once the field option changes. A
+              // boolean starts unchecked (false), so the row applies as it
+              // shows instead of being dropped for having no value.
+              const nextField = fields.find((f) => f.key === option.value);
+              form.setFieldValue(
+                valueFieldPath,
+                nextField?.fieldType === IFieldType.BOOLEAN ? false : '',
+              );
             }}
             popoverProps={{
               inline: true,
@@ -396,7 +408,12 @@ export function AdvancedFilterDropdown({
       ? conditions
       : [initialCondition, initialCondition];
 
-  const [prevConditions, setPrevConditions] = React.useState(initialConditions);
+  // Start from the conditions already applied (the complete rows), so
+  // opening the popover doesn't re-apply the same filter and re-render the
+  // list, which closed a dropdown opened right away.
+  const [prevConditions, setPrevConditions] = React.useState(() =>
+    filterConditionRoles(initialConditions),
+  );
 
   // Handle the filter dropdown form submit.
   const handleFitlerDropdownSubmit = (values: IFilterDropdownFormikValues) => {
