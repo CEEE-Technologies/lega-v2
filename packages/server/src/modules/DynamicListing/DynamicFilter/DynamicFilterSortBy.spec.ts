@@ -1,4 +1,5 @@
 import knexFactory from 'knex';
+import { DynamicFilter } from './DynamicFilter';
 import { DynamicFilterSortBy } from './DynamicFilterSortBy';
 
 const knex = knexFactory({ client: 'mysql2' });
@@ -43,6 +44,42 @@ describe('DynamicFilterSortBy', () => {
 
     expect(buildSql(sortBy)).toBe(
       'select * from `payment_receives` order by amount ASC, `payment_receives`.`id` ASC',
+    );
+  });
+
+  it('sorts a relation field by its label on the aliased join', () => {
+    const model = {
+      tableName: 'payment_receives',
+      relationMappings: {
+        customer: {
+          modelClass: {
+            getField: (key: string, attr: string) =>
+              key === 'display_name' && attr === 'column'
+                ? 'display_name'
+                : undefined,
+          },
+          join: { from: 'payment_receives.customer_id', to: 'contacts.id' },
+        },
+      },
+      getField: (key: string) =>
+        ({
+          customer: {
+            column: 'customer_id',
+            fieldType: 'relation',
+            relationKey: 'customer',
+            relationEntityLabel: 'display_name',
+            relationEntityKey: 'id',
+          },
+        })[key],
+    } as any;
+    const dynamicFilter = new DynamicFilter(model);
+    dynamicFilter.setFilter(new DynamicFilterSortBy('customer', 'asc'));
+
+    const query = knex('payment_receives');
+    dynamicFilter.buildQuery()(query);
+
+    expect(query.toString()).toBe(
+      'select * from `payment_receives` left join `contacts` as `filter_customer` on `payment_receives`.`customer_id` = `filter_customer`.`id` order by `filter_customer`.`display_name` ASC, `payment_receives`.`id` ASC',
     );
   });
 });

@@ -1,4 +1,3 @@
-import { FIELD_TYPE } from './constants';
 import { DynamicFilterRoleAbstractor } from './DynamicFilterRoleAbstractor';
 import { sanitizeSortDirection } from './sanitizeSortDirection';
 
@@ -33,34 +32,6 @@ export class DynamicFilterSortBy extends DynamicFilterRoleAbstractor {
   public onInitialize() {
     this.setRelationIfRelationField(this.sortRole.fieldKey);
   }
-
-  /**
-   * Retrieve field comparator relatin column.
-   * @param field
-   * @returns {string}
-   */
-  protected getFieldComparatorRelationColumn(field: any): string {
-    const relation = this.model.relationMappings[field.relationKey];
-
-    if (relation) {
-      const relationModel = relation.modelClass;
-      const relationField = relationModel.getField(field.relationEntityLabel);
-
-      return `${relationModel.tableName}.${relationField.column}`;
-    }
-    return '';
-  }
-
-  /**
-   * Retrieve the comparator field column.
-   * @param {IModel} field
-   * @returns {string}
-   */
-  getFieldComparatorColumn = (field) => {
-    return field.fieldType === FIELD_TYPE.RELATION
-      ? this.getFieldComparatorRelationColumn(field)
-      : `${this.tableName}.${field.column}`;
-  };
 
   /**
    * Builds database query of sort by column on the given direction.

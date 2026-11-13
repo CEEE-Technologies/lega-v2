@@ -2,14 +2,6 @@ import { DynamicFilterRoleAbstractor } from './DynamicFilterRoleAbstractor';
 
 export class DynamicFilterFilterRoles extends DynamicFilterRoleAbstractor {
   /**
-   * On initialize filter roles.
-   */
-  public onInitialize() {
-    super.onInitialize();
-    this.setFilterRolesRelations();
-  }
-
-  /**
    * Builds filter roles logic expression.
    * @return {string}
    */
@@ -36,14 +28,5 @@ export class DynamicFilterFilterRoles extends DynamicFilterRoleAbstractor {
         logicExpression,
       )(builder);
     };
-  }
-
-  /**
-   * Sets filter roles relations if field was relation type.
-   */
-  private setFilterRolesRelations() {
-    this.filterRoles.forEach((relationRole) => {
-      this.setRelationIfRelationField(relationRole.fieldKey);
-    });
   }
 }

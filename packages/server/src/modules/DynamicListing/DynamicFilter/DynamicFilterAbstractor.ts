@@ -1,5 +1,6 @@
 import { IDynamicFilter } from './DynamicFilter.types';
 import { MetableModel } from '../types/DynamicList.types';
+import { relationJoinAlias } from './constants';
 
 export class DynamicFilterAbstractor {
   public model: MetableModel;
@@ -16,32 +17,39 @@ export class DynamicFilterAbstractor {
   };
 
   /**
-   * Builds view roles join queries.
-   * @param {String} tableName - Table name.
-   * @param {Array} roles - Roles.
+   * Builds the relation joins the filters need, once per relation even when
+   * several filters (or a view and the filter roles) use it.
+   * @param builder - Query builder.
    */
   protected buildFilterRolesJoins = (builder) => {
-    this.dynamicFilters.forEach((dynamicFilter) => {
-      const relationsFields = dynamicFilter.relationFields;
+    const relationKeys = new Set<string>();
 
-      this.buildFieldsJoinQueries(builder, relationsFields);
+    this.dynamicFilters.forEach((dynamicFilter) => {
+      dynamicFilter.relationFields.forEach((key) => relationKeys.add(key));
     });
+    this.buildFieldsJoinQueries(builder, [...relationKeys]);
   };
 
   /**
-   * Builds join queries of fields.
+   * Left-joins each relation's table under its filter alias, so rows without
+   * the relation still match negative filters ("does not contain").
    * @param builder -
-   * @param {string[]} fieldsRelations -
+   * @param {string[]} fieldsRelations - Relation keys.
    */
   private buildFieldsJoinQueries = (builder, fieldsRelations: string[]) => {
     fieldsRelations.forEach((fieldRelation) => {
       const relation = this.model.relationMappings[fieldRelation];
 
       if (relation) {
-        const splitToRelation = relation.join.to.split('.');
-        const relationTable = splitToRelation[0] || '';
+        const [relationTable, relationColumn] = relation.join.to.split('.');
+        const alias = relationJoinAlias(fieldRelation);
 
-        builder.join(relationTable, relation.join.from, '=', relation.join.to);
+        builder.leftJoin(
+          `${relationTable} as ${alias}`,
+          relation.join.from,
+          '=',
+          `${alias}.${relationColumn}`,
+        );
       }
     });
   };

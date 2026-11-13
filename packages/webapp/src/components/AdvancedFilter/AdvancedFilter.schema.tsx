@@ -5,7 +5,8 @@ export const getFilterDropdownSchema = () =>
     conditions: Yup.array().of(
       Yup.object().shape({
         fieldKey: Yup.string(),
-        value: Yup.string().nullable(),
+        // Text, a date, an option key or a boolean (checkbox fields).
+        value: Yup.mixed().nullable(),
         condition: Yup.string().nullable(),
         comparator: Yup.string().nullable(),
       }),

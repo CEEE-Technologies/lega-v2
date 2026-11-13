@@ -22,6 +22,10 @@ export const SaleReceiptMeta = {
       name: 'receipt.field.amount',
       column: 'amount',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     deposit_account: {
       column: 'deposit_account_id',

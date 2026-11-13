@@ -75,6 +75,7 @@ export const ItemMeta = {
     inventory_account: {
       name: 'item.field.inventory_account',
       column: 'inventory_account_id',
+      fieldType: 'relation',
 
       relationType: 'enumeration',
       relationKey: 'inventoryAccount',
@@ -105,6 +106,7 @@ export const ItemMeta = {
     category: {
       name: 'item.field.category',
       column: 'category_id',
+      fieldType: 'relation',
 
       relationType: 'enumeration',
       relationKey: 'category',

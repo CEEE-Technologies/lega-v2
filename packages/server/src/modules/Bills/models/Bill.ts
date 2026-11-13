@@ -29,6 +29,7 @@ import {
   sqlMoneyLeft,
   sqlSumMoney,
 } from '@/utils/document-money-sql';
+import { rawNumberFilterQuery } from '@/modules/DynamicListing/DynamicFilter/rawNumberFilterQuery';
 
 /**
  * SQL of the bill total, due and settled amounts in cents: the same formulas
@@ -395,6 +396,12 @@ export class Bill extends TenantBaseModel {
   static get modifiers() {
     return {
       /**
+       * Filters by the document total (the list's Amount column).
+       */
+      totalAmountFilter(query, role) {
+        rawNumberFilterQuery(BILL_TOTAL_SQL)(query, role);
+      },
+      /**
        * Filters the bills in draft status.
        */
       draft(query) {
@@ -483,16 +490,23 @@ export class Bill extends TenantBaseModel {
             query.modify('opened');
             break;
           case 'unpaid':
+            query.modify('opened');
             query.modify('unpaid');
             break;
+          // Overdue, like the status shown on the list: opened, still
+          // owed and past its due date.
           case 'overdue':
           default:
+            query.modify('opened');
+            query.modify('dueBills');
             query.modify('overdue');
             break;
           case 'partially-paid':
+            query.modify('opened');
             query.modify('partiallyPaid');
             break;
           case 'paid':
+            query.modify('opened');
             query.modify('paid');
             break;
         }

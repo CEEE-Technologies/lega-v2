@@ -18,6 +18,11 @@ import { DiscountType } from '@/common/types/Discount';
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { SaleEstimateDefaultViews } from '../constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
+import { rawNumberFilterQuery } from '@/modules/DynamicListing/DynamicFilter/rawNumberFilterQuery';
+import { sqlDocumentTotal } from '@/utils/document-money-sql';
+
+/** SQL of the estimate total, the same formula as the `total` getter. */
+const ESTIMATE_TOTAL_SQL = sqlDocumentTotal('AMOUNT', false);
 
 @InjectAttachable()
 @ExportableModel()
@@ -223,6 +228,12 @@ export class SaleEstimate extends TenantBaseModel {
    */
   static get modifiers() {
     return {
+      /**
+       * Filters by the document total (the list's Amount column).
+       */
+      totalAmountFilter(query, role) {
+        rawNumberFilterQuery(ESTIMATE_TOTAL_SQL)(query, role);
+      },
       /**
        * Filters the drafted estimates transactions.
        */

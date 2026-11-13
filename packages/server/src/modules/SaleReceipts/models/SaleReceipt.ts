@@ -25,6 +25,11 @@ import { SaleReceiptMeta } from './SaleReceipt.meta';
 import { sanitizeSortDirection } from '@/modules/DynamicListing/DynamicFilter/sanitizeSortDirection';
 import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelDefaultViews.decorator';
 import { SaleReceiptDefaultViews } from '../constants';
+import { rawNumberFilterQuery } from '@/modules/DynamicListing/DynamicFilter/rawNumberFilterQuery';
+import { sqlDocumentTotal } from '@/utils/document-money-sql';
+
+/** SQL of the receipt total, the same formula as the `total` getter. */
+const RECEIPT_TOTAL_SQL = sqlDocumentTotal('AMOUNT', false);
 
 const ExtendedModel = R.pipe(
   CustomViewBaseModelMixin,
@@ -235,6 +240,12 @@ export class SaleReceipt extends ExtendedModel {
    */
   static get modifiers() {
     return {
+      /**
+       * Filters by the document total (the list's Amount column).
+       */
+      totalAmountFilter(query, role) {
+        rawNumberFilterQuery(RECEIPT_TOTAL_SQL)(query, role);
+      },
       /**
        * Filters the closed receipts.
        */

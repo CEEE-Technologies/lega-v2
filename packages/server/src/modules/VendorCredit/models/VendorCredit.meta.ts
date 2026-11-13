@@ -41,11 +41,15 @@ export const VendorCreditMeta = {
       name: 'vendor_credit.field.amount',
       column: 'amount',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     currency_code: {
       name: 'vendor_credit.field.currency_code',
       column: 'currency_code',
-      fieldType: 'string',
+      fieldType: 'text',
     },
     credit_date: {
       name: 'vendor_credit.field.credit_date',
