@@ -19,6 +19,10 @@ COPY --chown=node:node shared ./shared
 # Patched dependencies (see `pnpm.patchedDependencies` in package.json)
 COPY --chown=node:node patches ./patches
 
+# The patched packages are server dependencies, which this image doesn't
+# install, so pnpm would stop on their unused patches.
+RUN npm pkg set pnpm.allowNonAppliedPatches=true --json
+
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install
 
