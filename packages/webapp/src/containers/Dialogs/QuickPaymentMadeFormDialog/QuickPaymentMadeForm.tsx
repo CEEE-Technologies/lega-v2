@@ -13,7 +13,7 @@ import {
 } from './utils';
 import type { QuickPaymentMadeFormValues } from './types';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 
 interface QuickPaymentMadeFormProps extends WithDialogActionsProps {}
@@ -28,6 +28,11 @@ function QuickPaymentMadeFormInner({
     useQuickPaymentMadeContext();
 
   // Initial form values.
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: QuickPaymentMadeFormValues) => values.currencyCode,
+  );
+
   const initialValues: QuickPaymentMadeFormValues = {
     ...defaultPaymentMade,
     ...transformBillToForm(bill),
@@ -79,6 +84,7 @@ function QuickPaymentMadeFormInner({
   return (
     <Formik
       validationSchema={CreateQuickPaymentMadeFormSchema}
+      validate={validateExchangeRate}
       initialValues={initialValues}
       onSubmit={handleFormSubmit}
       component={QuickPaymentMadeFormContent}

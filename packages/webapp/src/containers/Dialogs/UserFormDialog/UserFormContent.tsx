@@ -17,6 +17,7 @@ import {
 } from '@/components';
 import { CLASSES } from '@/constants/classes';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
+import { useAssignableRoles } from '@/hooks/utils';
 
 interface UserFormContentProps extends WithDialogActionsProps {
   calloutCode: number[];
@@ -30,7 +31,12 @@ function UserFormContentInner({
   closeDialog,
 }: UserFormContentProps): React.ReactElement {
   const { isSubmitting } = useFormikContext<UserFormValues>();
-  const { dialogName, roles, isAuth } = useUserFormContext();
+  const { dialogName, roles, isAuth, user } = useUserFormContext();
+  // Only admins can give the Admin role; the user's own role stays listed.
+  const assignableRoles = useAssignableRoles(
+    roles as Array<{ id?: number; slug?: string }> | undefined,
+    (user as { roleId?: number } | undefined)?.roleId,
+  );
 
   const handleClose = () => {
     closeDialog(dialogName);
@@ -80,7 +86,7 @@ function UserFormContentInner({
         >
           <FSelect
             name={'roleId'}
-            items={roles}
+            items={assignableRoles}
             valueAccessor={'id'}
             textAccessor={'name'}
             popoverProps={{ minimal: true }}

@@ -6,6 +6,7 @@ import type { WithAlertActionsProps } from '@/containers/Alert/withAlertActions'
 import type { WithDrawerActionsProps } from '@/containers/Drawer/withDrawerActions';
 import { AppToaster, FormattedHTMLMessage } from '@/components';
 import { DRAWERS } from '@/constants/drawers';
+import { MATCHED_TRANSACTION_MESSAGE } from '@/constants/errors';
 import { withAlertActions } from '@/containers/Alert/withAlertActions';
 import { withAlertStoreConnect } from '@/containers/Alert/withAlertStoreConnect';
 import { withDrawerActions } from '@/containers/Drawer/withDrawerActions';
@@ -68,15 +69,14 @@ function AccountDeleteTransactionAlertInner({
           ) {
             AppToaster.show({
               message:
-                'Cannot delete transaction converted from uncategorized transaction but you uncategorize it.',
+                'This transaction was made from a bank line. Uncategorize the bank line instead.',
               intent: Intent.DANGER,
             });
           } else if (
             errors.find((e) => e.type === 'CANNOT_DELETE_TRANSACTION_MATCHED')
           ) {
             AppToaster.show({
-              message:
-                'Cannot delete a transaction matched to the bank transaction',
+              message: MATCHED_TRANSACTION_MESSAGE,
               intent: Intent.DANGER,
             });
           }

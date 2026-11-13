@@ -1,3 +1,5 @@
+import * as moment from 'moment';
+import { BILL_MONEY_SQL } from '@/modules/Bills/models/Bill';
 export const VendorMeta = {
   defaultFilterField: 'displayName',
   defaultSort: {
@@ -77,21 +79,12 @@ export const VendorMeta = {
     },
     status: {
       name: 'vendor.field.status',
-      type: 'enumeration',
+      fieldType: 'enumeration',
       options: [
         { key: 'overdue', label: 'vendor.field.status.overdue' },
         { key: 'unpaid', label: 'vendor.field.status.unpaid' },
       ],
-      filterCustomQuery: (query, role) => {
-        switch (role.value) {
-          case 'overdue':
-            query.modify('overdue');
-            break;
-          case 'unpaid':
-            query.modify('unpaid');
-            break;
-        }
-      },
+      filterCustomQuery: StatusFieldFilterQuery,
     },
   },
   columns: {
@@ -408,3 +401,29 @@ export const VendorMeta = {
     },
   },
 };
+
+/**
+ * Status field filter query. Overdue: has an opened bill that is still owed past its
+ * due date. Unpaid: has a balance. Written as plain where clauses so the
+ * filter can be grouped (AND/OR) and negated ("is not").
+ */
+function StatusFieldFilterQuery(query, role) {
+  switch (role.value) {
+    case 'overdue':
+      query.whereExists((subquery) =>
+        subquery
+          .select(1)
+          .from('bills')
+          .whereRaw('?? = ??', ['bills.vendor_id', 'contacts.id'])
+          .whereNotNull('bills.opened_at')
+          .where('bills.due_date', '<', moment().format('YYYY-MM-DD'))
+          .whereRaw(`${BILL_MONEY_SQL.due} > 0`),
+      );
+      break;
+    case 'unpaid':
+      query.whereRaw('ROUND(COALESCE(??, 0), 2) <> 0', ['contacts.balance']);
+      break;
+    default:
+      query.whereRaw('1 = 0');
+  }
+}

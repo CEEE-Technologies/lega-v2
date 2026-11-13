@@ -21,7 +21,17 @@ export class ManualJournalBranchesDTOTransformer {
     const isActive = await this.branchesSettings.isMultiBranchesActive();
 
     if (isActive) {
-      return DTO;
+      // A line without its own branch takes the journal's: the branch
+      // check passes on the journal's branch, and the ledger is written
+      // per line, so those lines were posted with no branch at all.
+      const branchId = (DTO as IManualJournalDTO & { branchId?: number })
+        .branchId;
+      return {
+        ...DTO,
+        entries: DTO.entries.map((e) =>
+          e.branchId || !branchId ? e : { ...e, branchId },
+        ),
+      };
     }
     return {
       ...DTO,

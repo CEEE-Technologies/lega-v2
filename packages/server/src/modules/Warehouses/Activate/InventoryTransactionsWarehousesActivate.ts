@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { InventoryTransaction } from '@/modules/InventoryCost/models/InventoryTransaction';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { Inject, Injectable } from '@nestjs/common';
@@ -22,16 +23,18 @@ export class InventoryActivateWarehouses {
    * Updates all inventory transactions with the primary warehouse.
    * @param   {number} tenantId
    * @param   {number} primaryWarehouse
+   * @param   {Knex.Transaction} trx - The activation transaction.
    * @returns {Promise<void>}
    */
   public updateInventoryTransactionsWithWarehouse = async (
     primaryWarehouse: Warehouse,
+    trx?: Knex.Transaction,
   ): Promise<void> => {
     // Updates the inventory transactions with primary warehouse.
-    await this.inventoryTransactionModel().query().update({
+    await this.inventoryTransactionModel().query(trx).update({
       warehouseId: primaryWarehouse.id,
     });
-    await this.inventoryCostLotTrackerModel().query().update({
+    await this.inventoryCostLotTrackerModel().query(trx).update({
       warehouseId: primaryWarehouse.id,
     });
   };

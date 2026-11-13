@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { waitForListResponse } from './_invoices';
 
 const MONTHS = [
   'Jan',
@@ -230,7 +231,14 @@ export async function filterEstimatesByNumber(
   estimateNumber: string,
 ): Promise<Locator> {
   await page.getByRole('button', { name: /filter|filters applied/i }).click();
+  // Wait for the filtered list (a new filter replaces the rows).
+  const filtered = waitForListResponse(
+    page,
+    '/api/sale-estimates',
+    estimateNumber,
+  );
   await page.getByPlaceholder('Value').first().fill(estimateNumber);
+  await filtered;
 
   const row = page
     .getByTestId('estimate-row')

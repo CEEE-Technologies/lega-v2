@@ -37,12 +37,52 @@ export async function waitForTransaction(trx) {
 }
 
 /**
+ * After-commit work queued while a savepoint step runs (see
+ * `withSavepoint`): one list per open step, innermost last. A failed step's
+ * list is dropped with its writes; a successful step hands its list to the
+ * step around it, or to the transaction itself.
+ */
+const STEP_HOOKS = Symbol('lega.stepAfterCommitHooks');
+
+type StepHooks = Array<Array<() => unknown>>;
+
+/**
+ * Starts collecting the after-commit work of a savepoint step.
+ * @param {import('objection').TransactionOrKnex} trx
+ */
+export function openStepHooks(trx) {
+  if (!trx[STEP_HOOKS]) trx[STEP_HOOKS] = [] as StepHooks;
+  (trx[STEP_HOOKS] as StepHooks).push([]);
+}
+
+/**
+ * Ends the innermost savepoint step: keeps its after-commit work when the
+ * step succeeded, and drops it when the step was undone.
+ * @param {import('objection').TransactionOrKnex} trx
+ * @param {boolean} keep - Whether the step succeeded.
+ */
+export function closeStepHooks(trx, keep: boolean) {
+  const hooks = (trx[STEP_HOOKS] as StepHooks | undefined)?.pop() ?? [];
+  if (!keep) return;
+  hooks.forEach((callback) => runAfterTransaction(trx, callback));
+}
+
+/** The after-commit work that has not finished yet. */
+const pendingAfterCommitWork = new Set<Promise<unknown>>();
+
+/**
  * Run a callback when the transaction is done.
  * @param {import('objection').TransactionOrKnex | undefined} trx
  * @param {Function} callback
  */
 export function runAfterTransaction(trx, callback) {
-  waitForTransaction(trx).then(
+  // Inside a savepoint step the work waits for the step to succeed first.
+  const steps = trx?.[STEP_HOOKS] as StepHooks | undefined;
+  if (steps && steps.length > 0) {
+    steps[steps.length - 1].push(callback);
+    return;
+  }
+  const work = waitForTransaction(trx).then(
     () => {
       // If transaction success, then run action
       // Log instead of re-throwing: an error thrown from a timer is an
@@ -60,4 +100,32 @@ export function runAfterTransaction(trx, callback) {
       // The transaction was rolled back: skip the hook.
     },
   );
+  pendingAfterCommitWork.add(work);
+  work.finally(() => pendingAfterCommitWork.delete(work));
+}
+
+/**
+ * Waits until the after-commit work queued so far (and any it queues in
+ * turn) has finished. A process that exits right after a save, such as a
+ * CLI repair command, calls this before closing the app: otherwise the
+ * work (adding the cost recompute job, the analytics delta, the audit row)
+ * is cut off, although the save itself committed. Gives up after
+ * `timeoutMs`, so a transaction left open can't hang a shutdown.
+ */
+export async function settleAfterCommitWork(
+  timeoutMs: number = 30_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (pendingAfterCommitWork.size > 0 && Date.now() < deadline) {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, deadline - Date.now());
+    });
+    // A transaction still open at the deadline doesn't hold up shutdown.
+    await Promise.race([
+      Promise.allSettled([...pendingAfterCommitWork]),
+      timeout,
+    ]);
+    clearTimeout(timer);
+  }
 }

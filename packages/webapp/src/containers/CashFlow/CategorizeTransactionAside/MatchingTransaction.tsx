@@ -10,10 +10,15 @@ import {
 import * as FF from 'fp-ts/function';
 import { isEmpty } from 'lodash';
 import React, { useEffect, useState } from 'react';
+import { useAccountTransactionsContext } from '../AccountTransactions/AccountTransactionsProvider';
 import { withBanking } from '../withBanking';
 import { withBankingActions } from '../withBankingActions';
 import styles from './CategorizeTransactionAside.module.scss';
 import { useCategorizeTransactionTabsBoot } from './CategorizeTransactionTabsBoot';
+import {
+  MatchExchangeRateFields,
+  useSelectedForeignMatches,
+} from './MatchExchangeRateFields';
 import { MatchingReconcileTransactionForm } from './MatchingReconcileTransactionAside/MatchingReconcileTransactionForm';
 import {
   MatchingTransactionBoot,
@@ -30,11 +35,13 @@ import type { MatchingTransactionFormValues } from './types';
 import type { WithBankingProps } from '../withBanking';
 import type { WithBankingActionsProps } from '../withBankingActions';
 import { AppToaster, Box, FormatNumber, Group, Stack } from '@/components';
+import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { useMatchUncategorizedTransaction } from '@/hooks/query/banking';
 import { useIsDarkMode } from '@/hooks/useDarkMode';
 
 const initialValues: MatchingTransactionFormValues = {
   matched: {},
+  exchangeRates: {},
 };
 
 interface MatchingBankTransactionRootProps
@@ -84,8 +91,23 @@ function MatchingBankTransactionRoot({
       })
       .catch(
         (err: {
-          response?: { data?: { errors?: Array<{ type: string }> } };
+          response?: {
+            data?: { errors?: Array<{ type: string; message?: string }> };
+          };
         }) => {
+          const rateError = err.response?.data?.errors?.find(
+            (e) => e.type === 'EXCHANGE_RATE_REQUIRED',
+          );
+          if (rateError) {
+            AppToaster.show({
+              message:
+                rateError.message ||
+                'Enter the exchange rate of each invoice or bill in another currency.',
+              intent: Intent.DANGER,
+            });
+            setSubmitting(false);
+            return;
+          }
           if (
             err.response?.data?.errors?.find(
               (e) => e.type === 'TOTAL_MATCHING_TRANSACTIONS_INVALID',
@@ -202,6 +224,7 @@ function MatchingBankTransactionContent() {
     <Box className={styles.root}>
       <PerfectMatchingTransactions />
       <PossibleMatchingTransactions />
+      <MatchExchangeRateFields />
     </Box>
   );
 }
@@ -333,11 +356,31 @@ const MatchTransactionFooter = FF.pipe(
     closeMatchingTransactionAside,
     openReconcileMatchingTransaction,
   }: MatchTransctionFooterProps) => {
-    const { submitForm, isSubmitting } =
+    const { submitForm, isSubmitting, values } =
       useFormikContext<MatchingTransactionFormValues>();
     const totalPending = useGetPendingAmountMatched();
+    // The bank lines are in the bank account's currency (it was always USD).
+    const { currentAccount } = useAccountTransactionsContext();
+    const baseCurrency = useCurrentOrganizationBaseCurrency();
+    const pendingCurrency =
+      (currentAccount as { currencyCode?: string } | undefined)?.currencyCode ||
+      baseCurrency;
     const showReconcileLink = useIsShowReconcileTransactionLink();
-    const submitDisabled = !moneyIsZero(totalPending);
+    // Every selected invoice or bill in another currency needs a rate.
+    const foreignMatches = useSelectedForeignMatches();
+    const missingRate = foreignMatches.some(
+      (match) =>
+        !(
+          parseFloat(
+            String(
+              values.exchangeRates?.[
+                `${match.referenceType}-${match.referenceId}`
+              ] ?? '',
+            ),
+          ) > 0
+        ),
+    );
+    const submitDisabled = !moneyIsZero(totalPending) || missingRate;
     const isDarkMode = useIsDarkMode();
 
     const handleCancelBtnClick = () => {
@@ -375,7 +418,7 @@ const MatchTransactionFooter = FF.pipe(
               Pending{' '}
               <FormatNumber
                 value={totalPending}
-                currency={'USD'}
+                currency={pendingCurrency}
                 noZero={false}
               />
             </Text>

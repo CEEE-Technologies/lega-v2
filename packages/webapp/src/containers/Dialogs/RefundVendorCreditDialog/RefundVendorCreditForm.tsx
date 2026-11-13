@@ -10,7 +10,7 @@ import { RefundVendorCreditFormContent } from './RefundVendorCreditFormContent';
 import { useRefundVendorCreditContext } from './RefundVendorCreditFormProvider';
 import type { RefundVendorCreditFormValues } from './types';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 
 const defaultInitialValues: RefundVendorCreditFormValues = {
@@ -34,6 +34,11 @@ function RefundVendorCreditFormInner({
     useRefundVendorCreditContext();
 
   // Initial form values
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: RefundVendorCreditFormValues) => values.currencyCode,
+  );
+
   const initialValues: RefundVendorCreditFormValues = {
     ...defaultInitialValues,
     ...(vendorCredit as unknown as RefundVendorCreditFormValues),
@@ -78,6 +83,7 @@ function RefundVendorCreditFormInner({
   return (
     <Formik
       validationSchema={CreateVendorRefundCreditFormSchema}
+      validate={validateExchangeRate}
       initialValues={initialValues}
       onSubmit={handleFormSubmit}
       component={RefundVendorCreditFormContent}

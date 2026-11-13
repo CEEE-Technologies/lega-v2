@@ -34,11 +34,17 @@ import type {
   CreateBillPaymentBody,
   EditBillPaymentBody,
 } from '@bigcapital/sdk-ts';
-import { AppToaster, Box } from '@/components';
+import {
+  AppToaster,
+  Box,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { orderingLinesIndexes, safeSumBy, formattedAmount } from '@/utils';
+import { keepBranchAndWarehouse } from '@/utils/keep-branch-on-reset';
 
 type WithDialogActionsProps = {
   openDialog: (name: string, payload?: Record<string, unknown>) => void;
@@ -154,7 +160,8 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
       setSubmitting(false);
 
       submitPayload.redirect && history.push('/payments-made');
-      submitPayload.resetForm && resetForm();
+      submitPayload.resetForm &&
+        resetForm(keepBranchAndWarehouse(initialValues, values));
       return true;
     };
 
@@ -184,9 +191,13 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<PaymentMadeFormValues>
       initialValues={initialValues}
+      validate={validateExchangeRate}
       validationSchema={
         isNewMode ? CreatePaymentMadeFormSchema : EditPaymentMadeFormSchema
       }
@@ -200,6 +211,8 @@ function PaymentMadeFormInner({ openDialog }: PaymentMadeFormRootProps) {
           flex: 1,
         })}
       >
+        {/* Fills the rate: never a silent 1 for a foreign currency. */}
+        <DocumentExchangeRateSync isNewMode={isNewMode} />
         <PageForm flex={1}>
           <PageForm.Body>
             <PaymentMadeInnerProvider>

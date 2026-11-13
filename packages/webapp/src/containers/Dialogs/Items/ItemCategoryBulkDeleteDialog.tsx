@@ -7,7 +7,10 @@ import type { WithItemCategoriesActionsProps } from '@/containers/ItemsCategorie
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withItemCategoriesActions } from '@/containers/ItemsCategories/withItemCategoriesActions';
 import { useBulkDeleteItemCategories } from '@/hooks/query/items-categories';
 
@@ -89,6 +92,10 @@ function ItemCategoryBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_item_category_singular')}
         resourcePluralLabel={intl.get('resource_item_category_plural')}
       />

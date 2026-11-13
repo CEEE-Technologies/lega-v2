@@ -35,12 +35,15 @@ export class ActivateBranches {
   /**
    * Creates a new initial branch.
    */
-  private createInitialBranch = () => {
-    return this.createBranch.createBranch({
-      name: this.i18n.t('branches.head_branch'),
-      code: '10001',
-      primary: true,
-    });
+  private createInitialBranch = (trx: Knex.Transaction) => {
+    return this.createBranch.createBranch(
+      {
+        name: this.i18n.t('branches.head_branch'),
+        code: '10001',
+        primary: true,
+      },
+      trx,
+    );
   };
 
   /**
@@ -60,11 +63,12 @@ export class ActivateBranches {
         trx,
       } as IBranchesActivatePayload);
 
-      // Create a new branch as primary branch.
-      const primaryBranch = await this.createInitialBranch();
-
-      // Mark the mutli-branches is activated.
-      await this.branchesSettings.markMultiBranchesAsActivated();
+      // Create a new branch as primary branch, and mark the feature as on,
+      // inside the transaction: if a later step fails, both are undone
+      // (they were kept, so a retry said "already on" while the existing
+      // transactions never got their branch).
+      const primaryBranch = await this.createInitialBranch(trx);
+      await this.branchesSettings.markMultiBranchesAsActivated(trx);
 
       // Triggers `onBranchActivated` branch.
       await this.eventPublisher.emitAsync(events.branch.onActivated, {

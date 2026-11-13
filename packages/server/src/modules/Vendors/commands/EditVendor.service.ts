@@ -47,9 +47,10 @@ export class EditVendorService {
         vendorDTO,
       } as IVendorEventEditingPayload);
 
-      // Edits the vendor contact.
+      // Edits the vendor contact inside the save, so a failed edit changes
+      // nothing.
       const vendor = await this.vendorModel()
-        .query()
+        .query(trx)
         .updateAndFetchById(vendorId, {
           ...vendorObj,
         });

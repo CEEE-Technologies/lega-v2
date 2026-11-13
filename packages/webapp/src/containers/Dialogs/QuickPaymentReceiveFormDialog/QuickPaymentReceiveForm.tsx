@@ -14,7 +14,7 @@ import {
 } from './utils';
 import type { QuickPaymentReceiveFormValues } from './types';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { transactionNumber } from '@/utils';
 
@@ -52,6 +52,11 @@ function QuickPaymentReceiveFormInner({
   const nextPaymentNumber = transactionNumber(
     paymentReceiveNumberPrefix,
     paymentReceiveNextNumber,
+  );
+
+  // The rate is required for a foreign-currency invoice.
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: QuickPaymentReceiveFormValues) => values.currencyCode,
   );
 
   // Initial form values
@@ -122,6 +127,7 @@ function QuickPaymentReceiveFormInner({
   return (
     <Formik
       validationSchema={CreateQuickPaymentReceiveFormSchema}
+      validate={validateExchangeRate}
       initialValues={initialValues}
       onSubmit={handleFormSubmit}
       component={QuickPaymentReceiveFormContent}

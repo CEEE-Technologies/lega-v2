@@ -62,7 +62,13 @@ function RefundVendorCreditFormProvider({
     'id',
     'creditsRemaining',
     'currencyCode',
-  ]) as { id?: number; creditsRemaining?: number; currencyCode?: string };
+    'exchangeRate',
+  ]) as {
+    id?: number;
+    creditsRemaining?: number;
+    currencyCode?: string;
+    exchangeRate?: number;
+  };
 
   const provider: RefundVendorCreditContextValue = {
     vendorCredit: vendorCreditRaw
@@ -71,6 +77,7 @@ function RefundVendorCreditFormProvider({
           creditsRemaining: (picked.creditsRemaining as number) ?? 0,
           currencyCode: (picked.currencyCode as string) ?? '',
           amount: (picked.creditsRemaining as number) ?? 0,
+          exchangeRate: picked.exchangeRate,
         }
       : undefined,
     accounts,

@@ -39,8 +39,9 @@ export class AuthMailSubscriber {
   /**
    * @param {IAuthSignedUpEventPayload | ISignUpConfigmResendedEventPayload} payload
    */
-  @OnEvent(events.auth.signUp)
-  @OnEvent(events.auth.signUpConfirmResended)
+  // Side effect (email): an error is logged and does not stop the save.
+  @OnEvent(events.auth.signUp, { suppressErrors: true })
+  @OnEvent(events.auth.signUpConfirmResended, { suppressErrors: true })
   async handleSignupSendVerificationMail(
     payload: IAuthSignedUpEventPayload | ISignUpConfigmResendedEventPayload,
   ) {
@@ -61,7 +62,8 @@ export class AuthMailSubscriber {
   /**
    * @param {IAuthSendedResetPassword} payload
    */
-  @OnEvent(events.auth.sendResetPassword)
+  // Side effect (email): an error is logged and does not stop the save.
+  @OnEvent(events.auth.sendResetPassword, { suppressErrors: true })
   async handleSendResetPasswordMail(payload: IAuthSendedResetPassword) {
     // No reset code or user record (password hash) in the job; the
     // processor reads what it needs.

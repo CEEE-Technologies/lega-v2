@@ -15,7 +15,17 @@ import { ILedgerEntry } from '@/modules/Ledger/types/Ledger.types';
 import { AccountNormal } from '@/interfaces/Account';
 import { AccountRepository } from '@/modules/Accounts/repositories/Account.repository';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
-import { RefundVendorCreditCashGL } from './RefundVendorCreditCashGL';
+import { subtractMoney } from '@bigcapital/utils';
+import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import {
+  getExchangeGainLossEntries,
+  getRunningTotalRelief,
+  IRefundExchangeGainLoss,
+} from '@/utils/exchange-gain-loss';
+import {
+  getRefundVendorCreditLocalAmount,
+  RefundVendorCreditCashGL,
+} from './RefundVendorCreditCashGL';
 
 @Injectable()
 export class RefundVendorCreditGLEntries {
@@ -30,6 +40,8 @@ export class RefundVendorCreditGLEntries {
     private readonly refundVendorCreditModel: TenantModelProxy<
       typeof RefundVendorCredit
     >,
+
+    private readonly tenancyContext?: TenancyContext,
   ) {}
 
   /**
@@ -80,7 +92,7 @@ export class RefundVendorCreditGLEntries {
 
     return {
       ...commonEntry,
-      credit: refundVendorCredit.amount,
+      credit: getRefundVendorCreditLocalAmount(refundVendorCredit),
       foreignCredit: refundVendorCredit.amount,
       accountId: APAccountId,
       contactId: refundVendorCredit.vendorCredit.vendorId,
@@ -102,7 +114,7 @@ export class RefundVendorCreditGLEntries {
 
     return {
       ...commonEntry,
-      debit: refundVendorCredit.amount,
+      debit: getRefundVendorCreditLocalAmount(refundVendorCredit),
       foreignDebit: refundVendorCredit.amount,
       accountId: refundVendorCredit.depositAccountId,
       index: 2,
@@ -111,14 +123,65 @@ export class RefundVendorCreditGLEntries {
   };
 
   /**
+   * Retrieves the exchange gain/loss lines of the refund. The vendor credit
+   * debited A/P at its own rate; the refund relieves A/P at that rate (a
+   * running total over the vendor credit's refunds), as a bill payment
+   * relieves A/P at the bill rate. The A/P line is at the refund rate, so
+   * this pair moves the difference from A/P to exchange gain/loss: money
+   * back at a higher rate than the vendor credit's is a gain.
+   * @param {RefundVendorCredit} refundVendorCredit
+   * @param {number} APAccountId
+   * @param {IRefundExchangeGainLoss} fx
+   * @returns {ILedgerEntry[]}
+   */
+  private getRefundVendorCreditGLExchangeGainLossEntries = (
+    refundVendorCredit: RefundVendorCredit,
+    APAccountId: number,
+    fx?: IRefundExchangeGainLoss,
+  ): ILedgerEntry[] => {
+    const vendorCredit = refundVendorCredit.vendorCredit;
+    if (!fx?.exchangeGainOrLossAccountId || !vendorCredit) return [];
+
+    const relief = getRunningTotalRelief(
+      refundVendorCredit.amount,
+      fx.refundedBefore,
+      vendorCredit.exchangeRate ?? refundVendorCredit.exchangeRate ?? 1,
+    );
+    const entries = getExchangeGainLossEntries({
+      commonEntry: this.getRefundVendorCreditCommonGLEntry(refundVendorCredit),
+      // > 0 debits A/P: the A/P line (at the refund rate) credited more
+      // than the relief.
+      amount: subtractMoney(
+        getRefundVendorCreditLocalAmount(refundVendorCredit),
+        relief,
+      ),
+      baseCurrencyCode: fx.baseCurrencyCode,
+      contactEntry: {
+        accountId: APAccountId,
+        contactId: vendorCredit.vendorId,
+        index: 3,
+        accountNormal: AccountNormal.CREDIT,
+      },
+      gainLossEntry: {
+        accountId: fx.exchangeGainOrLossAccountId,
+        index: 3,
+        accountNormal: AccountNormal.DEBIT,
+      },
+    });
+    return entries ? [entries.contactEntry, entries.gainLossEntry] : [];
+  };
+
+  /**
    * Retrieve refund vendor credit GL entries.
    * @param {RefundVendorCredit} refundVendorCredit
    * @param {number} APAccountId
+   * @param {IRefundExchangeGainLoss} fx - Without it, no exchange gain/loss.
    * @returns {ILedgerEntry[]}
    */
   public getRefundVendorCreditGLEntries(
     refundVendorCredit: RefundVendorCredit,
     APAccountId: number,
+    fx?: IRefundExchangeGainLoss,
   ): ILedgerEntry[] {
     const payableEntry = this.getRefundVendorCreditGLPayableEntry(
       refundVendorCredit,
@@ -127,8 +190,60 @@ export class RefundVendorCreditGLEntries {
     const depositEntry =
       this.getRefundVendorCreditGLDepositEntry(refundVendorCredit);
 
-    return [payableEntry, depositEntry];
+    return [
+      payableEntry,
+      depositEntry,
+      ...this.getRefundVendorCreditGLExchangeGainLossEntries(
+        refundVendorCredit,
+        APAccountId,
+        fx,
+      ),
+    ];
   }
+
+  /**
+   * What the refunds before this one (date, then id) took of the vendor
+   * credit. Locks the vendor credit in a transaction.
+   * @param {RefundVendorCredit} refundVendorCredit
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<number>}
+   */
+  private getRefundedBefore = async (
+    refundVendorCredit: RefundVendorCredit,
+    trx?: Knex.Transaction,
+  ): Promise<number> => {
+    const refundedBefore = await getDocumentsPaidBefore(
+      trx ?? this.refundVendorCreditModel().knex(),
+      VENDOR_CREDIT_REFUND_PAID_BEFORE,
+      { id: refundVendorCredit.id, date: refundVendorCredit.date },
+      [refundVendorCredit.vendorCreditId],
+      !!trx,
+    );
+    return refundedBefore[refundVendorCredit.vendorCreditId] || 0;
+  };
+
+  /**
+   * Retrieves what the accrual journal needs for the exchange gain/loss.
+   * @param {RefundVendorCredit} refundVendorCredit
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<IRefundExchangeGainLoss>}
+   */
+  private getRefundExchangeGainLoss = async (
+    refundVendorCredit: RefundVendorCredit,
+    trx?: Knex.Transaction,
+  ): Promise<IRefundExchangeGainLoss> => {
+    const exGainLossAccount = await this.accountModel()
+      .query(trx)
+      .modify('findBySlug', 'exchange-grain-loss')
+      .first();
+    const tenantMeta = await this.tenancyContext?.getTenantMetadata();
+
+    return {
+      exchangeGainOrLossAccountId: exGainLossAccount?.id ?? null,
+      baseCurrencyCode: tenantMeta?.baseCurrency,
+      refundedBefore: await this.getRefundedBefore(refundVendorCredit, trx),
+    };
+  };
 
   /**
    * Retrieves the refund vendor credit general ledger.
@@ -146,7 +261,11 @@ export class RefundVendorCreditGLEntries {
   ): Promise<Ledger> => {
     // Accrual basis ledger entries.
     const accrualLedger = new Ledger(
-      this.getRefundVendorCreditGLEntries(refundVendorCredit, APAccountId),
+      this.getRefundVendorCreditGLEntries(
+        refundVendorCredit,
+        APAccountId,
+        await this.getRefundExchangeGainLoss(refundVendorCredit, trx),
+      ),
     );
 
     // Cash basis ledger entries.
@@ -180,12 +299,9 @@ export class RefundVendorCreditGLEntries {
 
     // What the earlier refunds took of the vendor credit: the running-total
     // split of this refund starts from there.
-    const refundedBefore = await getDocumentsPaidBefore(
-      trx ?? this.refundVendorCreditModel().knex(),
-      VENDOR_CREDIT_REFUND_PAID_BEFORE,
-      { id: refundVendorCredit.id, date: refundVendorCredit.date },
-      [refundVendorCredit.vendorCreditId],
-      !!trx,
+    const refundedBefore = await this.getRefundedBefore(
+      refundVendorCredit,
+      trx,
     );
     // A vendor credit with no expense to reverse (or a refund above what is
     // left of it) returns the refund to the vendor's prepaid expenses.
@@ -195,7 +311,7 @@ export class RefundVendorCreditGLEntries {
     const refundVendorCreditCashGL = new RefundVendorCreditCashGL(
       refundVendorCredit,
     )
-      .setRefundedBefore(refundedBefore[refundVendorCredit.vendorCreditId] || 0)
+      .setRefundedBefore(refundedBefore)
       .setPurchaseDiscountAccountId(purchaseDiscountAccount.id)
       .setOtherExpensesAccountId(otherExpensesAccount.id)
       .setPrepaidExpensesAccountId(prepaidExpensesAccount.id);
@@ -253,12 +369,48 @@ export class RefundVendorCreditGLEntries {
   };
 
   /**
-   * Rewrites the cash basis entries of all the refunds of the given vendor
-   * credit.
+   * Rewrites a refund whose position or vendor credit changed: its cash
+   * basis entries, and its accrual ones too in a foreign currency (their
+   * A/P relief is a running total at the vendor credit rate, so it moves
+   * with the refunds before it and with the vendor credit's rate). In the
+   * base currency the accrual entries never move.
+   * @param {number} refundVendorCreditId
+   * @param {Knex.Transaction} trx
+   */
+  private rewriteRefundOnChange = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> => {
+    const refund = await this.refundVendorCreditModel()
+      .query(trx)
+      .findById(refundVendorCreditId)
+      .withGraphFetched('vendorCredit');
+    if (!refund) return;
+
+    // By the currency, not the rates: a foreign document edited to the
+    // rate 1 (with a refund at 1) still has to drop the exchange gain/loss
+    // its accrual entries were posted with at the old rate.
+    const baseCurrency = (await this.tenancyContext?.getTenantMetadata())
+      ?.baseCurrency;
+    const currencyCode =
+      refund.currencyCode ?? refund.vendorCredit?.currencyCode;
+    const isForeign =
+      (!!baseCurrency && !!currencyCode && currencyCode !== baseCurrency) ||
+      Number(refund.exchangeRate ?? 1) !== 1 ||
+      Number(refund.vendorCredit?.exchangeRate ?? 1) !== 1;
+    return isForeign
+      ? this.rewriteRefundVendorCreditGLEntries(refundVendorCreditId, trx)
+      : this.rewriteRefundVendorCreditCashGLEntries(refundVendorCreditId, trx);
+  };
+
+  /**
+   * Rewrites the refunds of the given vendor credit once it is edited:
+   * their cash basis entries, and in a foreign currency their whole
+   * journal (the vendor credit's rate may have changed).
    * @param {number} vendorCreditId - Vendor credit id.
    * @param {Knex.Transaction} trx - Knex transaction.
    */
-  public rewriteVendorCreditRefundsCashGLEntries = async (
+  public rewriteVendorCreditRefundsGLEntries = async (
     vendorCreditId: number,
     trx?: Knex.Transaction,
   ) => {
@@ -272,8 +424,40 @@ export class RefundVendorCreditGLEntries {
       ]);
 
     for (const refund of refunds) {
-      await this.rewriteRefundVendorCreditCashGLEntries(refund.id, trx);
+      await this.rewriteRefundOnChange(refund.id, trx);
     }
+  };
+
+  /**
+   * Builds the journal (accrual and cash basis) the refund is posted with.
+   * @param {number} refundVendorCreditId
+   * @param {Knex.Transaction} trx
+   * @returns {Promise<Ledger | null>} Null when the refund is gone.
+   */
+  public buildRefundVendorCreditGLedger = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ): Promise<Ledger | null> => {
+    // Retrieve the refund with associated vendor credit and items.
+    const refundVendorCredit = await this.refundVendorCreditModel()
+      .query(trx)
+      .findById(refundVendorCreditId)
+      .withGraphFetched('vendorCredit.entries.item');
+
+    if (!refundVendorCredit) return null;
+
+    // Retrieve the payable account (A/P) account based on the given currency.
+    const APAccount = await this.accountRepository.findOrCreateAccountsPayable(
+      refundVendorCredit.currencyCode,
+      {},
+      trx,
+    );
+    // Retrieve refund vendor credit ledger entries.
+    return this.getRefundVendorCreditGLedger(
+      refundVendorCredit,
+      APAccount.id,
+      trx,
+    );
   };
 
   /**
@@ -285,28 +469,26 @@ export class RefundVendorCreditGLEntries {
     refundVendorCreditId: number,
     trx?: Knex.Transaction,
   ) => {
-    // Retrieve the refund with associated vendor credit and items.
-    const refundVendorCredit = await this.refundVendorCreditModel()
-      .query(trx)
-      .findById(refundVendorCreditId)
-      .withGraphFetched('vendorCredit.entries.item');
-
-    // Retrieve the payable account (A/P) account based on the given currency.
-    const APAccount = await this.accountRepository.findOrCreateAccountsPayable(
-      refundVendorCredit.currencyCode,
-      {},
+    const ledger = await this.buildRefundVendorCreditGLedger(
+      refundVendorCreditId,
       trx,
     );
-
-    // Retrieve refund vendor credit ledger entries.
-    const ledger = await this.getRefundVendorCreditGLedger(
-      refundVendorCredit,
-      APAccount.id,
-      trx,
-    );
-
     // Saves refund ledger entries.
-    await this.ledgerStorage.commit(ledger, trx);
+    if (ledger) await this.ledgerStorage.commit(ledger, trx);
+  };
+
+  /**
+   * Rewrites the whole journal of the refund (accrual and cash basis), as
+   * deleting and saving it again would.
+   * @param {number} refundVendorCreditId
+   * @param {Knex.Transaction} trx
+   */
+  public rewriteRefundVendorCreditGLEntries = async (
+    refundVendorCreditId: number,
+    trx?: Knex.Transaction,
+  ) => {
+    await this.revertRefundVendorCreditGLEntries(refundVendorCreditId, trx);
+    await this.createRefundVendorCreditGLEntries(refundVendorCreditId, trx);
   };
 
   /**
@@ -327,8 +509,10 @@ export class RefundVendorCreditGLEntries {
   /**
    * Rebuilds, one at a time and in order, the cash basis entries of the
    * refunds of the vendor credit that come after the given position (date, then
-   * id): their running-total split starts from the refunds before them.
-   * Refunds in a locked period are skipped (and logged).
+   * id): their running-total split starts from the refunds before them. In
+   * a foreign currency their accrual entries too (the A/P relief is a
+   * running total as well). Refunds in a locked period are skipped (and
+   * logged).
    * @param {number} vendorCreditId
    * @param {{ id: number; date: any }} after - The position to start after.
    * @param {Knex.Transaction} trx
@@ -349,7 +533,7 @@ export class RefundVendorCreditGLEntries {
       knex,
       laterRefunds.filter((refund) => refund.id !== after.id),
       'RefundVendorCredit',
-      (refundId) => this.rewriteRefundVendorCreditCashGLEntries(refundId, trx),
+      (refundId) => this.rewriteRefundOnChange(refundId, trx),
     );
   };
 }

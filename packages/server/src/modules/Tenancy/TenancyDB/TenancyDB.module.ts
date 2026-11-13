@@ -1,5 +1,4 @@
 import knex from 'knex';
-import * as LRUCache from 'lru-cache';
 import { Global, Module } from '@nestjs/common';
 import { knexSnakeCaseMappers } from 'objection';
 import { ClsModule, ClsService } from 'nestjs-cls';
@@ -7,8 +6,20 @@ import { ConfigService } from '@nestjs/config';
 import { DATE_ONLY_COLUMNS_OPTIONS } from '@/common/constants/database.constants';
 import { TENANCY_DB_CONNECTION } from './TenancyDB.constants';
 import { UnitOfWork } from './UnitOfWork.service';
+import { KnexPoolCache } from './KnexPoolCache';
 
-const lruCache = new LRUCache();
+const tenantPools = new KnexPoolCache();
+
+/**
+ * The company database's name: the configured prefix (TENANT_DB_NAME_PERFIX,
+ * as the migrations and the CLI use) and the organization id. It used to be
+ * hard-coded as `bigcapital_tenant_`.
+ */
+export const getTenantDatabaseName = (
+  configService: Pick<ConfigService, 'get'>,
+  organizationId: string,
+): string =>
+  `${configService.get('tenantDatabase.dbNamePrefix') ?? 'bigcapital_tenant_'}${organizationId}`;
 
 export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
   provide: TENANCY_DB_CONNECTION,
@@ -17,8 +28,8 @@ export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
   inject: [ConfigService, ClsService],
   useFactory: async (configService: ConfigService, cls: ClsService) => () => {
     const organizationId = cls.get('organizationId');
-    const database = `bigcapital_tenant_${organizationId}`;
-    const cachedInstance = lruCache.get(database);
+    const database = getTenantDatabaseName(configService, organizationId);
+    const cachedInstance = tenantPools.get(database);
 
     if (cachedInstance) {
       return cachedInstance;
@@ -44,7 +55,7 @@ export const TenancyDatabaseProxyProvider = ClsModule.forFeatureAsync({
       pool: { min: 0, max: 7 },
       ...knexSnakeCaseMappers({ upperCase: true }),
     });
-    lruCache.set(database, knexInstance);
+    tenantPools.set(database, knexInstance);
 
     return knexInstance;
   },

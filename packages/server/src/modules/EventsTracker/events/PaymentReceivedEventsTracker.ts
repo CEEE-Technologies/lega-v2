@@ -19,7 +19,8 @@ import {
 export class PaymentReceivedEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.paymentReceive.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onCreated, { suppressErrors: true })
   public handleTrackPaymentReceivedCreatedEvent({}: IPaymentReceivedCreatedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_RECEIVED_CREATED,
@@ -27,7 +28,8 @@ export class PaymentReceivedEventsTracker {
     });
   }
 
-  @OnEvent(events.paymentReceive.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onEdited, { suppressErrors: true })
   public handleTrackEditedPaymentReceivedEvent({}: IPaymentReceivedEditedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_RECEIVED_EDITED,
@@ -35,7 +37,8 @@ export class PaymentReceivedEventsTracker {
     });
   }
 
-  @OnEvent(events.paymentReceive.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onDeleted, { suppressErrors: true })
   public handleTrackDeletedPaymentReceivedEvent({}: IPaymentReceivedDeletedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_RECEIVED_DELETED,
@@ -43,7 +46,8 @@ export class PaymentReceivedEventsTracker {
     });
   }
 
-  @OnEvent(events.paymentReceive.onPdfViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onPdfViewed, { suppressErrors: true })
   public handleTrackPdfViewedPaymentReceivedEvent({}: IPaymentReceivedDeletedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_RECEIVED_PDF_VIEWED,
@@ -51,7 +55,8 @@ export class PaymentReceivedEventsTracker {
     });
   }
 
-  @OnEvent(events.paymentReceive.onMailSent)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onMailSent, { suppressErrors: true })
   public handleTrackMailSentPaymentReceivedEvent({}: IPaymentReceivedDeletedPayload) {
     this.posthog.trackEvent({
       event: PAYMENT_RECEIVED_MAIL_SENT,

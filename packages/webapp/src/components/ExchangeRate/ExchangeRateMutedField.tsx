@@ -6,7 +6,9 @@ import {
   FormGroup,
   Position,
   Classes,
+  Intent,
 } from '@blueprintjs/core';
+import { useFormikContext } from 'formik';
 import React from 'react';
 import intl from 'react-intl-universal';
 import styled from 'styled-components';
@@ -33,6 +35,13 @@ export function ExchangeRateMutedField({
   popoverProps,
   ...formGroupProps
 }: ExchangeRateMutedFieldProps) {
+  const { getFieldMeta } = useFormikContext();
+  const meta = name ? getFieldMeta(name) : null;
+  // An empty rate (no rate found for a foreign currency) or a refused one
+  // is shown, not hidden behind the pencil.
+  const isEmpty = exchangeRate === '' || exchangeRate == null;
+  const error = meta?.touched || meta?.error ? meta?.error : null;
+
   const content = (
     <ExchangeRateFormGroupContent>
       <ExchangeRateInputGroup
@@ -45,7 +54,12 @@ export function ExchangeRateMutedField({
   );
 
   return (
-    <ExchangeRateFormGroup label={`As on ${date},`} {...formGroupProps}>
+    <ExchangeRateFormGroup
+      label={`As on ${date},`}
+      {...formGroupProps}
+      intent={error ? Intent.DANGER : undefined}
+      helperText={error || undefined}
+    >
       <Popover
         content={content}
         interactionKind={PopoverInteractionKind.CLICK}
@@ -58,8 +72,10 @@ export function ExchangeRateMutedField({
         usePortal={false}
         target={<div />}
       >
-        <ExchangeRateButton>
-          1 {fromCurrency} = {exchangeRate} {toCurrency}
+        <ExchangeRateButton data-empty={isEmpty || undefined}>
+          {isEmpty
+            ? `${intl.get('exchange_rate.enter_rate')}: 1 ${fromCurrency} = ? ${toCurrency}`
+            : `1 ${fromCurrency} = ${exchangeRate} ${toCurrency}`}
           <Button
             className={Classes.MINIMAL}
             rightIcon={<Icon icon="pen-18" iconSize={14} />}
@@ -93,6 +109,10 @@ const ExchangeRateButton = styled.div`
 
   .bp4-dark & {
     color: var(--color-light-gray1);
+  }
+
+  &[data-empty] {
+    color: var(--color-danger, #c23030);
   }
 
   .bp4-button {

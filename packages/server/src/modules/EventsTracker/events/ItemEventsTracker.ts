@@ -18,7 +18,8 @@ import {
 export class ItemEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.item.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.item.onCreated, { suppressErrors: true })
   public handleTrackItemCreatedEvent({}: IItemEventCreatedPayload) {
     this.posthog.trackEvent({
       event: ITEM_EVENT_CREATED,
@@ -26,7 +27,8 @@ export class ItemEventsTracker {
     });
   }
 
-  @OnEvent(events.item.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.item.onEdited, { suppressErrors: true })
   public handleTrackEditedItemEvent({}: IItemEventEditedPayload) {
     this.posthog.trackEvent({
       event: ITEM_EVENT_EDITED,
@@ -34,7 +36,8 @@ export class ItemEventsTracker {
     });
   }
 
-  @OnEvent(events.item.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.item.onDeleted, { suppressErrors: true })
   public handleTrackDeletedItemEvent({}: IItemEventDeletedPayload) {
     this.posthog.trackEvent({
       event: ITEM_EVENT_DELETED,
@@ -42,7 +45,8 @@ export class ItemEventsTracker {
     });
   }
 
-  @OnEvent(events.item.onViewed)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.item.onViewed, { suppressErrors: true })
   public handleTrackViewedItemEvent({}: IItemEventDeletedPayload) {
     this.posthog.trackEvent({
       event: ITEM_EVENT_VIEWED,

@@ -15,6 +15,8 @@ export interface GetStripeConnectLinkResponse {
 
 export interface ExchangeStripeOAuthBody {
   code: string;
+  /** The state of the connect link, returned by Stripe unchanged. */
+  state?: string;
 }
 
 export interface CreateStripeAccountLinkBody {

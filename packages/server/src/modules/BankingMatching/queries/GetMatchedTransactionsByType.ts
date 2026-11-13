@@ -2,6 +2,7 @@ import { Knex } from 'knex';
 import {
   GetMatchedTransactionsFilter,
   IMatchTransactionDTO,
+  MatchedTransactionContext,
   MatchedTransactionPOJO,
   MatchedTransactionsPOJO,
 } from '../types';
@@ -9,10 +10,23 @@ import PromisePool from '@supercharge/promise-pool';
 import { MatchedBankTransaction } from '../models/MatchedBankTransaction';
 import { Inject } from '@nestjs/common';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 
 export abstract class GetMatchedTransactionsByType {
   @Inject(MatchedBankTransaction.name)
   matchedBankTransactionModel: TenantModelProxy<typeof MatchedBankTransaction>;
+
+  @Inject(TenancyContext)
+  tenancyContext: TenancyContext;
+
+  /**
+   * Retrieves the organization base currency.
+   * @returns {Promise<string>}
+   */
+  protected async getBaseCurrency(): Promise<string> {
+    const metadata = await this.tenancyContext.getTenantMetadata();
+    return metadata?.baseCurrency;
+  }
 
   /**
    * Retrieves the matched transactions.
@@ -36,6 +50,7 @@ export abstract class GetMatchedTransactionsByType {
    */
   public async getMatchedTransaction(
     _transactionId: number,
+    _context?: MatchedTransactionContext,
   ): Promise<MatchedTransactionPOJO> {
     throw new Error(
       'The `getMatchedTransaction` method is not defined for the transaction type.',

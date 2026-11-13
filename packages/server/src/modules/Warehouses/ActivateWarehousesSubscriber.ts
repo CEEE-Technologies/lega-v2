@@ -20,9 +20,11 @@ export class ActivateWarehousesSubscriber {
   @OnEvent(events.warehouse.onActivated)
   async updateInventoryTransactionsWithWarehouseOnActivating({
     primaryWarehouse,
+    trx,
   }: IWarehousesActivatedPayload) {
     await this.updateInventoryTransactionsWithWarehouse.run(
       primaryWarehouse.id,
+      trx,
     );
   }
 
@@ -33,7 +35,11 @@ export class ActivateWarehousesSubscriber {
   @OnEvent(events.warehouse.onActivated)
   async createInitialWarehousesItemsQuantityOnActivating({
     primaryWarehouse,
+    trx,
   }: IWarehousesActivatedPayload) {
-    await this.createInitialWarehousesItemsQuantity.run(primaryWarehouse.id);
+    await this.createInitialWarehousesItemsQuantity.run(
+      primaryWarehouse.id,
+      trx,
+    );
   }
 }

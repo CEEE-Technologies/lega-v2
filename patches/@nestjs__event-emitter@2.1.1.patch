@@ -1,0 +1,27 @@
+diff --git a/dist/event-subscribers.loader.js b/dist/event-subscribers.loader.js
+index 68fca99541d8e88c667a55e26993a170a048047d..fb0a7406b842eb8dce5ec8fb938c97384f4b8e5a 100644
+--- a/dist/event-subscribers.loader.js
++++ b/dist/event-subscribers.loader.js
+@@ -97,7 +97,7 @@ let EventSubscribersLoader = class EventSubscribersLoader {
+             return await instance[methodKey].call(instance, ...args);
+         }
+         catch (e) {
+-            if (options?.suppressErrors ?? true) {
++            if (options?.suppressErrors ?? false) {
+                 const error = e;
+                 this.logger.error(error.message, error.stack);
+             }
+diff --git a/dist/interfaces/on-event-options.interface.d.ts b/dist/interfaces/on-event-options.interface.d.ts
+index b2c4152a3eab72d628e575a2f7b11e32bf25d29c..06cdf055e7a79075f31f54202ca9cd6c5b719922 100644
+--- a/dist/interfaces/on-event-options.interface.d.ts
++++ b/dist/interfaces/on-event-options.interface.d.ts
+@@ -1,5 +1,9 @@
+ import { OnOptions } from 'eventemitter2';
+ export type OnEventOptions = OnOptions & {
+     prependListener?: boolean;
++    /**
++     * Lega patch: defaults to `false`, so a handler error reaches the caller
++     * (and rolls back its transaction). Set `true` only for side effects.
++     */
+     suppressErrors?: boolean;
+ };

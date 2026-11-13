@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { waitForListResponse } from './_invoices';
 import { faker } from '@faker-js/faker';
 
 const ACCOUNT_TYPE = 'Expense';
@@ -104,7 +105,10 @@ async function createAccount(
  */
 async function filterAccountsBy(page: Page, text: string) {
   await page.getByRole('button', { name: /filter|filters applied/i }).click();
+  // Wait for the filtered list (a new filter replaces the rows).
+  const filtered = waitForListResponse(page, '/api/accounts', text);
   await page.getByPlaceholder('Value').first().fill(text);
+  await filtered;
 
   const row = page.getByTestId('account-row').filter({ hasText: text }).first();
   await expect(row).toBeVisible({ timeout: 30_000 });
@@ -146,9 +150,8 @@ test.describe('accounts chart', () => {
     await expect(
       page.getByRole('button', { name: 'New Account' }),
     ).toBeVisible();
-    await expect(
-      page.getByTestId('account-row').filter({ hasText: 'Petty Cash' }),
-    ).toBeVisible();
+    // The chart only renders the rows in view; filter to bring it in.
+    await filterAccountsBy(page, 'Petty Cash');
   });
 
   test('should validate the required fields of the new account dialog.', async ({

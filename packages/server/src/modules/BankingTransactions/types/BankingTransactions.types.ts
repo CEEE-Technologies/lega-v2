@@ -114,14 +114,6 @@ export enum CashflowAction {
   View = 'View',
 }
 
-export interface CategorizeTransactionAsExpenseDTO {
-  expenseAccountId: number;
-  exchangeRate: number;
-  referenceNo: string;
-  description: string;
-  branchId?: number;
-}
-
 export interface IGetUncategorizedTransactionsQuery {
   page?: number;
   pageSize?: number;

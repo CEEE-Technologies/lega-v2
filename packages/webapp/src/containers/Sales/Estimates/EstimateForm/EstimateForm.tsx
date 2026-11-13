@@ -27,7 +27,7 @@ import {
   resetFormState,
 } from './utils';
 import type { EstimateFormValues } from './utils';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
 import { transactionNumber, orderingLinesIndexes } from '@/utils';
@@ -155,12 +155,16 @@ function EstimateFormInner({}: EstimateFormRootProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik
       validationSchema={
         isNewMode ? CreateEstimateFormSchema : EditEstimateFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form

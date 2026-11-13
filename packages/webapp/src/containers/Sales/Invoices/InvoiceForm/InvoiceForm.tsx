@@ -30,7 +30,7 @@ import {
   resetFormState,
 } from './utils';
 import type { InvoiceFormValues } from './utils';
-import { AppToaster, Box } from '@/components';
+import { AppToaster, Box, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
@@ -168,12 +168,16 @@ function InvoiceFormRoot({}: InvoiceFormRootProps) {
   // Edit invoice form schema.
   const EditInvoiceFormSchema = getEditInvoiceFormSchema();
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<InvoiceFormValues>
       validationSchema={
         isNewMode ? CreateInvoiceFormSchema : EditInvoiceFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleSubmit}
     >
       <Form

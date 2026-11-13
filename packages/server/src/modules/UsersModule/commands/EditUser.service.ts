@@ -12,6 +12,7 @@ import { SystemUser } from '@/modules/System/models/SystemUser';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { Role } from '@/modules/Roles/models/Role.model';
 import { TenantUserOwnerService } from './TenantUserOwner.service';
+import { AdminAccessService } from '@/modules/Roles/AdminAccess.service';
 
 const normalizeEmail = (email: string | null | undefined) =>
   (email || '').trim().toLowerCase();
@@ -31,6 +32,7 @@ export class EditUserService {
     private readonly eventEmitter: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
     private readonly tenantUserOwner: TenantUserOwnerService,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -68,6 +70,13 @@ export class EditUserService {
     );
     // Validate the given role exists.
     await this.validateRoleExists(editUserDTO.roleId);
+
+    // Only the owner and admins can make someone an admin, or change an
+    // admin's role.
+    await this.validateAdminRoleChange(
+      oldTenantUser.roleId,
+      editUserDTO.roleId,
+    );
 
     const isEmailChanged =
       normalizeEmail(editUserDTO.email) !== normalizeEmail(oldTenantUser.email);
@@ -116,6 +125,23 @@ export class EditUserService {
     if (!role) {
       throw new ServiceError(ERRORS.ROLE_NOT_FOUND, 'Role not found.');
     }
+  }
+
+  /**
+   * Throws unless the signed-in user may make the role change: taking away
+   * or giving the Admin role needs an admin; giving another role needs its
+   * permissions (a non-admin can't give more than they hold).
+   * @param {number} oldRoleId - The user's role now.
+   * @param {number} newRoleId - The role asked for.
+   */
+  async validateAdminRoleChange(oldRoleId: number, newRoleId: number) {
+    if (oldRoleId === newRoleId) return;
+
+    if (await this.adminAccess.isAdminRole(oldRoleId)) {
+      await this.adminAccess.throwUnlessAdmin();
+    }
+    // The Admin role needs an admin; any other role needs its permissions.
+    await this.adminAccess.throwUnlessMayGiveRole(newRoleId);
   }
 
   /**

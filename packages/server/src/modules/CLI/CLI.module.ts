@@ -18,6 +18,10 @@ import { AnalyticsCoreModule } from '../Analytics/AnalyticsCore.module';
 import { TenantsRebuildCashBasisCommand } from './commands/TenantsRebuildCashBasis.command';
 import { TenantsMoneyHealthCheckCommand } from './commands/TenantsMoneyHealthCheck.command';
 import { TenantsMoneyRepairCommand } from './commands/TenantsMoneyRepair.command';
+import { TenantsRepairStaleJournalsCommand } from './commands/TenantsRepairStaleJournals.command';
+import { TenantsRepairRefundJournalsCommand } from './commands/TenantsRepairRefundJournals.command';
+import { TenantsRepairLandedCostsFromInventoryCommand } from './commands/TenantsRepairLandedCostsFromInventory.command';
+import { TenantsRepairStockQuantitiesCommand } from './commands/TenantsRepairStockQuantities.command';
 
 @Module({
   imports: [
@@ -44,6 +48,10 @@ import { TenantsMoneyRepairCommand } from './commands/TenantsMoneyRepair.command
     TenantsRebuildCashBasisCommand,
     TenantsMoneyHealthCheckCommand,
     TenantsMoneyRepairCommand,
+    TenantsRepairStaleJournalsCommand,
+    TenantsRepairRefundJournalsCommand,
+    TenantsRepairLandedCostsFromInventoryCommand,
+    TenantsRepairStockQuantitiesCommand,
   ],
 })
 export class CLIModule {}

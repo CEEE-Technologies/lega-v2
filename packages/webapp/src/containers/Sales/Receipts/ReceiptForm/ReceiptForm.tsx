@@ -28,7 +28,7 @@ import {
   resetFormState,
 } from './utils';
 import type { ReceiptFormValues } from './utils';
-import { AppToaster } from '@/components';
+import { AppToaster, useExchangeRateValidate } from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDashboardActions } from '@/containers/Dashboard/withDashboardActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
@@ -153,12 +153,16 @@ function ReceiptFormRoot({}: ReceiptFormRootProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik<ReceiptFormValues>
       validationSchema={
         isNewMode ? CreateReceiptFormSchema : EditReceiptFormSchema
       }
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleFormSubmit}
     >
       <Form

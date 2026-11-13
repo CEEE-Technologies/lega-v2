@@ -15,7 +15,8 @@ export class PaymentReceivedSmsNotificationSubscriber {
    * Handles sending SMS notification after the payment received creation.
    * @param {IPaymentReceivedCreatedPayload} payload -
    */
-  @OnEvent(events.paymentReceive.onCreated)
+  // Side effect (SMS notice): an error is logged and does not stop the save.
+  @OnEvent(events.paymentReceive.onCreated, { suppressErrors: true })
   private async handleNotifyBySmsAfterCreation({
     paymentReceiveId,
     trx,

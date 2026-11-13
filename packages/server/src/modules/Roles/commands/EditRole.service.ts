@@ -8,6 +8,9 @@ import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { Role } from '../models/Role.model';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { validateInvalidPermissions } from '../utils';
+import { ADMIN_ROLE_SLUG, AdminAccessService } from '../AdminAccess.service';
+import { ServiceError } from '@/modules/Items/ServiceError';
+import { ERRORS } from '../constants';
 
 @Injectable()
 export class EditRoleService {
@@ -17,6 +20,8 @@ export class EditRoleService {
 
     @Inject(Role.name)
     private readonly roleModel: TenantModelProxy<typeof Role>,
+
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -30,6 +35,30 @@ export class EditRoleService {
 
     // Retrieve the given role or throw not found serice error.
     const oldRole = await this.roleModel().query().findById(roleId);
+
+    if (!oldRole) {
+      throw new ServiceError(ERRORS.ROLE_NOT_FOUND, 'Role not found.');
+    }
+    // Only the owner and admins can edit the Admin role, and nobody else can
+    // change the permissions of their own role.
+    if (
+      oldRole.slug === ADMIN_ROLE_SLUG ||
+      oldRole.id === (await this.adminAccess.getCurrentUserRoleId())
+    ) {
+      await this.adminAccess.throwUnlessAdmin();
+    }
+    // A non-admin may only add permissions they hold themselves. The ones
+    // the role already has can stay, so the role can still be edited.
+    const current = new Set(
+      (await this.adminAccess.getRolePermissions(roleId)).map(
+        (p) => `${p.subject}:${p.ability}`,
+      ),
+    );
+    await this.adminAccess.throwUnlessHoldsPermissions(
+      editRoleDTO.permissions.filter(
+        (p) => !current.has(`${p.subject}:${p.ability}`),
+      ),
+    );
     // Transform permissions: map permissionId to id for Objection.js upsertGraph
     const permissions = editRoleDTO.permissions.map((perm) => ({
       id: perm.permissionId,

@@ -23,6 +23,7 @@ import { InjectModelDefaultViews } from '@/modules/Views/decorators/InjectModelD
 import { VendorCreditDefaultViews } from '../constants';
 import { InjectAttachable } from '@/modules/Attachments/decorators/InjectAttachable.decorator';
 import { sqlDocumentTotal, sqlMoneyLeft } from '@/utils/document-money-sql';
+import { rawNumberFilterQuery } from '@/modules/DynamicListing/DynamicFilter/rawNumberFilterQuery';
 
 /**
  * SQL of the vendor credit total and the credit still left to use, in cents: the
@@ -178,6 +179,12 @@ export class VendorCredit extends TenantBaseModel {
    */
   static get modifiers() {
     return {
+      /**
+       * Filters by the document total (the list's Amount column).
+       */
+      totalAmountFilter(query, role) {
+        rawNumberFilterQuery(VENDOR_CREDIT_TOTAL_SQL)(query, role);
+      },
       /**
        * Filters the credit notes in draft status.
        */

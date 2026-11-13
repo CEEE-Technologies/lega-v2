@@ -12,7 +12,9 @@ export default function ContactsListCellRenderer({
 }) {
   const handleContactSelected = useCallback(
     (contact) => {
-      updateData(index, 'contact_id', contact.id);
+      // The column's own field (`contactId`): `contact_id` isn't a form
+      // field, so the picked contact was dropped on save.
+      updateData(index, id, contact.id);
     },
     [updateData, index, id],
   );
@@ -31,7 +33,7 @@ export default function ContactsListCellRenderer({
       <ContactsSuggestField
         contactsList={contacts}
         onContactSelected={handleContactSelected}
-        selectedContactId={original?.contact_id}
+        selectedContactId={original?.[id]}
         selectedContactType={original?.contact_type}
       />
     </FormGroup>

@@ -10,6 +10,11 @@ import {
 } from '../types/Vendors.types';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { ERRORS } from '../constants';
+import {
+  getContactTransactionKinds,
+  contactHasTransactionsMessage,
+} from '@/modules/Contacts/ContactTransactions';
+import { ServiceError } from '@/modules/Items/ServiceError';
 
 @Injectable()
 export class DeleteVendorService {
@@ -33,6 +38,21 @@ export class DeleteVendorService {
     // Retrieves the old vendor or throw not found service error.
     const query = this.vendorModel().query(trx);
     const oldVendor = await query.findById(vendorId).throwIfNotFound();
+
+    // A vendor with any transaction can't be deleted: say so, instead of
+    // the database refusing the delete (a raw 500).
+    const transactions = await getContactTransactionKinds(
+      trx ?? this.vendorModel().knex(),
+      'vendor',
+      vendorId,
+    );
+    if (transactions.length > 0) {
+      throw new ServiceError(
+        ERRORS.VENDOR_HAS_TRANSACTIONS,
+        contactHasTransactionsMessage('Vendor', transactions),
+        { transactions },
+      );
+    }
 
     // Triggers `onVendorDeleting` event.
     await this.eventPublisher.emitAsync(events.vendors.onDeleting, {

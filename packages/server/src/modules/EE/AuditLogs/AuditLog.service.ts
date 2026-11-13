@@ -6,11 +6,15 @@ import '@/utils/moment-mysql';
 import { AuditLog } from './models/AuditLog.model';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { TENANCY_DB_CONNECTION } from '@/modules/Tenancy/TenancyDB/TenancyDB.constants';
+import { runAfterTransaction } from '@/modules/Tenancy/TenancyDB/TransactionsHooks';
 
 const METADATA_JSON_MAX = 8000;
 
 export interface RecordAuditLogParams {
-  /** When set, the row is written in the same DB transaction as the business change. */
+  /**
+   * The save's transaction. The row is written only after it commits, and
+   * never if it is undone. The row is not written with the transaction.
+   */
   trx?: Knex.Transaction;
   action: string;
   subject: string;
@@ -29,29 +33,39 @@ export class AuditLogService {
   ) {}
 
   /**
-   * Persists one audit row. Prefer always passing `trx` from domain event payloads so the
-   * audit row rolls back with failed business transactions. If `trx` is omitted, the insert
-   * runs on a separate connection/transaction (only use after the business change committed).
+   * Records one audit row once the save's transaction (`trx`) has committed;
+   * without `trx` it is written straight away.
+   *
+   * The row is never written with the save's transaction: if that insert hit
+   * a deadlock, the database would undo the whole save while the save carried
+   * on without a transaction, and its ledger and stock rows would be kept
+   * for a document that no longer exists. Writing after the commit also
+   * means an undone save logs nothing.
+   *
+   * The user, IP and company connection are read now, while the request's
+   * context is still there. A failed insert is logged and never fails the
+   * save.
    */
   async record(params: RecordAuditLogParams): Promise<void> {
-    const userId = this.cls.get<number>('userId') ?? null;
-    const ip = (this.cls.get<string>('ip') as string) ?? null;
-    const executor =
-      params.trx && !params.trx.isCompleted() ? params.trx : this.tenantKnex();
-    const metadata = this.normalizeMetadata(params.metadata);
+    const row = {
+      userId: this.cls.get<number>('userId') ?? null,
+      action: params.action,
+      subject: params.subject,
+      subjectId: this.normalizeSubjectId(params.subjectId),
+      metadata: this.normalizeMetadata(params.metadata),
+      ip: (this.cls.get<string>('ip') as string) ?? null,
+      // MySQL DATETIME expects `YYYY-MM-DD HH:mm:ss`, not ISO-8601 with `T`/`Z`.
+      createdAt: moment().toMySqlDateTime(),
+    };
+    const model = this.auditLogModel();
+    const knex = this.tenantKnex();
+    const insert = () => model.query(knex).insert(row);
 
-    await this.auditLogModel()
-      .query(executor)
-      .insert({
-        userId,
-        action: params.action,
-        subject: params.subject,
-        subjectId: this.normalizeSubjectId(params.subjectId),
-        metadata,
-        ip,
-        // MySQL DATETIME expects `YYYY-MM-DD HH:mm:ss`, not ISO-8601 with `T`/`Z`.
-        createdAt: moment().toMySqlDateTime(),
-      });
+    if (!params.trx) {
+      await insert();
+      return;
+    }
+    runAfterTransaction(params.trx, insert);
   }
 
   /**

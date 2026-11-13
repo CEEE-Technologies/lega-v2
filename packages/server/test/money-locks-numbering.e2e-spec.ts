@@ -516,18 +516,43 @@ describe('Money, locks and numbering — package 2 (e2e)', () => {
           items: [{ entryId: await billEntryId(targetBillId), cost: 20 }],
         });
 
+    // The freight bill's landed cost is on a service line (decision D7).
     const stockBill = (date: string, landedCost = false) =>
       createBill({
         billDate: date,
         dueDate: date,
         entries: [
-          { index: 1, itemId: stockItemId, quantity: 2, rate: 100, landedCost },
+          {
+            index: 1,
+            itemId: landedCost ? freightItemId : stockItemId,
+            quantity: 2,
+            rate: 100,
+            landedCost,
+          },
         ],
       });
+
+    let freightItemId: number;
 
     beforeAll(async () => {
       await setLandedCostFeature(1);
       stockItemId = await createInventoryItem();
+      freightItemId = parseInt(
+        (
+          await request(server())
+            .post('/items')
+            .set(authHeaders())
+            .send({
+              name: `P2 freight ${tag()}`,
+              type: 'service',
+              purchasable: true,
+              costAccountId: 1019,
+              costPrice: 100,
+            })
+            .expect(201)
+        ).body.id,
+        10,
+      );
     });
 
     it('allocating onto a bill dated in a locked month is refused', async () => {

@@ -4,6 +4,7 @@ import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { TenantUser } from '@/modules/Tenancy/TenancyModels/models/TenantUser.model';
 import { Inject, Injectable } from '@nestjs/common';
+import { AdminAccessService } from '@/modules/Roles/AdminAccess.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ERRORS } from '../Users.constants';
 import { ModelObject } from 'objection';
@@ -16,6 +17,7 @@ export class ActivateUserService {
     private readonly tenantUserModel: TenantModelProxy<typeof TenantUser>,
     private readonly tenancyContext: TenancyContext,
     private readonly eventEmitter: EventEmitter2,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   /**
@@ -42,6 +44,9 @@ export class ActivateUserService {
 
     // Throw serivce error if the user is already activated.
     this.throwErrorIfUserActive(tenantUser);
+
+    // Only the owner and admins can reactivate an admin.
+    await this.adminAccess.throwUnlessAdminForAdminUser(tenantUser);
 
     // Marks the tenant user as active.
     await this.tenantUserModel()

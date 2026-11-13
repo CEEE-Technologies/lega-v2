@@ -15,7 +15,9 @@ import {
   sumUncategorizedTransactions,
   validateUncategorizedTransactionsExcluded,
   validateUncategorizedTransactionsNotMatched,
+  validateUncategorizedTransactionsSameAccount,
 } from '../_utils';
+import { Account } from '@/modules/Accounts/models/Account.model';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UnitOfWork } from '@/modules/Tenancy/TenancyDB/UnitOfWork.service';
 import { ServiceError } from '@/modules/Items/ServiceError';
@@ -35,6 +37,9 @@ export class MatchBankTransactions {
     private readonly uncategorizedBankTransactionModel: TenantModelProxy<
       typeof UncategorizedBankTransaction
     >,
+
+    @Inject(Account.name)
+    private readonly accountModel: TenantModelProxy<typeof Account>,
   ) {}
 
   /**
@@ -72,6 +77,11 @@ export class MatchBankTransactions {
     // Validate the uncategorized transaction is not excluded.
     validateUncategorizedTransactionsExcluded(uncategorizedTransactions);
 
+    // The bank lines are on one account: each match is checked against it.
+    validateUncategorizedTransactionsSameAccount(uncategorizedTransactions);
+    const accountId = uncategorizedTransactions[0]?.accountId;
+    const account = await this.accountModel().query(trx).findById(accountId);
+
     // Validates the given matched transaction.
     const validateMatchedTransaction = async (matchedTransaction) => {
       const getMatchedTransactionsService =
@@ -86,6 +96,9 @@ export class MatchBankTransactions {
       const foundMatchedTransaction =
         await getMatchedTransactionsService.getMatchedTransaction(
           matchedTransaction.referenceId,
+          // Matched against the bank account: its own transactions, at
+          // what they move on it, in its currency.
+          { accountId, accountCurrencyCode: account?.currencyCode },
         );
       if (!foundMatchedTransaction) {
         throw new ServiceError(ERRORS.RESOURCE_ID_MATCHING_TRANSACTION_INVALID);

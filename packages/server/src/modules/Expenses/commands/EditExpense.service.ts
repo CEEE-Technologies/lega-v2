@@ -71,16 +71,11 @@ export class EditExpense {
     // Validate the given expense categories not equal zero.
     this.validator.validateCategoriesNotEqualZero(expenseDTO);
 
-    // Validate expense entries that have allocated landed cost cannot be deleted.
-    // this.entriesService.validateLandedCostEntriesNotDeleted(
-    //   oldExpense.categories,
-    //   expenseDTO.categories,
-    // );
-    // // Validate expense entries that have allocated cost amount should be bigger than amount.
-    // this.entriesService.validateLocatedCostEntriesSmallerThanNewEntries(
-    //   oldExpense.categories,
-    //   expenseDTO.categories,
-    // );
+    // The edit's line ids must belong to this expense.
+    this.validator.validateCategoriesIdsExist(
+      oldExpense.categories,
+      expenseDTO.categories,
+    );
   };
 
   /**
@@ -117,6 +112,23 @@ export class EditExpense {
 
     // Edits expense transactions and associated transactions under UOW envirement.
     return this.uow.withTransaction(async (trx: Knex.Transaction) => {
+      // Lines a landed cost was allocated from can't be removed, or reduced
+      // below what was allocated. Read and locked inside the save, so an
+      // allocation made at the same moment is seen.
+      const lockedExpense = await this.expenseModel()
+        .query(trx)
+        .findById(expenseId)
+        .forUpdate()
+        .withGraphFetched('categories')
+        .throwIfNotFound();
+
+      await this.validator.validateLandedCostCategoriesOnEdit(
+        expenseId,
+        lockedExpense.categories,
+        expenseDTO.categories,
+        trx,
+      );
+
       // Triggers `onExpenseEditing` event.
       await this.eventEmitter.emitAsync(events.expenses.onEditing, {
         oldExpense,

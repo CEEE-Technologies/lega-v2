@@ -7,6 +7,7 @@ import { Account } from '@/modules/Accounts/models/Account.model';
 import { PlaidApi } from 'plaid';
 import { PLAID_CLIENT } from '@/modules/Plaid/Plaid.module';
 import { TenantModelProxy } from '@/modules/System/models/TenantBaseModel';
+import { runAfterTransaction } from '@/modules/Tenancy/TenancyDB/TransactionsHooks';
 
 @Injectable()
 export class DisconnectPlaidItemOnAccountDeleted {
@@ -21,7 +22,9 @@ export class DisconnectPlaidItemOnAccountDeleted {
   ) {}
 
   /**
-   * Deletes Plaid item from the system and Plaid once the account deleted.
+   * Unlinks the Plaid item inside the account delete, then disconnects it
+   * from Plaid once the delete is committed. A dry run or a delete that is
+   * undone later keeps the bank connection.
    * @param {IAccountEventDeletedPayload} payload
    * @returns {Promise<void>}
    */
@@ -51,11 +54,17 @@ export class DisconnectPlaidItemOnAccountDeleted {
       .findOne('plaidItemId', oldAccount.plaidItemId)
       .delete();
 
-    // Remove Plaid item once the transaction resolve.
+    // Tell Plaid only once the delete is committed. The call can't be
+    // undone, so it must not run for a dry run or a delete that fails.
     if (oldPlaidItem) {
-      // Remove the Plaid item.
-      await this.plaidClient.itemRemove({
-        access_token: oldPlaidItem.plaidAccessToken,
+      runAfterTransaction(trx, async () => {
+        try {
+          await this.plaidClient.itemRemove({
+            access_token: oldPlaidItem.plaidAccessToken,
+          });
+        } catch (error) {
+          console.error('[plaid] Failed to disconnect the Plaid item:', error);
+        }
       });
     }
   }

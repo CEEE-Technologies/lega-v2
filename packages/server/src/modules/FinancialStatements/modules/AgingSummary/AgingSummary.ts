@@ -1,6 +1,7 @@
 import { sumMoney, sumMoneyBy } from '@bigcapital/utils';
 import { ModelObject } from 'objection';
 import { defaultTo, get } from 'lodash';
+import * as moment from 'moment';
 import {
   IAgingPeriod,
   IAgingPeriodTotal,
@@ -55,12 +56,23 @@ export abstract class AgingSummaryReport extends AgingReport {
         const newAgingPeriods = this.getContactAgingDueAmount(
           agingPeriods,
           unpaidInvoice.dueAmountLocal,
-          unpaidInvoice.overdueDays,
+          this.getOverdueDaysAsOf(unpaidInvoice.dueDate),
         );
         return newAgingPeriods;
       },
       initialAgingPeriods,
     );
+  }
+
+  /**
+   * Days overdue on the report's date (`asDate`), not today: the model's
+   * `overdueDays` counts from now, so an aging as of a past date put
+   * everything in the oldest buckets.
+   * @param {Date | string} dueDate
+   * @returns {number}
+   */
+  protected getOverdueDaysAsOf(dueDate: Date | string): number {
+    return Math.max(moment(this.query.asDate).diff(moment(dueDate), 'days'), 0);
   }
 
   /**

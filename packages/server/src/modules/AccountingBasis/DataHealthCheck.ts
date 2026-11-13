@@ -6,6 +6,25 @@ import { BILL_MONEY_SQL } from '@/modules/Bills/models/Bill';
 import { CREDIT_NOTE_MONEY_SQL } from '@/modules/CreditNotes/models/CreditNote';
 import { VENDOR_CREDIT_MONEY_SQL } from '@/modules/VendorCredit/models/VendorCredit';
 import { getLockedPeriods } from './MoneyHealthCheck';
+import {
+  day,
+  ids,
+  INDENT,
+  label,
+  money,
+  num,
+  pick,
+  qty,
+  QUANTITY_NOISE,
+  roundQuantity,
+  section,
+} from './DataHealthCheck.shared';
+import {
+  checkRound3DataHealth,
+  formatRound3DataHealth,
+  IDataHealthRound3Result,
+  isRound3DataHealthClean,
+} from './DataHealthCheckRound3';
 
 /**
  * Read-only data health check of one tenant database, run with the money
@@ -25,6 +44,9 @@ import { getLockedPeriods } from './MoneyHealthCheck';
  *   entries, and bill stock costed at the raw line price (I3).
  * H6 (duplicate login emails, decides the S1 index) reads the system
  * database once for all companies: `checkSystemDataHealth`.
+ * H9–H16 (round 3: memberships, write-offs, landed costs, bank lines,
+ * ledger entries, tax rows, matched payments, stock rows) are in
+ * DataHealthCheckRound3.ts and are part of the same result.
  *
  * Plain SELECT queries on the given connections (snake case mappers, like
  * the money check). Nothing is written.
@@ -134,7 +156,7 @@ export interface IDataHealthLotCost {
   reason: 'vat_included' | 'discount_ignored' | 'other';
 }
 
-export interface IDataHealthResult {
+export interface IDataHealthResult extends IDataHealthRound3Result {
   /** H1 (null: the base currency isn't known). */
   rateOneDocuments: IDataHealthRateOneDocument[] | null;
   /** H2, listed only: not counted as a problem. */
@@ -172,42 +194,6 @@ export interface IDataHealthSystemResult {
   /** H6 */
   duplicateLoginEmails: IDataHealthLoginEmail[];
 }
-
-const LABELS: Record<string, string> = {
-  SaleInvoice: 'Invoice',
-  SaleEstimate: 'Estimate',
-  SaleReceipt: 'Receipt',
-  PaymentReceive: 'Payment received',
-  CreditNote: 'Credit note',
-  RefundCreditNote: 'Credit note refund',
-  Bill: 'Bill',
-  BillPayment: 'Bill payment',
-  VendorCredit: 'Vendor credit',
-  RefundVendorCredit: 'Vendor credit refund',
-  Expense: 'Expense',
-  ManualJournal: 'Manual journal',
-  BankTransaction: 'Bank transaction',
-  WarehouseTransfer: 'Warehouse transfer',
-  InventoryAdjustment: 'Inventory adjustment',
-  LandedCost: 'Landed cost on bill',
-  CustomerOpeningBalance: 'Customer opening balance',
-  VendorOpeningBalance: 'Supplier opening balance',
-};
-const label = (type: string) => LABELS[type] || type;
-
-/** Reads a raw alias whether the mapper camel cased it or not. */
-const pick = (row: any, key: string) =>
-  row[key] ?? row[key.replace(/_([a-z])/g, (_m, c) => c.toUpperCase())];
-
-const day = (value: any): string | null =>
-  value ? moment(value).format('YYYY-MM-DD') : null;
-
-const num = (value: any) => Number(value || 0);
-
-/** Quantities are stored with 3 decimals. */
-const QUANTITY_NOISE = 0.0005;
-/** Drops float noise from a quantity sum (they aren't money). */
-const roundQuantity = (value: number) => Number(Number(value).toPrecision(12));
 
 // ---------------------------------------------------------------------------
 // H1. Foreign currency documents saved at exchange rate 1 (M4).
@@ -603,7 +589,7 @@ const movementTotals = (knex: Knex, groupBy: string[]) =>
  * on (the per-warehouse figures are only kept then). The old code undid a
  * re-saved document's movements once per line, so its stock grew.
  */
-const getStockTotalDifferences = async (knex: Knex) => {
+export const getStockTotalDifferences = async (knex: Knex) => {
   const differences: IDataHealthStockTotal[] = [];
 
   const items: any[] = await knex
@@ -1154,7 +1140,7 @@ const getLotCostDifferences = async (
  * Runs the data health check on the given tenant database.
  * @param {Knex} knex - Tenant database connection.
  * @param {string} baseCurrency - The tenant base currency.
- * @param {object} system - The system database and the tenant id, for H7.
+ * @param {object} system - The system database and the tenant id, for H7 and H9.
  * @returns {Promise<IDataHealthResult>}
  */
 export const checkDataHealth = async (
@@ -1174,6 +1160,7 @@ export const checkDataHealth = async (
   const untaggedLandedCosts = await getUntaggedLandedCosts(knex);
   const landedCostsWithoutCashSet = await getLandedCostsWithoutCashSet(knex);
   const lotCostDifferences = await getLotCostDifferences(knex);
+  const round3 = await checkRound3DataHealth(knex, baseCurrency, system);
 
   return {
     rateOneDocuments,
@@ -1189,6 +1176,7 @@ export const checkDataHealth = async (
     untaggedLandedCosts,
     landedCostsWithoutCashSet,
     lotCostDifferences,
+    ...round3,
   };
 };
 
@@ -1254,37 +1242,18 @@ export const isDataHealthClean = (result: IDataHealthResult) =>
   (result.ownerMemberships ?? []).length === 0 &&
   result.untaggedLandedCosts.length === 0 &&
   result.landedCostsWithoutCashSet.length === 0 &&
-  result.lotCostDifferences.length === 0;
+  result.lotCostDifferences.length === 0 &&
+  isRound3DataHealthClean(result);
 
 /** Whether the system data is clean (H6). */
 export const isSystemDataHealthClean = (result: IDataHealthSystemResult) =>
   result.duplicateLoginEmails.length === 0;
 
-const money = (value: number) =>
-  Number(value).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-const qty = (value: number) => `${roundQuantity(value)}`;
 const signed = (value: number) => (value > 0 ? `+${qty(value)}` : qty(value));
 const warehouse = (id: number | null) => (id ? ` in warehouse #${id}` : '');
 
-/** The ids as #1, #2, ...; long lists are cut (the JSON has them all). */
-const ids = (list: number[], max = 10) =>
-  list
-    .slice(0, max)
-    .map((id) => `#${id}`)
-    .join(', ') + (list.length > max ? ` and ${list.length - max} more` : '');
-
-const INDENT = '      ';
-const section = (lines: string[], title: string, items: string[]) => {
-  lines.push(`  ${title}: ${items.length}`);
-  if (items.length === 0) lines.push(`${INDENT}none`);
-  items.forEach((item) => lines.push(`${INDENT}${item}`));
-};
-
 /**
- * Formats the company result as printable lines (H1–H5, H7, H8).
+ * Formats the company result as printable lines (H1–H5, H7–H16).
  * @param {IDataHealthResult} result
  * @param {string} baseCurrency
  * @returns {string[]}
@@ -1433,6 +1402,7 @@ export const formatDataHealth = (
         `Bill ${row.billNo} (#${row.billId}) line #${row.entryId}, item ${row.itemName} (#${row.itemId}), ${qty(row.quantity)} units: ${row.source === 'lot' ? 'cost lot' : 'stock movement'} ${money(row.stored)}, books ${money(row.expected)} (${reasons[row.reason]})`,
     ),
   );
+  lines.push(...formatRound3DataHealth(result, baseCurrency));
   return lines;
 };
 

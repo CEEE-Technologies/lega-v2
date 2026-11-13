@@ -8,6 +8,7 @@ import { BalanceSheet } from './BalanceSheet';
 import { getBalanceSheetDefaultQuery } from './constants';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
 import { I18nService } from 'nestjs-i18n';
+import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class BalanceSheetInjectable {
@@ -16,7 +17,7 @@ export class BalanceSheetInjectable {
     private readonly eventPublisher: EventEmitter2,
     private readonly tenancyContext: TenancyContext,
     private readonly i18n: I18nService,
-    private readonly balanceSheetRepository: BalanceSheetRepository,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -34,7 +35,17 @@ export class BalanceSheetInjectable {
     const tenantMetadata = await this.tenancyContext.getTenantMetadata();
 
     // Loads all resources.
-    await this.balanceSheetRepository.asyncInitialize(filter);
+    // A new repository per report: it holds this report's query and
+    // data, and one instance shared by every request (the service is
+    // a singleton) let concurrent reports overwrite each other's.
+    const balanceSheetRepository = await this.moduleRef.resolve(
+      BalanceSheetRepository,
+      undefined,
+      {
+        strict: false,
+      },
+    );
+    await balanceSheetRepository.asyncInitialize(filter);
 
     // Balance sheet meta first to get date format.
     const meta = await this.balanceSheetMeta.meta(filter);
@@ -42,7 +53,7 @@ export class BalanceSheetInjectable {
     // Balance sheet report instance.
     const balanceSheetInstanace = new BalanceSheet(
       filter,
-      this.balanceSheetRepository,
+      balanceSheetRepository,
       this.i18n,
       {
         baseCurrency: tenantMetadata.baseCurrency,

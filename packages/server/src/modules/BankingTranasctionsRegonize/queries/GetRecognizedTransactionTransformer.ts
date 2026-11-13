@@ -121,7 +121,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {number}
    */
   public assignedAccountId(transaction: any): number {
-    return transaction.recognizedTransaction.assignedAccountId;
+    return transaction.recognizedTransaction?.assignedAccountId;
   }
 
   /**
@@ -130,7 +130,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   public assignedAccountName(transaction: any): string {
-    return transaction.recognizedTransaction.assignAccount.name;
+    return transaction.recognizedTransaction?.assignAccount?.name;
   }
 
   /**
@@ -139,7 +139,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   public assignedAccountCode(transaction: any): string {
-    return transaction.recognizedTransaction.assignAccount.code;
+    return transaction.recognizedTransaction?.assignAccount?.code;
   }
 
   /**
@@ -147,8 +147,8 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @param {object} transaction
    * @returns {string}
    */
-  public getAssignedPayee(transaction: any): string {
-    return transaction.recognizedTransaction.assignedPayee;
+  public assignedPayee(transaction: any): string {
+    return transaction.recognizedTransaction?.assignedPayee;
   }
 
   /**
@@ -157,7 +157,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   public assignedMemo(transaction: any): string {
-    return transaction.recognizedTransaction.assignedMemo;
+    return transaction.recognizedTransaction?.assignedMemo;
   }
 
   /**
@@ -166,7 +166,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   public assignedCategory(transaction: any): string {
-    return transaction.recognizedTransaction.assignedCategory;
+    return transaction.recognizedTransaction?.assignedCategory;
   }
 
   /**
@@ -247,7 +247,7 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   protected bankRuleId(transaction) {
-    return transaction.recognizedTransaction.bankRuleId;
+    return transaction.recognizedTransaction?.bankRuleId;
   }
 
   /**
@@ -256,6 +256,6 @@ export class GetRecognizedTransactionTransformer extends Transformer {
    * @returns {string}
    */
   protected bankRuleName(transaction) {
-    return transaction.recognizedTransaction.bankRule.name;
+    return transaction.recognizedTransaction?.bankRule?.name;
   }
 }

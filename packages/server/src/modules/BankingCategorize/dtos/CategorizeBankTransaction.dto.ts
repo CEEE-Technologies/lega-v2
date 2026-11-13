@@ -61,15 +61,15 @@ export class CategorizeBankTransactionDto {
   transactionType: string;
 
   @ApiPropertyOptional({
-    description: 'Exchange rate for currency conversion',
+    description:
+      'Exchange rate for currency conversion: 1 account currency = rate base currency. Required for a foreign-currency bank account.',
     type: Number,
-    default: 1,
     example: 1.15,
   })
   @IsNumber()
   @ToNumber()
   @IsOptional()
-  exchangeRate: number = 1;
+  exchangeRate?: number;
 
   @ApiPropertyOptional({
     description: 'Currency code for the transaction',

@@ -41,7 +41,7 @@ export class GetLemonSqueezyCheckoutService {
         },
         productOptions: {
           enabledVariants: [variantId],
-          redirectUrl: this.configService.get('lemonSqueezy.redirectTo'),
+          redirectUrl: this.configService.get('lemonsqueezy.redirectTo'),
           receiptButtonText: 'Go to Dashboard',
           receiptThankYouNote: 'Thank you for signing up to Lemon Stand!',
         },

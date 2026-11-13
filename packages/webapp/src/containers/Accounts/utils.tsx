@@ -12,10 +12,12 @@ import { transformTableStateToQuery, isBlank } from '@/utils';
 export const DeleteAccountTypeError = {
   AccountPredefined: 'account_predefined',
   AccountHasAssociatedTransactions: 'account_has_associated_transactions',
+  AccountUsedByBankRules: 'ACCOUNT_USED_BY_BANK_RULES',
 };
 
 interface DeleteError {
   type: string;
+  message?: string;
 }
 
 /**
@@ -49,6 +51,17 @@ export const handleDeleteErrors = (errors: DeleteError[]) => {
   ) {
     AppToaster.show({
       message: intl.get('cannot_delete_account_has_associated_transactions'),
+      intent: Intent.DANGER,
+    });
+  }
+  const usedByRules = errors.find(
+    (e) => e.type === DeleteAccountTypeError.AccountUsedByBankRules,
+  );
+  if (usedByRules) {
+    AppToaster.show({
+      // The server names the rules.
+      message:
+        usedByRules.message || intl.get('accounts.error.used_by_bank_rules'),
       intent: Intent.DANGER,
     });
   }

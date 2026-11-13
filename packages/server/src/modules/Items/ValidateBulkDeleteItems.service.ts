@@ -3,6 +3,15 @@ import { Knex } from 'knex';
 import { TENANCY_DB_CONNECTION } from '../Tenancy/TenancyDB/TenancyDB.constants';
 import { DeleteItemService } from './DeleteItem.service';
 import { ModelHasRelationsError } from '@/common/exceptions/ModelHasRelations.exception';
+import {
+  runDryRun,
+  TransactionAbortedError,
+  withSavepoint,
+} from '@/modules/Tenancy/TenancyDB/DryRun';
+import {
+  NonDeletableReason,
+  toNonDeletableReason,
+} from '@/common/utils/non-deletable-reason';
 
 @Injectable()
 export class ValidateBulkDeleteItemsService {
@@ -24,50 +33,49 @@ export class ValidateBulkDeleteItemsService {
     nonDeletableCount: number;
     deletableIds: number[];
     nonDeletableIds: number[];
+    nonDeletableReasons?: NonDeletableReason[];
   }> {
-    // Create a transaction that will be rolled back
-    const trx = await this.tenantKnex().transaction({
-      isolationLevel: 'read committed',
-    });
-
-    try {
+    // Every delete runs in a transaction that is always rolled back, so
+    // nothing is kept and no after-save work runs.
+    return runDryRun(this.tenantKnex(), async (trx) => {
       const deletableIds: number[] = [];
       const nonDeletableIds: number[] = [];
+      const nonDeletableReasons: NonDeletableReason[] = [];
 
       // Check each item to see if it can be deleted by attempting deletion in transaction
       for (const itemId of itemIds) {
         try {
           // Attempt to delete the item using the deleteItem service with the transaction
           // This will use the exact same validation logic as the actual delete
-          await this.deleteItemService.deleteItem(itemId, trx);
+          // A failed delete only undoes its own writes.
+          await withSavepoint(trx, () =>
+            this.deleteItemService.deleteItem(itemId, trx),
+          );
 
           // If deletion succeeds, item is deletable
           deletableIds.push(itemId);
         } catch (error) {
+          if (error instanceof TransactionAbortedError) throw error;
           // If error occurs, check the type of error
           if (error instanceof ModelHasRelationsError) {
             // Item has associated transactions/relations, cannot be deleted
             nonDeletableIds.push(itemId);
+            nonDeletableReasons.push(toNonDeletableReason(itemId, error));
           } else {
             // Other errors (e.g., item not found), also mark as non-deletable
             nonDeletableIds.push(itemId);
+            nonDeletableReasons.push(toNonDeletableReason(itemId, error));
           }
         }
       }
-
-      // Always rollback the transaction to ensure no changes are persisted
-      await trx.rollback();
 
       return {
         deletableCount: deletableIds.length,
         nonDeletableCount: nonDeletableIds.length,
         deletableIds,
         nonDeletableIds,
+        nonDeletableReasons,
       };
-    } catch (error) {
-      // Rollback in case of any error
-      await trx.rollback();
-      throw error;
-    }
+    });
   }
 }

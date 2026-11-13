@@ -68,7 +68,13 @@ function RefundCreditNoteFormProvider({
     'id',
     'creditsRemaining',
     'currencyCode',
-  ]) as { id?: number; creditsRemaining?: number; currencyCode?: string };
+    'exchangeRate',
+  ]) as {
+    id?: number;
+    creditsRemaining?: number;
+    currencyCode?: string;
+    exchangeRate?: number;
+  };
 
   const provider: RefundCreditNoteContextValue = {
     creditNote: creditNoteRaw
@@ -77,6 +83,7 @@ function RefundCreditNoteFormProvider({
           creditsRemaining: (picked.creditsRemaining as number) ?? 0,
           currencyCode: (picked.currencyCode as string) ?? '',
           amount: (picked.creditsRemaining as number) ?? 0,
+          exchangeRate: picked.exchangeRate,
         }
       : undefined,
     accounts,

@@ -1,5 +1,6 @@
 import { useFormikContext } from 'formik';
 import { useMemo } from 'react';
+import { MoneyOutExchangeRateSync } from './MoneyOutExchangeRateField';
 import { MoneyOutFieldsProvider } from './MoneyOutFieldsProvider';
 import { OtherExpnseFormFields } from './OtherExpense/OtherExpnseFormFields';
 import { OwnerDrawingsFormFields } from './OwnerDrawings/OwnerDrawingsFormFields';
@@ -31,5 +32,10 @@ export function MoneyOutContentFields() {
   // Cannot continue if transaction type or account is not selected.
   if (!values.transactionType || !values.cashflowAccountId) return null;
 
-  return <MoneyOutFieldsProvider>{transactionType}</MoneyOutFieldsProvider>;
+  return (
+    <MoneyOutFieldsProvider>
+      <MoneyOutExchangeRateSync />
+      {transactionType}
+    </MoneyOutFieldsProvider>
+  );
 }

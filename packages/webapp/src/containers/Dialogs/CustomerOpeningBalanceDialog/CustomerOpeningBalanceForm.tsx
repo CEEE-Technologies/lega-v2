@@ -9,7 +9,11 @@ import { CustomerOpeningBalanceFormContent } from './CustomerOpeningBalanceFormC
 import { useCustomerOpeningBalanceContext } from './CustomerOpeningBalanceFormProvider';
 import type { CustomerOpeningBalanceFormValues } from './utils';
 import type { WithDialogActionsProps } from '@/containers/Dialog/withDialogActions';
-import { AppToaster } from '@/components';
+import {
+  AppToaster,
+  hasOpeningBalance,
+  useExchangeRateValidate,
+} from '@/components';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 
 const defaultInitialValues: CustomerOpeningBalanceFormValues = {
@@ -36,6 +40,14 @@ function CustomerOpeningBalanceFormInner({
     ...customer,
     openingBalance: defaultTo(customer.openingBalance, ''),
   };
+
+  // The rate is required for a foreign-currency opening balance.
+  const validateExchangeRate = useExchangeRateValidate(
+    (values: CustomerOpeningBalanceFormValues & { currencyCode?: string }) =>
+      values.currencyCode,
+    'openingBalanceExchangeRate',
+    hasOpeningBalance,
+  );
 
   // Handles the form submit.
   const handleFormSubmit = (
@@ -89,6 +101,7 @@ function CustomerOpeningBalanceFormInner({
   return (
     <Formik<CustomerOpeningBalanceFormValues>
       validationSchema={CreateCustomerOpeningBalanceFormSchema}
+      validate={validateExchangeRate}
       initialValues={initialValues}
       onSubmit={handleFormSubmit}
       component={CustomerOpeningBalanceFormContent}

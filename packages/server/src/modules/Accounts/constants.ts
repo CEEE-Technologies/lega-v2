@@ -9,6 +9,7 @@ export const ERRORS = {
   ACCOUNT_TYPE_NOT_ALLOWED_TO_CHANGE: 'account_type_not_allowed_to_changed',
   ACCOUNT_PREDEFINED: 'account_predefined',
   ACCOUNT_HAS_ASSOCIATED_TRANSACTIONS: 'account_has_associated_transactions',
+  ACCOUNT_USED_BY_BANK_RULES: 'ACCOUNT_USED_BY_BANK_RULES',
   PREDEFINED_ACCOUNTS: 'predefined_accounts',
   ACCOUNTS_HAVE_TRANSACTIONS: 'accounts_have_transactions',
   CLOSE_ACCOUNT_AND_TO_ACCOUNT_NOT_SAME_TYPE:

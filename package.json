@@ -45,12 +45,13 @@
   "engines": {
     "node": "16.x || 17.x || 18.x"
   },
-  "husky": {
-    "hooks": {
-      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
-    }
-  },
   "dependencies": {
     "tsup": "^8.3.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@nestjs/event-emitter@2.1.1": "patches/@nestjs__event-emitter@2.1.1.patch",
+      "eventemitter2@6.4.9": "patches/eventemitter2@6.4.9.patch"
+    }
   }
 }

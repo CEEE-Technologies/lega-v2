@@ -357,12 +357,13 @@ const transformPaymentMethodsToForm = (
 };
 
 export const useSetPrimaryWarehouseToForm = () => {
-  const { setFieldValue } = useFormikContext<InvoiceFormValues>();
+  const { setFieldValue, values } = useFormikContext<InvoiceFormValues>();
   const { warehouses, isWarehousesSuccess, isNewMode } =
     useInvoiceFormContext();
 
   React.useEffect(() => {
-    if (isWarehousesSuccess && isNewMode) {
+    // Keep one already set (from the estimate / invoice it's made from).
+    if (isWarehousesSuccess && isNewMode && !values.warehouseId) {
       const primaryWarehouse =
         warehouses.find((b) => b.primary) || first(warehouses);
 
@@ -370,22 +371,29 @@ export const useSetPrimaryWarehouseToForm = () => {
         setFieldValue('warehouseId', primaryWarehouse.id);
       }
     }
-  }, [isWarehousesSuccess, setFieldValue, warehouses, isNewMode]);
+  }, [
+    isWarehousesSuccess,
+    setFieldValue,
+    warehouses,
+    isNewMode,
+    values.warehouseId,
+  ]);
 };
 
 export const useSetPrimaryBranchToForm = () => {
-  const { setFieldValue } = useFormikContext<InvoiceFormValues>();
+  const { setFieldValue, values } = useFormikContext<InvoiceFormValues>();
   const { branches, isBranchesSuccess, isNewMode } = useInvoiceFormContext();
 
   React.useEffect(() => {
-    if (isBranchesSuccess && isNewMode) {
+    // Keep one already set (from the estimate / invoice it's made from).
+    if (isBranchesSuccess && isNewMode && !values.branchId) {
       const primaryBranch = branches.find((b) => b.primary) || first(branches);
 
       if (primaryBranch) {
         setFieldValue('branchId', primaryBranch.id);
       }
     }
-  }, [isBranchesSuccess, setFieldValue, branches, isNewMode]);
+  }, [isBranchesSuccess, setFieldValue, branches, isNewMode, values.branchId]);
 };
 
 /**
@@ -493,6 +501,8 @@ export const resetFormState = ({
       // Reset the all values except the warehouse and brand id.
       ...initialValues,
       warehouseId: values.warehouseId,
+      // The branch too (it was dropped, so the next one had none).
+      branchId: values.branchId,
     },
   });
 };

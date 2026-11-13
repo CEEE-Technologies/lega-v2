@@ -14,7 +14,8 @@ import { events } from '@/common/events/events';
 export class TransactionsLockingEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.transactionsLocking.locked)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.transactionsLocking.locked, { suppressErrors: true })
   public handleTransactionsLockingLockedEvent({}: ITransactionsLockingPartialUnlocked) {
     this.posthog.trackEvent({
       event: TRANSACTIONS_LOCKING_LOCKED,
@@ -22,7 +23,8 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.transactionsLocking.lockCanceled)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.transactionsLocking.lockCanceled, { suppressErrors: true })
   public handleTransactionsLockingCancelledEvent({}: ITransactionsLockingPartialUnlocked) {
     this.posthog.trackEvent({
       event: TRANSACTIONS_LOCKING_LOCKING_CANCELLED,
@@ -30,7 +32,8 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.transactionsLocking.partialUnlocked)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.transactionsLocking.partialUnlocked, { suppressErrors: true })
   public handleTransactionsLockingPartiallyUnlockedEvent({}: ITransactionsLockingPartialUnlocked) {
     this.posthog.trackEvent({
       event: TRANSACTIONS_LOCKING_PARTIALLY_UNLOCKED,
@@ -38,7 +41,10 @@ export class TransactionsLockingEventsTracker {
     });
   }
 
-  @OnEvent(events.transactionsLocking.partialUnlockCanceled)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.transactionsLocking.partialUnlockCanceled, {
+    suppressErrors: true,
+  })
   public handleTransactionsLockingPartiallyUnlockCancelledEvent({}: ITransactionsLockingPartialUnlocked) {
     this.posthog.trackEvent({
       event: TRANSACTIONS_LOCKING_PARTIALLY_UNLOCK_CANCELLED,

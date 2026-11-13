@@ -13,7 +13,8 @@ import { events } from '@/common/events/events';
 export class PdfTemplateEventsTracker {
   constructor(public readonly posthog: EventTrackerService) {}
 
-  @OnEvent(events.pdfTemplate.onCreated)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.pdfTemplate.onCreated, { suppressErrors: true })
   public handleTrackPdfTemplateCreatedEvent({}) {
     this.posthog.trackEvent({
       event: PDF_TEMPLATE_CREATED,
@@ -21,7 +22,8 @@ export class PdfTemplateEventsTracker {
     });
   }
 
-  @OnEvent(events.pdfTemplate.onEdited)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.pdfTemplate.onEdited, { suppressErrors: true })
   public handleTrackEditedPdfTemplateEvent({}) {
     this.posthog.trackEvent({
       event: PDF_TEMPLATE_EDITED,
@@ -29,7 +31,8 @@ export class PdfTemplateEventsTracker {
     });
   }
 
-  @OnEvent(events.pdfTemplate.onDeleted)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.pdfTemplate.onDeleted, { suppressErrors: true })
   public handleTrackDeletedPdfTemplateEvent({}) {
     this.posthog.trackEvent({
       event: PDF_TEMPLATE_DELETED,
@@ -37,7 +40,8 @@ export class PdfTemplateEventsTracker {
     });
   }
 
-  @OnEvent(events.pdfTemplate.onAssignedDefault)
+  // Side effect (PostHog analytics): an error is logged and does not stop the save.
+  @OnEvent(events.pdfTemplate.onAssignedDefault, { suppressErrors: true })
   public handleTrackAssignedAsDefaultPdfTemplateEvent({}) {
     this.posthog.trackEvent({
       event: PDF_TEMPLATE_ASSIGNED_DEFAULT,

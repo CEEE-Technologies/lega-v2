@@ -22,4 +22,10 @@ export const transformErrors = (
       roleId: intl.get('roles.error.you_cannot_change_your_own_role'),
     });
   }
+  if (errors.find((error) => error.type === 'ADMIN_ONLY')) {
+    setErrors({ roleId: intl.get('roles.error.admin_only') });
+  }
+  if (errors.find((error) => error.type === 'PERMISSIONS_NOT_HELD')) {
+    setErrors({ roleId: intl.get('roles.error.permissions_not_held') });
+  }
 };

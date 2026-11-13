@@ -16,6 +16,8 @@ ENV PYTHON=/usr/bin/python3
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml lerna.json ./
 COPY --chown=node:node packages/server/package.json ./packages/server/
 COPY --chown=node:node shared ./shared
+# Patched dependencies (see `pnpm.patchedDependencies` in package.json)
+COPY --chown=node:node patches ./patches
 
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install --frozen-lockfile
@@ -48,6 +50,7 @@ ENV PYTHON=/usr/bin/python3
 COPY --chown=nodejs:nodejs package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --chown=nodejs:nodejs packages/server/package.json ./packages/server/
 COPY --chown=nodejs:nodejs shared ./shared
+COPY --chown=nodejs:nodejs patches ./patches
 
 # Copy .husky directory (needed for husky install command)
 COPY --chown=nodejs:nodejs .husky ./.husky

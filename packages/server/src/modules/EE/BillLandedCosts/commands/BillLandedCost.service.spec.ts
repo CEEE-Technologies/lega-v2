@@ -21,7 +21,9 @@ describe('BillLandedCost transformer', () => {
         entries: [
           {
             id: 5,
+            // Before discount; 900 after it, which is what can be allocated.
             amount: 1000,
+            totalExcludingTax: 900,
             allocatedCostAmount: 50,
             unallocatedCostAmount: 950,
             description: 'Item',
@@ -47,7 +49,7 @@ describe('BillLandedCost transformer', () => {
           id: 5,
           name: 'Item A',
           code: 'IT-1',
-          amount: 1000,
+          amount: 900,
           allocatedCostAmount: 50,
           unallocatedCostAmount: 950,
           description: 'Item',
@@ -85,6 +87,7 @@ describe('BillLandedCost transformer', () => {
       const entry = {
         id: 5,
         amount: 1000,
+        totalExcludingTax: 1000,
         allocatedCostAmount: 50,
         unallocatedCostAmount: 950,
         description: 'Item',

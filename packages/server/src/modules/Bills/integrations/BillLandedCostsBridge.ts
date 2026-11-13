@@ -34,6 +34,17 @@ export interface IBillLandedCostsProvider {
   ): Promise<void>;
 
   /**
+   * Validates no landed cost was allocated from the given bill (the bill is
+   * the source of the cost, such as a freight bill).
+   * @param {number} billId - Bill id.
+   * @param {Knex.Transaction} trx - Knex transaction.
+   */
+  validateBillNotLandedCostSource(
+    billId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void>;
+
+  /**
    * Validates the bill entries that have landed cost flag should be
    * inventory items.
    * @param {IBillLandedCostEntryDTO[]} entries - Bill entries.
@@ -76,6 +87,16 @@ export class BillLandedCostsBridge {
     trx?: Knex.Transaction,
   ): Promise<void> {
     await this.provider?.validateBillHasNoLandedCosts(billId, trx);
+  }
+
+  /**
+   * Validates no landed cost was allocated from the given bill.
+   */
+  public async validateBillNotLandedCostSource(
+    billId: number,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    await this.provider?.validateBillNotLandedCostSource(billId, trx);
   }
 
   /**

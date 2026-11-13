@@ -459,9 +459,6 @@ export const events = {
 
     onTransactionUncategorizing: 'onTransactionUncategorizing',
     onTransactionUncategorized: 'onTransactionUncategorized',
-
-    onTransactionCategorizingAsExpense: 'onTransactionCategorizingAsExpense',
-    onTransactionCategorizedAsExpense: 'onTransactionCategorizedAsExpense',
   },
 
   /**
@@ -600,6 +597,9 @@ export const events = {
    * Branches.
    */
   branch: {
+    onCreate: 'onBranchCreate',
+    onCreated: 'onBranchCreated',
+
     onActivate: 'onBranchActivate',
     onActivated: 'onBranchActivated',
 

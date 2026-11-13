@@ -3,6 +3,7 @@ import { flow } from 'fp-ts/function';
 import * as A from 'fp-ts/Array';
 import { eqNumber } from 'fp-ts/Eq';
 import { isEmpty } from 'lodash';
+import * as moment from 'moment';
 import {
   IAccountTransactionsGroupBy,
   IBalanceSheetQuery,
@@ -21,6 +22,10 @@ import { GConstructor } from '@/common/types/Constructor';
 import { FinancialSheet } from '../../common/FinancialSheet';
 import { AccountingBasis } from '@/common/types/AccountingBasis';
 import { AccountingBasisService } from '../../common/AccountingBasisService';
+
+/** The day before the given date (YYYY-MM-DD). */
+const dayBefore = (date: Date | string): string =>
+  moment(date).subtract(1, 'day').format('YYYY-MM-DD');
 
 @Injectable({ scope: Scope.TRANSIENT })
 export class BalanceSheetRepository extends flow(
@@ -292,8 +297,10 @@ export class BalanceSheetRepository extends flow(
       this.transactionsGroupType,
     );
     // Retrieves opening balance of grouped transactions.
+    // Up to the day before the first period: the periods start on
+    // fromDate, so closing on it counted its entries twice.
     const periodsOpeningByAccount = await this.closingAccountsTotal(
-      this.query.fromDate as Date,
+      dayBefore(this.query.fromDate as Date),
     );
     // Inject to the repository.
     this.periodsAccountsLedger = Ledger.fromTransactions(periodsByAccount);
@@ -328,8 +335,10 @@ export class BalanceSheetRepository extends flow(
       this.transactionsGroupType,
     );
     // Retrieves opening balance of grouped transactions.
+    // Up to the day before the first period: the periods start on
+    // PYFromDate, so closing on it counted its entries twice.
     const periodsOpeningByAccount = await this.closingAccountsTotal(
-      this.query.PYFromDate,
+      dayBefore(this.query.PYFromDate),
     );
     // Inject to the repository.
     this.PYPeriodsAccountsLedger = Ledger.fromTransactions(PYPeriodsBYAccounts);
@@ -364,8 +373,10 @@ export class BalanceSheetRepository extends flow(
       this.transactionsGroupType,
     );
     // Retrieves opening balance of grouped transactions.
+    // Up to the day before the first period: the periods start on
+    // PPFromDate, so closing on it counted its entries twice.
     const periodsOpeningByAccount = await this.closingAccountsTotal(
-      this.query.PPFromDate,
+      dayBefore(this.query.PPFromDate),
     );
     // Inject to the repository.
     this.PPPeriodsAccountsLedger = Ledger.fromTransactions(PPPeriodsBYAccounts);

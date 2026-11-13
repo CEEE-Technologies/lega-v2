@@ -45,8 +45,11 @@ export class GetAutofillCategorizeTransctionTransformer extends Transformer {
    * @returns {string}
    */
   public formattedAmount() {
+    // In the bank line's currency (it was always shown as USD).
     return this.formatNumber(this.amount(), {
-      currencyCode: 'USD',
+      currencyCode:
+        this.options.firstUncategorizedTransaction?.currencyCode ||
+        this.context.organization?.baseCurrency,
       money: true,
     });
   }

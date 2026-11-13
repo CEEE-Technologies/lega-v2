@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npm run format
-git add -A
+# Formats only the staged files and stages only those again (it used to
+# format the whole repo and run `git add -A`, which committed every
+# untracked file in the folder).
+node bin/format-staged.js

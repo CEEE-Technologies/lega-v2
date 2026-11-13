@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { waitForListResponse } from './_invoices';
 import { faker } from '@faker-js/faker';
 
 /**
@@ -130,7 +131,10 @@ async function createVendor(
  */
 async function filterVendorsBy(page: Page, displayName: string) {
   await page.getByRole('button', { name: /filter|filters applied/i }).click();
+  // Wait for the filtered list (a new filter replaces the rows).
+  const filtered = waitForListResponse(page, '/api/vendors', displayName);
   await page.getByPlaceholder('Value').first().fill(displayName);
+  await filtered;
 
   const row = page
     .getByTestId('vendor-row')

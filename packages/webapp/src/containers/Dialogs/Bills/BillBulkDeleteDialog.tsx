@@ -7,7 +7,10 @@ import type { WithBillsActionsProps } from '@/containers/Purchases/Bills/BillsLa
 import { AppToaster, FormattedMessage as T } from '@/components';
 import withDialogRedux from '@/components/DialogReduxConnect';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
-import { BulkDeleteDialogContent } from '@/containers/Dialogs/components/BulkDeleteDialogContent';
+import {
+  BulkDeleteDialogContent,
+  type NonDeletableReason,
+} from '@/containers/Dialogs/components/BulkDeleteDialogContent';
 import { withBillsActions } from '@/containers/Purchases/Bills/BillsLanding/withBillsActions';
 import { useBulkDeleteBills } from '@/hooks/query/bills';
 
@@ -91,6 +94,10 @@ function BillBulkDeleteDialogInner({
         totalSelected={totalSelected}
         deletableCount={deletableCount}
         undeletableCount={undeletableCount}
+        nonDeletableReasons={
+          (payload as { nonDeletableReasons?: NonDeletableReason[] })
+            ?.nonDeletableReasons
+        }
         resourceSingularLabel={intl.get('resource_bill_singular')}
         resourcePluralLabel={intl.get('resource_bill_plural')}
       />

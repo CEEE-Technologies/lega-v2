@@ -57,9 +57,10 @@ export class EditCustomer {
         trx,
       } as ICustomerEventEditingPayload);
 
-      // Edits the customer details on the storage.
+      // Edits the customer details inside the save, so a failed edit
+      // changes nothing.
       const customer = await this.customerModel()
-        .query()
+        .query(trx)
         .updateAndFetchById(customerId, {
           ...customerObj,
         });

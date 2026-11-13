@@ -1,5 +1,6 @@
 import { useFormikContext } from 'formik';
 import React, { useMemo } from 'react';
+import { MoneyInExchangeRateSync } from './MoneyInExchangeRateField';
 import { MoneyInFieldsProvider } from './MoneyInFieldsProvider';
 import { OtherIncomeFormFields } from './OtherIncome/OtherIncomeFormFields';
 import { OwnerContributionFormFields } from './OwnerContribution/OwnerContributionFormFields';
@@ -31,5 +32,10 @@ export function MoneyInContentFields() {
   // Cannot continue if transaction type or account is not selected.
   if (!values.transactionType || !values.cashflowAccountId) return null;
 
-  return <MoneyInFieldsProvider>{transactionFields}</MoneyInFieldsProvider>;
+  return (
+    <MoneyInFieldsProvider>
+      <MoneyInExchangeRateSync />
+      {transactionFields}
+    </MoneyInFieldsProvider>
+  );
 }

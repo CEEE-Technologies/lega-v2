@@ -9,11 +9,12 @@ import { InventoryItemDetailsRepository } from './InventoryItemDetailsRepository
 import { InventoryDetailsMetaInjectable } from './InventoryItemDetailsMeta';
 import { getInventoryItemDetailsDefaultQuery } from './constant';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import { ModuleRef } from '@nestjs/core';
 
 @Injectable()
 export class InventoryDetailsService {
   constructor(
-    private readonly inventoryItemDetailsRepository: InventoryItemDetailsRepository,
+    private readonly moduleRef: ModuleRef,
     private readonly inventoryDetailsMeta: InventoryDetailsMetaInjectable,
     private readonly i18n: I18nService,
     private readonly tenancyContext: TenancyContext,
@@ -33,8 +34,18 @@ export class InventoryDetailsService {
     };
 
     // Initialize the inventory item details repository.
-    this.inventoryItemDetailsRepository.setFilter(filter);
-    await this.inventoryItemDetailsRepository.asyncInit();
+    // A new repository per report: it holds this report's query and
+    // data, and one instance shared by every request (the service is
+    // a singleton) let concurrent reports overwrite each other's.
+    const inventoryItemDetailsRepository = await this.moduleRef.resolve(
+      InventoryItemDetailsRepository,
+      undefined,
+      {
+        strict: false,
+      },
+    );
+    inventoryItemDetailsRepository.setFilter(filter);
+    await inventoryItemDetailsRepository.asyncInit();
 
     // Retrieve the meta first to get date format.
     const meta = await this.inventoryDetailsMeta.meta(query);
@@ -42,7 +53,7 @@ export class InventoryDetailsService {
     // Inventory details report mapper.
     const inventoryDetailsInstance = new InventoryDetails(
       filter,
-      this.inventoryItemDetailsRepository,
+      inventoryItemDetailsRepository,
       this.i18n,
       { baseCurrency: meta.baseCurrency, dateFormat: meta.dateFormat },
     );

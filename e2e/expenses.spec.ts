@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { faker } from '@faker-js/faker';
+import { waitForListResponse } from './_invoices';
 import {
   createExpense,
   waitForExpensesPage,
@@ -17,7 +18,12 @@ const expenseAmount = () => faker.number.int({ min: 1000, max: 50000 });
  */
 async function filterExpensesByRef(page: Page, refNo: string) {
   await page.getByRole('button', { name: /filter|filters applied/i }).click();
+  // Wait for the filtered list itself: a new filter swaps the table for its
+  // loading view and back, so a row clicked before then (for example its
+  // right-click menu, already open) is replaced.
+  const filtered = waitForListResponse(page, '/api/expenses', refNo);
   await page.getByPlaceholder('Value').first().fill(refNo);
+  await filtered;
 
   const row = page.getByTestId('expense-row').first();
   await expect(row).toBeVisible({ timeout: 30_000 });

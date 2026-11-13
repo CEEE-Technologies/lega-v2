@@ -1,6 +1,9 @@
 import { GetMatchedTransactionsByType } from './GetMatchedTransactionsByType';
 import { GetMatchedTransactionCashflowTransformer } from './GetMatchedTransactionCashflowTransformer';
-import { GetMatchedTransactionsFilter } from '../types';
+import {
+  GetMatchedTransactionsFilter,
+  MatchedTransactionContext,
+} from '../types';
 import { BankTransaction } from '@/modules/BankingTransactions/models/BankTransaction';
 import { TransformerInjectable } from '@/modules/Transformer/TransformerInjectable.service';
 import { Inject, Injectable } from '@nestjs/common';
@@ -41,6 +44,18 @@ export class GetMatchedTransactionsByCashflow extends GetMatchedTransactionsByTy
         // Published.
         q.modify('published');
 
+        // Only the bank line's own account: a transaction on another
+        // account never moved money on this one. (A transaction is in its
+        // account's currency, so its amount compares as it is.)
+        if (filter.accountId) {
+          q.where('cashflowAccountId', filter.accountId);
+        }
+        if (filter.minAmount) {
+          q.where('cashflow_transactions.amount', '>=', filter.minAmount);
+        }
+        if (filter.maxAmount) {
+          q.where('cashflow_transactions.amount', '<=', filter.maxAmount);
+        }
         if (filter.fromDate) {
           q.where('date', '>=', filter.fromDate);
         }
@@ -57,20 +72,28 @@ export class GetMatchedTransactionsByCashflow extends GetMatchedTransactionsByTy
   }
 
   /**
-   * Retrieves the matched transaction of cash flow.
-   * @param {number} tenantId
+   * Retrieves the matched transaction of cash flow: on the bank line's
+   * account. Not found otherwise.
    * @param {number} transactionId
+   * @param {MatchedTransactionContext} context - The bank line's account.
    * @returns
    */
-  async getMatchedTransaction(transactionId: number) {
-    const transactions = await this.bankTransactionModel()
+  async getMatchedTransaction(
+    transactionId: number,
+    context?: MatchedTransactionContext,
+  ) {
+    const query = this.bankTransactionModel()
       .query()
       .findById(transactionId)
       .withGraphJoined('matchedBankTransaction')
       .whereNull('matchedBankTransaction.id')
       .modify('notCategorized')
-      .modify('published')
-      .throwIfNotFound();
+      .modify('published');
+
+    if (context?.accountId) {
+      query.where('cashflowAccountId', context.accountId);
+    }
+    const transactions = await query.throwIfNotFound();
 
     return this.transformer.transform(
       transactions,

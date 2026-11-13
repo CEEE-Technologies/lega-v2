@@ -10,6 +10,7 @@ import { LandedCostInventoryTransactionsSubscriber } from './commands/LandedCost
 import { BillAllocatedLandedCostTransactions } from './commands/BillAllocatedLandedCostTransactions.service';
 import { BillAllocateLandedCostController } from './LandedCost.controller';
 import { RevertAllocatedLandedCost } from './commands/RevertAllocatedLandedCost.service';
+import { LandedCostsFromInventoryRepairService } from './commands/LandedCostsFromInventoryRepair.service';
 import { LandedCostTranasctions } from './commands/LandedCostTransactions.service';
 import { LandedCostInventoryTransactions } from './commands/LandedCostInventoryTransactions.service';
 import { InventoryCostModule } from '../../InventoryCost/InventoryCost.module';
@@ -47,6 +48,7 @@ const models = [
     ExpenseLandedCost,
     LandedCostSyncCostTransactions,
     RevertAllocatedLandedCost,
+    LandedCostsFromInventoryRepairService,
     LandedCostInventoryTransactions,
     LandedCostTranasctions,
     LandedCostGLEntriesSubscriber,
@@ -56,6 +58,6 @@ const models = [
     LandedCostsBridgeProvider,
   ],
   controllers: [BillAllocateLandedCostController],
-  exports: [LandedCostGLEntriesService],
+  exports: [LandedCostGLEntriesService, LandedCostsFromInventoryRepairService],
 })
 export class BillLandedCostsModule {}

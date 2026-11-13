@@ -4,9 +4,7 @@ import { UncategorizeBankTransactionService } from './commands/UncategorizeBankT
 import { UncategorizeBankTransactionsBulk } from './commands/UncategorizeBankTransactionsBulk.service';
 import { UncategorizedBankTransactionDto } from './dtos/CreateUncategorizedBankTransaction.dto';
 import { CategorizeBankTransactionDto } from './dtos/CategorizeBankTransaction.dto';
-import { CategorizeTransactionAsExpense } from './commands/CategorizeTransactionAsExpense';
 import { CreateUncategorizedTransactionService } from './commands/CreateUncategorizedTransaction.service';
-import { ICategorizeCashflowTransactioDTO } from './types/BankingCategorize.types';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -15,7 +13,6 @@ export class BankingCategorizeApplication {
     private readonly categorizeBankTransaction: CategorizeBankTransaction,
     private readonly uncategorizeBankTransaction: UncategorizeBankTransactionService,
     private readonly uncategorizeBankTransactionsBulk: UncategorizeBankTransactionsBulk,
-    private readonly categorizeTransactionAsExpense: CategorizeTransactionAsExpense,
     private readonly createUncategorizedTransaction: CreateUncategorizedTransactionService,
   ) {}
 
@@ -58,22 +55,6 @@ export class BankingCategorizeApplication {
   ) {
     return this.uncategorizeBankTransactionsBulk.uncategorizeBulk(
       uncategorizedTransactionIds,
-    );
-  }
-
-  /**
-   * Categorize a transaction as an expense.
-   * @param {number} cashflowTransactionId - The ID of the cashflow transaction to categorize.
-   * @param {ICategorizeCashflowTransactioDTO} transactionDTO - Data for categorization.
-   * @returns {Promise<any>} The result of the categorization operation.
-   */
-  public categorizeTransactionAsExpenseType(
-    cashflowTransactionId: number,
-    transactionDTO: ICategorizeCashflowTransactioDTO,
-  ) {
-    return this.categorizeTransactionAsExpense.categorize(
-      cashflowTransactionId,
-      transactionDTO,
     );
   }
 

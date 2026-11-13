@@ -23,6 +23,10 @@ export const SaleEstimateMeta = {
       name: 'estimate.field.amount',
       column: 'amount',
       fieldType: 'number',
+      // The list shows the total (after discount and adjustment), not the
+      // subtotal column.
+      filterCustomQuery: (query, role) =>
+        query.modify('totalAmountFilter', role),
     },
     estimate_number: {
       name: 'estimate.field.estimate_number',
@@ -80,7 +84,7 @@ export const SaleEstimateMeta = {
     created_at: {
       name: 'estimate.field.created_at',
       column: 'created_at',
-      columnType: 'date',
+      fieldType: 'date',
     },
   },
   columns: {

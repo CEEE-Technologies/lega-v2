@@ -150,6 +150,7 @@ export class EditPaymentReceivedService {
     // Validate the deposit account existance and type.
     const depositAccount = await this.validators.getDepositAccountOrThrowError(
       paymentReceiveDTO.depositAccountId,
+      trx,
     );
     // Validate the entries ids existance on payment receive type.
     await this.validators.validateEntriesIdsExistance(

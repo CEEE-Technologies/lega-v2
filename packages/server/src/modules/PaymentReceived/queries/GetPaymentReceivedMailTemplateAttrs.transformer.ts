@@ -99,7 +99,9 @@ export class GetPaymentReceivedMailTemplateAttrsTransformer extends Transformer 
    * @returns {string}
    */
   public paymentNumber(): string {
-    return this.options.paymentReceived.paymentReceiveNumber;
+    // The field is paymentReceiveNo (paymentReceiveNumber doesn't exist, so
+    // the email showed a blank number).
+    return this.options.paymentReceived.paymentReceiveNo;
   }
 
   /**

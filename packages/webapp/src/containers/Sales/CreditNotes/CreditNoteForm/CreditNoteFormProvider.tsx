@@ -154,10 +154,27 @@ function CreditNoteFormProvider({
   // Determines whether the warehouse and branches are loading.
   const isFeatureLoading = isWarehouesLoading || isBranchesLoading;
 
+  // A credit note made from an invoice credits what was billed: its lines,
+  // rate, discount, adjustment, tax mode, branch and warehouse (only the
+  // lines were taken, so a discounted invoice was credited in full). Only
+  // those fields: the rest keeps the new credit note's defaults.
+  const INVOICE_FIELDS = [
+    'customerId',
+    'currencyCode',
+    'exchangeRate',
+    'discount',
+    'discountType',
+    'adjustment',
+    'branchId',
+    'warehouseId',
+  ];
   const newCreditNote = !isEmpty(invoice)
-    ? transformToEditForm({
-        ...pick(invoice, ['customerId', 'currencyCode', 'entries']),
-      })
+    ? (pick(
+        transformToEditForm({
+          ...pick(invoice, [...INVOICE_FIELDS, 'entries', 'isInclusiveTax']),
+        } as Parameters<typeof transformToEditForm>[0]),
+        [...INVOICE_FIELDS, 'entries', 'inclusiveExclusiveTax'],
+      ) as CreditNoteFormValues) // the picked fields; spread over the defaults
     : ([] as []);
 
   const isBootLoading =

@@ -68,7 +68,8 @@ export class ManualJournalGL {
       index: entry.index,
       accountNormal: entry.account.accountNormal,
 
-      branchId: entry.branchId,
+      // The line's branch, else the journal's (lines saved before F-S2).
+      branchId: entry.branchId ?? this.manualJournal.branchId,
       projectId: entry.projectId,
     };
   }

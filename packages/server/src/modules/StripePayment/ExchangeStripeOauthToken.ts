@@ -7,6 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaymentIntegration } from './models/PaymentIntegration.model';
 import { events } from '@/common/events/events';
 import { TenantModelProxy } from '../System/models/TenantBaseModel';
+import { StripeConnectStateService } from './StripeConnectState.service';
 
 @Injectable()
 export class ExchangeStripeOAuthTokenService {
@@ -19,13 +20,23 @@ export class ExchangeStripeOAuthTokenService {
     private readonly paymentIntegrationModel: TenantModelProxy<
       typeof PaymentIntegration
     >,
+
+    private readonly connectState: StripeConnectStateService,
   ) {}
 
   /**
    * Exchange stripe oauth authorization code to access token and user id.
    * @param {string} authorizationCode
+   * @param {string} state - The state of the connect link the user started.
    */
-  public async excahngeStripeOAuthToken(authorizationCode: string) {
+  public async excahngeStripeOAuthToken(
+    authorizationCode: string,
+    state?: string,
+  ) {
+    // Refuses a return link the signed-in user didn't start here, so nobody
+    // can connect their own Stripe account to this organization.
+    this.connectState.consume(state);
+
     const stripe = this.stripePaymentService.stripe;
 
     const response = await stripe.oauth.token({

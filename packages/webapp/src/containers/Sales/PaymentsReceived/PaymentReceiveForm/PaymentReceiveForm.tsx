@@ -38,7 +38,11 @@ import type {
   CreatePaymentReceivedBody,
   EditPaymentReceivedBody,
 } from '@bigcapital/sdk-ts';
-import { AppToaster } from '@/components';
+import {
+  AppToaster,
+  DocumentExchangeRateSync,
+  useExchangeRateValidate,
+} from '@/components';
 import { PageForm } from '@/components/PageForm';
 import { withDialogActions } from '@/containers/Dialog/withDialogActions';
 import { useCurrentOrganizationBaseCurrency } from '@/hooks/query';
@@ -203,9 +207,13 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
     }
   };
 
+  // The rate is required for a foreign-currency document.
+  const validateExchangeRate = useExchangeRateValidate();
+
   return (
     <Formik
       initialValues={initialValues}
+      validate={validateExchangeRate}
       onSubmit={handleSubmitForm}
       validationSchema={
         isNewMode
@@ -221,6 +229,8 @@ function PaymentReceiveFormRoot({ openDialog }: PaymentReceiveFormRootProps) {
           flex: 1,
         })}
       >
+        {/* Fills the rate: never a silent 1 for a foreign currency. */}
+        <DocumentExchangeRateSync isNewMode={isNewMode} />
         <PageForm flex={1}>
           <PaymentReceiveInnerProvider>
             <PageForm.Body>

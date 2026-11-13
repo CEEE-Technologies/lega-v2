@@ -1,4 +1,5 @@
 import { isEqual, omit } from 'lodash';
+import { Knex } from 'knex';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { events } from '@/common/events/events';
@@ -15,6 +16,7 @@ import {
   RecognizeUncategorizedTransactionsQueue,
 } from '../_types';
 import { TenancyContext } from '@/modules/Tenancy/TenancyContext.service';
+import { runAfterTransaction } from '@/modules/Tenancy/TenancyDB/TransactionsHooks';
 
 @Injectable()
 export class TriggerRecognizedTransactionsSubscriber {
@@ -29,9 +31,11 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize uncategorized transactions job on rule created.
    * @param {IBankRuleEventCreatedPayload} payload -
    */
-  @OnEvent(events.bankRules.onCreated)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onCreated, { suppressErrors: true })
   async recognizedTransactionsOnRuleCreated({
     bankRule,
+    trx,
   }: IBankRuleEventCreatedPayload) {
     const tenantPayload = await this.tenancyContect.getTenantJobPayload();
     const payload = {
@@ -39,21 +43,20 @@ export class TriggerRecognizedTransactionsSubscriber {
       ...tenantPayload,
     } as RecognizeUncategorizedTransactionsJobPayload;
 
-    await this.recognizeTransactionsQueue.add(
-      RecognizeUncategorizedTransactionsJob,
-      payload,
-    );
+    this.addJobAfterCommit(payload, trx);
   }
 
   /**
    * Triggers the recognize uncategorized transactions job on rule edited.
    * @param {IBankRuleEventEditedPayload} payload -
    */
-  @OnEvent(events.bankRules.onEdited)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onEdited, { suppressErrors: true })
   async recognizedTransactionsOnRuleEdited({
     editRuleDTO: _editRuleDTO,
     oldBankRule,
     bankRule,
+    trx,
   }: IBankRuleEventEditedPayload) {
     // Cannot continue if the new and old bank rule values are the same,
     // after excluding `createdAt` and `updatedAt` dates.
@@ -75,19 +78,18 @@ export class TriggerRecognizedTransactionsSubscriber {
     // Re-recognize the transactions based on the new rules.
     // Setting shouldRevert to true ensures that transactions previously recognized
     // by this or lower-priority rules are re-evaluated against the updated rule.
-    await this.recognizeTransactionsQueue.add(
-      RecognizeUncategorizedTransactionsJob,
-      payload,
-    );
+    this.addJobAfterCommit(payload, trx);
   }
 
   /**
    * Triggers the recognize uncategorized transactions job on rule deleted.
    * @param {IBankRuleEventDeletedPayload} payload -
    */
-  @OnEvent(events.bankRules.onDeleted)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.bankRules.onDeleted, { suppressErrors: true })
   async recognizedTransactionsOnRuleDeleted({
     ruleId,
+    trx,
   }: IBankRuleEventDeletedPayload) {
     const tenantPayload = await this.tenancyContect.getTenantJobPayload();
     const payload = {
@@ -96,9 +98,26 @@ export class TriggerRecognizedTransactionsSubscriber {
     } as RecognizeUncategorizedTransactionsJobPayload;
 
     // Re-recognize the transactions based on the new rules.
-    await this.recognizeTransactionsQueue.add(
-      RecognizeUncategorizedTransactionsJob,
-      payload,
+    this.addJobAfterCommit(payload, trx);
+  }
+
+  /**
+   * Queues the job once the rule's save has committed (straight away when
+   * there is no transaction). Queued earlier, a fast job could read the rule
+   * before it was saved: miss a new rule, or re-apply the old one on edit.
+   * A save that is rolled back queues nothing.
+   * @param {RecognizeUncategorizedTransactionsJobPayload} payload
+   * @param {Knex.Transaction} trx
+   */
+  private addJobAfterCommit(
+    payload: RecognizeUncategorizedTransactionsJobPayload,
+    trx?: Knex.Transaction,
+  ) {
+    runAfterTransaction(trx, () =>
+      this.recognizeTransactionsQueue.add(
+        RecognizeUncategorizedTransactionsJob,
+        payload,
+      ),
     );
   }
 
@@ -106,7 +125,8 @@ export class TriggerRecognizedTransactionsSubscriber {
    * Triggers the recognize bank transactions once the imported file commit.
    * @param {IImportFileCommitedEventPayload} payload -
    */
-  @OnEvent(events.import.onImportCommitted)
+  // Side effect (queues the bank-rules job): an error is logged and does not stop the save.
+  @OnEvent(events.import.onImportCommitted, { suppressErrors: true })
   async triggerRecognizeTransactionsOnImportCommitted({
     importId: _importId,
 
