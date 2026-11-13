@@ -221,21 +221,29 @@ export abstract class DynamicFilterRoleAbstractor implements IDynamicFilter {
     const field = model.getField(role.fieldKey);
     const comparatorColumn = this.getFieldComparatorColumn(field);
 
-    // Field custom query, wrapped so its conditions stay grouped. An
-    // enumeration's "is not" negates the custom match; number, date and text
-    // custom queries handle the comparator themselves.
+    // Field custom query (a status, a computed amount). It runs in its own
+    // subquery on the list's table: `id IN (SELECT id FROM <table> WHERE
+    // ...)`. Custom queries name columns without their table (e.g. BALANCE),
+    // and a sort by a relation joins another table that may have a column of
+    // the same name (contacts.BALANCE), which made the list query ambiguous.
+    // An enumeration's "is not" negates the custom match; number, date and
+    // text custom queries handle the comparator themselves.
     if (typeof field.filterCustomQuery !== 'undefined') {
       const negate =
         ![FIELD_TYPE.NUMBER, FIELD_TYPE.DATE, FIELD_TYPE.TEXT].includes(
           field.fieldType,
         ) && NEGATIVE_COMPARATORS.includes(role.comparator);
+      const idColumn = `${this.tableName}.id`;
 
       return (builder) => {
-        const customQuery = (query) => field.filterCustomQuery(query, role);
+        const customQuery = (query) => {
+          query.select(idColumn).from(this.tableName);
+          field.filterCustomQuery(query, role);
+        };
         if (negate) {
-          builder.whereNot(customQuery);
+          builder.whereNotIn(idColumn, customQuery);
         } else {
-          builder.where(customQuery);
+          builder.whereIn(idColumn, customQuery);
         }
       };
     }

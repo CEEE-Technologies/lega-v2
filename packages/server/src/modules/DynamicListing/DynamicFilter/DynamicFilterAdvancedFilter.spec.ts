@@ -2,6 +2,8 @@ import knexFactory from 'knex';
 import { DynamicFilterAdvancedFilter } from './DynamicFilterAdvancedFilter';
 import { rawNumberFilterQuery } from './rawNumberFilterQuery';
 import { parseFilterDate } from './DynamicFilterRoleAbstractor';
+import { DynamicFilter } from './DynamicFilter';
+import { DynamicFilterSortBy } from './DynamicFilterSortBy';
 
 const knex = knexFactory({ client: 'mysql2' });
 
@@ -112,12 +114,14 @@ describe('DynamicFilterAdvancedFilter', () => {
 
     it('a computed amount compares its SQL expression', () => {
       expect(whereSql(role('due_amount', 'bigger_or_equal', '10'))).toBe(
-        '((TOTAL - PAID) >= 10)',
+        '`sales_invoices`.`id` in (select `sales_invoices`.`id` from `sales_invoices` where (TOTAL - PAID) >= 10)',
       );
     });
 
     it('a computed amount with no number matches nothing', () => {
-      expect(whereSql(role('due_amount', 'equal', 'abc'))).toBe('(1 = 0)');
+      expect(whereSql(role('due_amount', 'equal', 'abc'))).toBe(
+        '`sales_invoices`.`id` in (select `sales_invoices`.`id` from `sales_invoices` where 1 = 0)',
+      );
     });
   });
 
@@ -171,15 +175,15 @@ describe('DynamicFilterAdvancedFilter', () => {
       );
     });
 
-    it('a custom status query is grouped for "is"', () => {
+    it('a custom status query runs in a subquery on the list table for "is"', () => {
       expect(whereSql(role('status', 'is', 'draft'))).toBe(
-        "(`sales_invoices`.`status` = 'draft')",
+        "`sales_invoices`.`id` in (select `sales_invoices`.`id` from `sales_invoices` where `sales_invoices`.`status` = 'draft')",
       );
     });
 
-    it('a custom status query is negated for "is not"', () => {
+    it('a custom status query is negated (NOT IN) for "is not"', () => {
       expect(whereSql(role('status', 'is_not', 'draft'))).toBe(
-        "not (`sales_invoices`.`status` = 'draft')",
+        "`sales_invoices`.`id` not in (select `sales_invoices`.`id` from `sales_invoices` where `sales_invoices`.`status` = 'draft')",
       );
     });
   });
@@ -218,6 +222,28 @@ describe('DynamicFilterAdvancedFilter', () => {
         ),
       ).toBe(
         '((COALESCE(`sales_invoices`.`balance`, 0) = 100) or (COALESCE(`sales_invoices`.`balance`, 0) = 500))',
+      );
+    });
+  });
+
+  describe('with a sort by a relation', () => {
+    it("keeps a computed amount's bare columns off the joined table", () => {
+      // Sorting by customer joins contacts, which has a BALANCE column too.
+      const dynamicFilter = new DynamicFilter(model);
+      dynamicFilter.setFilter(new DynamicFilterSortBy('customer', 'asc'));
+      dynamicFilter.setFilter(
+        new DynamicFilterAdvancedFilter([
+          { ...role('due_amount', 'bigger_than', '0'), index: 1 },
+        ]),
+      );
+      const query = knex('sales_invoices');
+      dynamicFilter.buildQuery()(query);
+
+      expect(query.toString()).toBe(
+        'select * from `sales_invoices` ' +
+          'left join `contacts` as `filter_customer` on `sales_invoices`.`customer_id` = `filter_customer`.`id` ' +
+          'where `sales_invoices`.`id` in (select `sales_invoices`.`id` from `sales_invoices` where (TOTAL - PAID) > 0) ' +
+          'order by `filter_customer`.`display_name` ASC, `sales_invoices`.`id` ASC',
       );
     });
   });
